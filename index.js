@@ -104,12 +104,12 @@ class FrictionUltimateBot {
             
             if (!messageText) return;
 
-            // Système de déduplication amélioré - inclure chatId et timestamp pour éviter les doublons sur retries WhatsApp
-            const timestamp = Math.floor(Date.now() / 5000); // Fenêtre de 5 secondes
-            const uniqueKey = `${from}-${sender}-${messageText.trim()}-${timestamp}`;
+            // Système de déduplication amélioré - utiliser le participant réel et messageId
+            const realSender = message.key.participant || sender;
+            const uniqueKey = `${realSender}-${messageId}-${messageText.trim()}`;
             
             if (this.processedMessages.has(uniqueKey)) {
-                console.log(`⚠️ Message dupliqué ignoré: ${messageText} (même sender dans la fenêtre de 5s)`);
+                console.log(`⚠️ Message dupliqué ignoré: ${messageText} (messageId: ${messageId})`);
                 return;
             }
             
@@ -125,8 +125,20 @@ class FrictionUltimateBot {
 
             console.log(`📨 Message de ${sender}: ${messageText}`);
 
-            // Extraction du numéro WhatsApp du joueur
-            const playerNumber = sender.split('@')[0];
+            // Extraction du numéro WhatsApp du joueur (gestion des groupes)
+            let playerNumber;
+            if (message.key.participant) {
+                // Message de groupe - utiliser le participant (l'utilisateur réel)
+                playerNumber = message.key.participant.split('@')[0];
+            } else {
+                // Message privé - utiliser l'expéditeur direct
+                playerNumber = sender.split('@')[0];
+            }
+            
+            // Nettoyer les formats @lid 
+            if (playerNumber.includes(':')) {
+                playerNumber = playerNumber.split(':')[0];
+            }
             
             // Traitement du message par le moteur de jeu
             const response = await this.gameEngine.processPlayerMessage({
