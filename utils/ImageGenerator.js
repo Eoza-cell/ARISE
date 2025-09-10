@@ -2,6 +2,7 @@ const sharp = require('sharp');
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs').promises;
 const path = require('path');
+const BytezClient = require('../bytez/BytezClient');
 const GeminiClient = require('../gemini/GeminiClient');
 
 class ImageGenerator {
@@ -10,15 +11,39 @@ class ImageGenerator {
         this.assetsPath = path.join(__dirname, '../assets');
         this.tempPath = path.join(__dirname, '../temp');
         
-        // Initialisation optionnelle de GeminiClient
+        // Initialisation optionnelle de BytezClient (priorité)
+        try {
+            this.bytezClient = new BytezClient();
+            this.hasBytez = this.bytezClient.hasValidClient();
+            if (this.hasBytez) {
+                console.log('✅ BytezClient initialisé avec succès - utilisé en priorité');
+            }
+        } catch (error) {
+            console.error('❌ Erreur lors de l\'initialisation de BytezClient:', error.message);
+            this.bytezClient = null;
+            this.hasBytez = false;
+        }
+
+        // Initialisation optionnelle de GeminiClient (fallback)
         try {
             this.geminiClient = new GeminiClient();
             this.hasGemini = this.geminiClient.isAvailable;
+            if (this.hasGemini && !this.hasBytez) {
+                console.log('✅ GeminiClient initialisé comme fallback');
+            }
         } catch (error) {
-            console.error('❌ Erreur lors de l\'initialisation de GeminiClient dans ImageGenerator:', error.message);
+            console.error('❌ Erreur lors de l\'initialisation de GeminiClient:', error.message);
             this.geminiClient = null;
             this.hasGemini = false;
-            console.log('⚠️ ImageGenerator fonctionnera en mode fallback uniquement');
+        }
+
+        // Log du mode de fonctionnement
+        if (this.hasBytez) {
+            console.log('🎨 Mode: Bytez (priorité) + Gemini (fallback) + Canvas (dernier recours)');
+        } else if (this.hasGemini) {
+            console.log('🎨 Mode: Gemini (principal) + Canvas (fallback)');
+        } else {
+            console.log('⚠️ Mode: Canvas uniquement (pas d\'IA disponible)');
         }
         
         // Créer les dossiers nécessaires
@@ -42,43 +67,54 @@ class ImageGenerator {
                 return this.imageCache.get(cacheKey);
             }
 
-            console.log('🎨 Génération de l\'image de menu avec IA Gemini...');
-            
-            const prompt = `Create a stunning steampunk fantasy menu background image for "FRICTION ULTIMATE" RPG game. 
-            - Show a young dark-haired man throwing a powerful right hook punch directly into the face of a demon at maximum speed
-            - Steampunk medieval-technological setting with brass gears, pipes, and steam
-            - Dark atmospheric background with golden accents
-            - Epic action scene with motion blur and impact effects
-            - Text space for "FRICTION ULTIMATE" title
-            - High quality, dramatic lighting, cinematic composition
-            - Style: Dark fantasy steampunk art, highly detailed`;
-
             const imagePath = path.join(this.tempPath, 'menu_main_ai.png');
             
-            try {
-                // Générer l'image avec Gemini AI (si disponible)
-                if (this.hasGemini && this.geminiClient) {
-                    await this.geminiClient.generateImage(prompt, imagePath);
-                } else {
-                    console.log('⚠️ Gemini AI non disponible, passage direct au fallback');
-                    return await this.generateMenuImageFallback();
+            // Essayer d'abord Bytez (priorité)
+            if (this.hasBytez && this.bytezClient) {
+                try {
+                    console.log('🎨 Génération de l\'image de menu avec Bytez...');
+                    await this.bytezClient.generateMenuImage(imagePath);
+                    
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log('✅ Image de menu générée avec succès par Bytez');
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (bytezError) {
+                    console.log('⚠️ Erreur Bytez, tentative avec Gemini:', bytezError.message);
                 }
-                
-                // Vérifier si l'image a été créée
-                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                
-                if (imageBuffer) {
-                    console.log('✅ Image de menu générée avec succès par IA');
-                    this.imageCache.set(cacheKey, imageBuffer);
-                    return imageBuffer;
-                } else {
-                    console.log('⚠️ IA indisponible, utilisation du fallback Canvas');
-                    return await this.generateMenuImageFallback();
-                }
-            } catch (aiError) {
-                console.log('⚠️ Erreur IA, utilisation du fallback Canvas:', aiError.message);
-                return await this.generateMenuImageFallback();
             }
+
+            // Fallback vers Gemini
+            if (this.hasGemini && this.geminiClient) {
+                try {
+                    console.log('🎨 Génération de l\'image de menu avec Gemini...');
+                    const prompt = `Create a stunning steampunk fantasy menu background image for "FRICTION ULTIMATE" RPG game. 
+                    - Show a young dark-haired man throwing a powerful right hook punch directly into the face of a demon at maximum speed
+                    - Steampunk medieval-technological setting with brass gears, pipes, and steam
+                    - Dark atmospheric background with golden accents
+                    - Epic action scene with motion blur and impact effects
+                    - Text space for "FRICTION ULTIMATE" title
+                    - High quality, dramatic lighting, cinematic composition
+                    - Style: Dark fantasy steampunk art, highly detailed`;
+
+                    await this.geminiClient.generateImage(prompt, imagePath);
+                    
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log('✅ Image de menu générée avec succès par Gemini');
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (geminiError) {
+                    console.log('⚠️ Erreur Gemini, utilisation du fallback Canvas:', geminiError.message);
+                }
+            }
+
+            // Fallback final vers Canvas
+            console.log('⚠️ IA indisponible, utilisation du fallback Canvas');
+            return await this.generateMenuImageFallback();
 
         } catch (error) {
             console.error('❌ Erreur lors de la génération de l\'image de menu:', error);
