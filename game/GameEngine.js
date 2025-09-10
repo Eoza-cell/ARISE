@@ -177,14 +177,8 @@ class GameEngine {
     }
 
     async handleGameAction({ player, chatId, message, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        // D'abord traiter les actions de création de personnage (avant de vérifier si personnage existe)
         
-        if (!character) {
-            return {
-                text: `❌ Tu dois d'abord créer un personnage avec /créer !`
-            };
-        }
-
         // Traitement des actions de création de personnage en cours
         if (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME' || message === '1' || message === '2') {
             return await this.handleGenderSelection({ player, message, dbManager, imageGenerator });
@@ -203,6 +197,15 @@ class GameEngine {
         if (tempGender && tempKingdom) {
             // Le joueur est en train de donner le nom de son personnage
             return await this.handleCharacterNameInput({ player, name: message, dbManager, imageGenerator });
+        }
+
+        // Maintenant vérifier si le personnage existe pour les actions de jeu normales
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        if (!character) {
+            return {
+                text: `❌ Tu dois d'abord créer un personnage avec /créer !`
+            };
         }
 
         // Traitement des actions de jeu normales avec IA Gemini
