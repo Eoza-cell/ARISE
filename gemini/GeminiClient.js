@@ -89,13 +89,10 @@ class GeminiClient {
         try {
             console.log('🎨 Génération d\'image avec Gemini AI:', prompt.substring(0, 50) + '...');
             
-            const result = await this.imageModel.generateContent(prompt);
-            const response = await result.response;
-            
-            // L'image est générée en base64 ou comme données binaires
-            // Pour l'instant, l'API est en preview et peut ne pas fonctionner
-            console.log('✅ Image générée (API en preview)');
-            return null; // Sera implémenté quand l'API sera stable
+            // Pour l'instant, Gemini 2.0 image generation API est instable
+            // Retourner null pour utiliser le fallback Canvas
+            console.log('⚠️ Gemini image generation désactivé temporairement (API instable)');
+            return null;
             
         } catch (error) {
             console.error('❌ Erreur lors de la génération d\'image:', error.message);

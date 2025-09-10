@@ -40,14 +40,24 @@ class BytezClient {
 
             console.log(`🎨 Génération d'image Bytez avec prompt: "${prompt.substring(0, 100)}..."`);
             
+            // Délai pour éviter les problèmes de concurrence
+            await this.waitForSlot();
+            
             // Utiliser le modèle Stable Diffusion XL
             const model = this.sdk.model("stabilityai/stable-diffusion-xl-base-1.0");
             
             // Optimiser le prompt pour Stable Diffusion
             const optimizedPrompt = this.optimizePromptForSD(prompt);
             
-            // Générer l'image
-            const { error, output } = await model.run(optimizedPrompt);
+            // Générer l'image avec retry en cas d'erreur de concurrence
+            let { error, output } = await model.run(optimizedPrompt);
+            
+            // Retry une fois en cas d'erreur de concurrence
+            if (error && error.includes('concurrency')) {
+                console.log('⏳ Erreur de concurrence Bytez, retry dans 3 secondes...');
+                await new Promise(resolve => setTimeout(resolve, 3000));
+                ({ error, output } = await model.run(optimizedPrompt));
+            }
             
             if (error) {
                 throw new Error(`Erreur Bytez API: ${error}`);
@@ -70,6 +80,11 @@ class BytezClient {
             console.error('❌ Erreur lors de la génération d\'image Bytez:', error.message);
             throw error;
         }
+    }
+
+    async waitForSlot() {
+        // Ajouter un petit délai pour éviter les conflits de concurrence
+        await new Promise(resolve => setTimeout(resolve, 1000));
     }
 
     optimizePromptForSD(prompt) {

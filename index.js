@@ -104,18 +104,23 @@ class FrictionUltimateBot {
             
             if (!messageText) return;
 
-            // Système de déduplication - éviter les messages en double
-            const uniqueKey = `${sender}-${messageId}-${messageText}`;
+            // Système de déduplication amélioré - inclure timestamp pour éviter les doublons sur retries WhatsApp
+            const timestamp = Math.floor(Date.now() / 5000); // Fenêtre de 5 secondes
+            const uniqueKey = `${sender}-${messageText.trim()}-${timestamp}`;
+            
             if (this.processedMessages.has(uniqueKey)) {
-                console.log(`⚠️ Message dupliqué ignoré: ${messageText}`);
+                console.log(`⚠️ Message dupliqué ignoré: ${messageText} (même sender dans la fenêtre de 5s)`);
                 return;
             }
             
             this.processedMessages.add(uniqueKey);
             
-            // Nettoyer la cache toutes les 1000 messages pour éviter les fuites mémoire
-            if (this.processedMessages.size > 1000) {
+            // Nettoyer la cache toutes les 500 messages pour éviter les fuites mémoire
+            if (this.processedMessages.size > 500) {
+                // Garder seulement les 100 derniers pour performance
+                const recentMessages = Array.from(this.processedMessages).slice(-100);
                 this.processedMessages.clear();
+                recentMessages.forEach(key => this.processedMessages.add(key));
             }
 
             console.log(`📨 Message de ${sender}: ${messageText}`);
@@ -132,8 +137,10 @@ class FrictionUltimateBot {
                 imageGenerator: this.imageGenerator
             });
 
-            // Envoi de la réponse
-            await this.sendResponse(from, response);
+            // Envoi de la réponse (avec petit délai pour éviter les doublons)
+            setTimeout(async () => {
+                await this.sendResponse(from, response);
+            }, 100);
 
         } catch (error) {
             console.error('❌ Erreur lors du traitement du message:', error);

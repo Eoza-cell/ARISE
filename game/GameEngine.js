@@ -107,29 +107,34 @@ class GameEngine {
     }
 
     async startCharacterCreation({ player, dbManager, imageGenerator }) {
-        const kingdoms = await dbManager.getAllKingdoms();
-        
-        let kingdomList = `🎨 **CRÉATION DE PERSONNAGE**\n\n` +
-                         `👤 Choisis d'abord ton **SEXE** :\n` +
-                         `• Écris "HOMME" pour un personnage masculin\n` +
-                         `• Écris "FEMME" pour un personnage féminin\n\n` +
-                         `🏰 **Les 12 Royaumes disponibles :**\n\n`;
-
-        kingdoms.forEach((kingdom, index) => {
-            kingdomList += `**${index + 1}. ${kingdom.id}**\n` +
-                          `${kingdom.description}\n` +
-                          `🌍 ${kingdom.geography}\n\n`;
-        });
-
-        kingdomList += `📝 **Instructions :**\n` +
-                      `1. Choisis ton sexe (HOMME/FEMME)\n` +
-                      `2. Écris le nom du royaume de ton choix\n` +
-                      `3. Donne un nom à ton personnage\n\n` +
-                      `💀 **Attention :** Ton choix de royaume déterminera tes capacités initiales !`;
+        // Processus simplifié en 3 étapes courtes
+        let creationText = `⚔️ **CRÉATION RAPIDE DE PERSONNAGE**\n\n` +
+                          `🎯 **Étape 1/3 - Sexe**\n` +
+                          `👤 Choisis ton sexe :\n` +
+                          `• Tape **1** pour HOMME\n` +
+                          `• Tape **2** pour FEMME\n\n` +
+                          `🏰 **Aperçu des royaumes (étape 2) :**\n` +
+                          `1️⃣ AEGYRIA - Chevaliers honorables\n` +
+                          `2️⃣ SOMBRENUIT - Maîtres des ombres\n` +
+                          `3️⃣ KHELOS - Nomades du désert\n` +
+                          `4️⃣ ABRANTIS - Marins intrépides\n` +
+                          `5️⃣ VARHA - Chasseurs montagnards\n` +
+                          `6️⃣ SYLVARIA - Gardiens de la forêt\n` +
+                          `7️⃣ ECLYPSIA - Seigneurs des éclipses\n` +
+                          `8️⃣ TERRE_DESOLE - Survivants post-apocalyptiques\n` +
+                          `9️⃣ DRAK_TARR - Forgeurs draconiques\n` +
+                          `🔟 URVALA - Alchimistes nécromants\n` +
+                          `1️⃣1️⃣ OMBREFIEL - Mercenaires exilés\n` +
+                          `1️⃣2️⃣ KHALDAR - Pirates des jungles\n\n` +
+                          `⚡ **Processus ultra-rapide :**\n` +
+                          `1. Sexe → tape 1 ou 2\n` +
+                          `2. Royaume → tape 1 à 12\n` +
+                          `3. Nom → écris ton nom\n\n` +
+                          `🚀 Création terminée en 3 messages !`;
 
         return {
-            text: kingdomList,
-            image: await imageGenerator.generateKingdomsOverview()
+            text: creationText,
+            image: await imageGenerator.generateMenuImage() // Menu plus simple et rapide
         };
     }
 
@@ -181,8 +186,14 @@ class GameEngine {
         }
 
         // Traitement des actions de création de personnage en cours
-        if (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME') {
+        if (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME' || message === '1' || message === '2') {
             return await this.handleGenderSelection({ player, message, dbManager, imageGenerator });
+        }
+
+        // Gestion des numéros de royaumes (1-12)
+        const kingdomNumber = parseInt(message);
+        if (kingdomNumber >= 1 && kingdomNumber <= 12) {
+            return await this.handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator });
         }
 
         // Traitement des actions de jeu normales avec IA Gemini
