@@ -98,15 +98,22 @@ class FrictionUltimateBot {
     async handleIncomingMessage(message) {
         try {
             const from = message.key.remoteJid;
-            const sender = message.key.participant || from;
             const messageText = this.extractMessageText(message);
             const messageId = message.key.id;
             
             if (!messageText) return;
 
-            // Système de déduplication amélioré - utiliser le participant réel et messageId
-            const realSender = message.key.participant || sender;
-            const uniqueKey = `${realSender}-${messageId}-${messageText.trim()}`;
+            // Gestion des groupes : ignorer les messages sans participant (doublons)
+            if (from.includes('@g.us') && !message.key.participant) {
+                console.log(`⚠️ Message de groupe sans participant ignoré (doublon): ${messageText}`);
+                return;
+            }
+
+            // Définir le vrai expéditeur pour l'affichage et la déduplication
+            const realSender = message.key.participant || from;
+            
+            // Déduplication basée sur messageId + contenu du message (plus robuste)
+            const uniqueKey = `${messageId}-${messageText.trim()}`;
             
             if (this.processedMessages.has(uniqueKey)) {
                 console.log(`⚠️ Message dupliqué ignoré: ${messageText} (messageId: ${messageId})`);
@@ -123,7 +130,7 @@ class FrictionUltimateBot {
                 recentMessages.forEach(key => this.processedMessages.add(key));
             }
 
-            console.log(`📨 Message de ${sender}: ${messageText}`);
+            console.log(`📨 Message de ${realSender}: ${messageText}`);
 
             // Extraction du numéro WhatsApp du joueur (gestion des groupes)
             let playerNumber;
@@ -132,7 +139,7 @@ class FrictionUltimateBot {
                 playerNumber = message.key.participant.split('@')[0];
             } else {
                 // Message privé - utiliser l'expéditeur direct
-                playerNumber = sender.split('@')[0];
+                playerNumber = from.split('@')[0];
             }
             
             // Nettoyer les formats @lid 
