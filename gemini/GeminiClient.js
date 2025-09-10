@@ -2,16 +2,35 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 
 class GeminiClient {
     constructor() {
-        if (!process.env.GEMINI_API_KEY) {
-            throw new Error('GEMINI_API_KEY environment variable is required');
-        }
+        this.isAvailable = false;
         
-        this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-        this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-        this.imageModel = this.genAI.getGenerativeModel({ model: "gemini-2.0-flash-preview-image-generation" });
+        try {
+            if (!process.env.GEMINI_API_KEY) {
+                console.log('⚠️ GEMINI_API_KEY non configurée - IA désactivée');
+                return;
+            }
+            
+            this.genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+            this.model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+            this.imageModel = this.genAI.getGenerativeModel({ 
+                model: "gemini-2.0-flash-experimental",
+                generationConfig: {
+                    responseMimeType: "image/png"
+                }
+            });
+            this.isAvailable = true;
+            console.log('✅ GeminiClient initialisé avec succès');
+        } catch (error) {
+            console.error('❌ Erreur lors de l\'initialisation de GeminiClient:', error.message);
+            console.log('⚠️ Le bot fonctionnera en mode fallback sans IA');
+        }
     }
 
     async generateNarration(context) {
+        if (!this.isAvailable) {
+            return "Le narrateur semble momentanément absent. L'action continue sans description détaillée.";
+        }
+        
         try {
             const prompt = this.buildNarrationPrompt(context);
             
@@ -26,6 +45,10 @@ class GeminiClient {
     }
 
     async generateCombatNarration(combatContext) {
+        if (!this.isAvailable) {
+            return "Le combat se déroule dans un tourbillon d'acier et de magie.";
+        }
+        
         try {
             const prompt = this.buildCombatPrompt(combatContext);
             
@@ -40,6 +63,10 @@ class GeminiClient {
     }
 
     async generateCharacterResponse(character, situation, playerAction) {
+        if (!this.isAvailable) {
+            return "Les PNJ semblent figés dans le temps...";
+        }
+        
         try {
             const prompt = this.buildCharacterResponsePrompt(character, situation, playerAction);
             
@@ -54,20 +81,24 @@ class GeminiClient {
     }
 
     async generateImage(prompt, outputPath) {
+        if (!this.isAvailable) {
+            console.log('⚠️ Gemini AI non disponible pour la génération d\'images');
+            return null;
+        }
+        
         try {
-            const result = await this.imageModel.generateContent([{
-                text: prompt
-            }]);
+            console.log('🎨 Génération d\'image avec Gemini AI:', prompt.substring(0, 50) + '...');
             
+            const result = await this.imageModel.generateContent(prompt);
             const response = await result.response;
             
-            // Traitement de la réponse image (à implémenter selon l'API)
-            // Pour l'instant, retourne null car l'API d'image generation est en preview
-            console.log('🎨 Image generation requested:', prompt);
-            return null;
+            // L'image est générée en base64 ou comme données binaires
+            // Pour l'instant, l'API est en preview et peut ne pas fonctionner
+            console.log('✅ Image générée (API en preview)');
+            return null; // Sera implémenté quand l'API sera stable
             
         } catch (error) {
-            console.error('❌ Erreur lors de la génération d\'image:', error);
+            console.error('❌ Erreur lors de la génération d\'image:', error.message);
             return null;
         }
     }
@@ -151,6 +182,17 @@ Réponds en 1-2 phrases courtes, en tant que ce PNJ.`;
     }
 
     async analyzePlayerAction(action, gameContext) {
+        if (!this.isAvailable) {
+            return {
+                actionType: "unknown",
+                precision: "medium",
+                consequences: ["Action analysée de manière basique"],
+                affectedEntities: [],
+                energyCost: 10,
+                riskLevel: "medium"
+            };
+        }
+        
         try {
             const prompt = `Analyse cette action de joueur dans FRICTION ULTIMATE:
 
@@ -191,7 +233,14 @@ Réponds en JSON:
             }
         } catch (error) {
             console.error('❌ Erreur lors de l\'analyse d\'action:', error);
-            return null;
+            return {
+                actionType: "unknown",
+                precision: "low",
+                consequences: ["Erreur d'analyse"],
+                affectedEntities: [],
+                energyCost: 10,
+                riskLevel: "medium"
+            };
         }
     }
 }

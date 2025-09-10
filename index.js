@@ -20,6 +20,7 @@ class FrictionUltimateBot {
         this.dbManager = new DatabaseManager();
         this.imageGenerator = new ImageGenerator();
         this.isConnected = false;
+        this.processedMessages = new Set(); // Système de déduplication
     }
 
     async initialize() {
@@ -99,8 +100,23 @@ class FrictionUltimateBot {
             const from = message.key.remoteJid;
             const sender = message.key.participant || from;
             const messageText = this.extractMessageText(message);
+            const messageId = message.key.id;
             
             if (!messageText) return;
+
+            // Système de déduplication - éviter les messages en double
+            const uniqueKey = `${sender}-${messageId}-${messageText}`;
+            if (this.processedMessages.has(uniqueKey)) {
+                console.log(`⚠️ Message dupliqué ignoré: ${messageText}`);
+                return;
+            }
+            
+            this.processedMessages.add(uniqueKey);
+            
+            // Nettoyer la cache toutes les 1000 messages pour éviter les fuites mémoire
+            if (this.processedMessages.size > 1000) {
+                this.processedMessages.clear();
+            }
 
             console.log(`📨 Message de ${sender}: ${messageText}`);
 

@@ -2,12 +2,24 @@ const sharp = require('sharp');
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs').promises;
 const path = require('path');
+const GeminiClient = require('../gemini/GeminiClient');
 
 class ImageGenerator {
     constructor() {
         this.imageCache = new Map();
         this.assetsPath = path.join(__dirname, '../assets');
         this.tempPath = path.join(__dirname, '../temp');
+        
+        // Initialisation optionnelle de GeminiClient
+        try {
+            this.geminiClient = new GeminiClient();
+            this.hasGemini = this.geminiClient.isAvailable;
+        } catch (error) {
+            console.error('❌ Erreur lors de l\'initialisation de GeminiClient dans ImageGenerator:', error.message);
+            this.geminiClient = null;
+            this.hasGemini = false;
+            console.log('⚠️ ImageGenerator fonctionnera en mode fallback uniquement');
+        }
         
         // Créer les dossiers nécessaires
         this.initializeFolders();
@@ -25,133 +37,103 @@ class ImageGenerator {
 
     async generateMenuImage() {
         try {
-            const cacheKey = 'menu_main';
+            const cacheKey = 'menu_main_ai';
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            // Créer une image de menu avec Canvas
-            const canvas = createCanvas(800, 600);
-            const ctx = canvas.getContext('2d');
-
-            // Background steampunk
-            const gradient = ctx.createLinearGradient(0, 0, 800, 600);
-            gradient.addColorStop(0, '#2c1810');
-            gradient.addColorStop(0.5, '#4a2c1a');
-            gradient.addColorStop(1, '#1a0f08');
+            console.log('🎨 Génération de l\'image de menu avec IA Gemini...');
             
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 800, 600);
+            const prompt = `Create a stunning steampunk fantasy menu background image for "FRICTION ULTIMATE" RPG game. 
+            - Show a young dark-haired man throwing a powerful right hook punch directly into the face of a demon at maximum speed
+            - Steampunk medieval-technological setting with brass gears, pipes, and steam
+            - Dark atmospheric background with golden accents
+            - Epic action scene with motion blur and impact effects
+            - Text space for "FRICTION ULTIMATE" title
+            - High quality, dramatic lighting, cinematic composition
+            - Style: Dark fantasy steampunk art, highly detailed`;
 
-            // Titre "FRICTION ULTIMATE"
-            ctx.fillStyle = '#d4af37';
-            ctx.font = 'bold 48px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('FRICTION ULTIMATE', 400, 100);
-
-            // Sous-titre
-            ctx.fillStyle = '#b8860b';
-            ctx.font = 'bold 24px serif';
-            ctx.fillText('Bot WhatsApp RPG', 400, 140);
-
-            // Image de fond - jeune homme frappant un démon
-            ctx.fillStyle = '#8b4513';
-            ctx.fillRect(150, 180, 500, 300);
+            const imagePath = path.join(this.tempPath, 'menu_main_ai.png');
             
-            // Placeholder pour l'image de combat
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 16px serif';
-            ctx.fillText('🥊 COMBAT ÉPIQUE 👹', 400, 330);
-            ctx.fillText('Jeune homme vs Démon', 400, 350);
-
-            // Bordures décoratives
-            ctx.strokeStyle = '#d4af37';
-            ctx.lineWidth = 3;
-            ctx.strokeRect(10, 10, 780, 580);
-            ctx.strokeRect(140, 170, 520, 320);
-
-            // Instructions
-            ctx.fillStyle = '#ffa500';
-            ctx.font = '16px serif';
-            ctx.fillText('Tapez /menu pour commencer votre aventure', 400, 520);
-            ctx.fillText('💀 Le monde de Friction vous attend ! 💀', 400, 550);
-
-            // Convertir en buffer
-            const buffer = canvas.toBuffer('image/png');
-            
-            // Sauvegarder et mettre en cache
-            const imagePath = path.join(this.tempPath, 'menu_main.png');
-            await fs.writeFile(imagePath, buffer);
-            
-            this.imageCache.set(cacheKey, buffer);
-            return buffer;
+            try {
+                // Générer l'image avec Gemini AI (si disponible)
+                if (this.hasGemini && this.geminiClient) {
+                    await this.geminiClient.generateImage(prompt, imagePath);
+                } else {
+                    console.log('⚠️ Gemini AI non disponible, passage direct au fallback');
+                    return await this.generateMenuImageFallback();
+                }
+                
+                // Vérifier si l'image a été créée
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                
+                if (imageBuffer) {
+                    console.log('✅ Image de menu générée avec succès par IA');
+                    this.imageCache.set(cacheKey, imageBuffer);
+                    return imageBuffer;
+                } else {
+                    console.log('⚠️ IA indisponible, utilisation du fallback Canvas');
+                    return await this.generateMenuImageFallback();
+                }
+            } catch (aiError) {
+                console.log('⚠️ Erreur IA, utilisation du fallback Canvas:', aiError.message);
+                return await this.generateMenuImageFallback();
+            }
 
         } catch (error) {
             console.error('❌ Erreur lors de la génération de l\'image de menu:', error);
-            return null;
+            return await this.generateMenuImageFallback();
         }
     }
 
     async generateCharacterImage(character) {
         try {
-            const cacheKey = `character_${character.id}`;
+            const cacheKey = `character_${character.id}_ai`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            const canvas = createCanvas(600, 800);
-            const ctx = canvas.getContext('2d');
-
-            // Background selon le royaume
-            const kingdomColors = this.getKingdomColors(character.kingdom);
-            const gradient = ctx.createLinearGradient(0, 0, 600, 800);
-            gradient.addColorStop(0, kingdomColors.primary);
-            gradient.addColorStop(1, kingdomColors.secondary);
+            console.log(`🎨 Génération de l'image du personnage ${character.name} avec IA...`);
             
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 600, 800);
-
-            // Cadre du personnage
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(50, 100, 500, 600);
-
-            // Modèle 3D placeholder (sera remplacé par les vrais modèles)
-            ctx.fillStyle = character.gender === 'male' ? '#8B4513' : '#DEB887';
-            ctx.fillRect(200, 200, 200, 400);
-
-            // Tête
-            ctx.beginPath();
-            ctx.arc(300, 180, 40, 0, 2 * Math.PI);
-            ctx.fill();
-
-            // Titre
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 24px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(character.name, 300, 50);
-
-            // Informations du personnage
-            ctx.font = '16px serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(`Royaume: ${character.kingdom}`, 60, 720);
-            ctx.fillText(`Ordre: ${character.order || 'Aucun'}`, 60, 745);
-            ctx.fillText(`Niveau: ${character.level} (${character.powerLevel})`, 60, 770);
-
-            // Barres de vie et énergie
-            this.drawHealthBar(ctx, 400, 720, character.currentLife, character.maxLife);
-            this.drawEnergyBar(ctx, 400, 750, character.currentEnergy, character.maxEnergy);
-
-            const buffer = canvas.toBuffer('image/png');
+            const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
+            const kingdomDesc = this.getKingdomDescription(character.kingdom);
             
-            const imagePath = path.join(this.tempPath, `character_${character.id}.png`);
-            await fs.writeFile(imagePath, buffer);
+            const prompt = `Create a detailed 3D realistic portrait of a ${genderDesc} from ${character.kingdom} kingdom:\n` +
+                          `- Character name: ${character.name}\n` +
+                          `- Kingdom style: ${kingdomDesc}\n` +
+                          `- Power level: ${character.powerLevel} (${this.getPowerLevelDescription(character.powerLevel)})\n` +
+                          `- Full body standing pose, detailed armor and weapons\n` +
+                          `- Background matching the kingdom's environment\n` +
+                          `- High quality 3D realistic rendering\n` +
+                          `- Fantasy RPG character design\n` +
+                          `- Cinematic lighting and composition`;
+
+            const imagePath = path.join(this.tempPath, `character_${character.id}_ai.png`);
             
-            this.imageCache.set(cacheKey, buffer);
-            return buffer;
+            try {
+                if (this.hasGemini && this.geminiClient) {
+                    await this.geminiClient.generateImage(prompt, imagePath);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    
+                    if (imageBuffer) {
+                        console.log(`✅ Image du personnage ${character.name} générée avec succès par IA`);
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    } else {
+                        return await this.generateCharacterImageFallback(character);
+                    }
+                } else {
+                    console.log('⚠️ Gemini AI non disponible pour personnage, fallback utilisé');
+                    return await this.generateCharacterImageFallback(character);
+                }
+            } catch (aiError) {
+                console.log(`⚠️ Fallback Canvas pour personnage ${character.name}:`, aiError.message);
+                return await this.generateCharacterImageFallback(character);
+            }
 
         } catch (error) {
             console.error('❌ Erreur lors de la génération de l\'image de personnage:', error);
-            return null;
+            return await this.generateCharacterImageFallback(character);
         }
     }
 
@@ -315,61 +297,54 @@ class ImageGenerator {
 
     async generateKingdomsOverview() {
         try {
-            const canvas = createCanvas(1000, 800);
-            const ctx = canvas.getContext('2d');
+            const cacheKey = 'kingdoms_overview_ai';
+            if (this.imageCache.has(cacheKey)) {
+                return this.imageCache.get(cacheKey);
+            }
 
-            // Background
-            const gradient = ctx.createLinearGradient(0, 0, 1000, 800);
-            gradient.addColorStop(0, '#1a1a2e');
-            gradient.addColorStop(0.5, '#16213e');
-            gradient.addColorStop(1, '#0f3460');
+            console.log('🎨 Génération de l\'aperçu des royaumes avec IA...');
             
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 1000, 800);
+            const prompt = `Create a magnificent fantasy world map showing the 12 kingdoms of Friction Ultimate:
+            - AEGYRIA: Golden plains with honor and chivalry, mountain forges
+            - SOMBRENUIT: Dark mysterious forests with moon and spirits
+            - KHELOS: Burning desert with ancient ruins and oasis
+            - ABRANTIS: Coastal fortified cities with ships and sea
+            - VARHA: Snowy mountains with hunters and beasts
+            - SYLVARIA: Magical bright forests with druids and archers
+            - ECLYPSIA: Dark lands under eclipse skies with shadow magic
+            - TERRE_DESOLE: Wasteland with survivors and ruins
+            - DRAK_TARR: Volcanic peaks with dragon fire forges
+            - URVALA: Misty swamps with alchemists and undead
+            - OMBREFIEL: Gray plains with exiled mercenaries
+            - KHALDAR: Tropical jungles with treasures and pirates
+            Style: Fantasy world map, detailed regions, ancient cartography, vibrant colors`;
 
-            // Titre
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 36px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('LES 12 ROYAUMES', 500, 50);
-
-            // Grille des royaumes (4x3)
-            const kingdoms = [
-                'AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS',
-                'VARHA', 'SYLVARIA', 'ECLYPSIA', 'TERRE DESOLÉ',
-                'DRAK\'TARR', 'URVALA', 'OMBREFIEL', 'KHALDAR'
-            ];
-
-            const slotWidth = 200;
-            const slotHeight = 150;
-            const startX = 100;
-            const startY = 100;
-
-            kingdoms.forEach((kingdom, index) => {
-                const x = startX + (index % 4) * (slotWidth + 50);
-                const y = startY + Math.floor(index / 4) * (slotHeight + 50);
-
-                // Cadre du royaume
-                ctx.fillStyle = this.getKingdomColors(kingdom).primary;
-                ctx.fillRect(x, y, slotWidth, slotHeight);
-                
-                ctx.strokeStyle = '#ffd700';
-                ctx.lineWidth = 2;
-                ctx.strokeRect(x, y, slotWidth, slotHeight);
-
-                // Nom du royaume
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 14px serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(kingdom, x + slotWidth/2, y + slotHeight/2);
-            });
-
-            const buffer = canvas.toBuffer('image/png');
-            return buffer;
+            const imagePath = path.join(this.tempPath, 'kingdoms_overview_ai.png');
+            
+            try {
+                if (this.hasGemini && this.geminiClient) {
+                    await this.geminiClient.generateImage(prompt, imagePath);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    
+                    if (imageBuffer) {
+                        console.log('✅ Aperçu des royaumes généré avec succès par IA');
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    } else {
+                        return await this.generateKingdomsOverviewFallback();
+                    }
+                } else {
+                    console.log('⚠️ Gemini AI non disponible pour royaumes, fallback utilisé');
+                    return await this.generateKingdomsOverviewFallback();
+                }
+            } catch (aiError) {
+                console.log('⚠️ Fallback Canvas pour royaumes:', aiError.message);
+                return await this.generateKingdomsOverviewFallback();
+            }
 
         } catch (error) {
             console.error('❌ Erreur lors de la génération de l\'aperçu des royaumes:', error);
-            return null;
+            return await this.generateKingdomsOverviewFallback();
         }
     }
 
@@ -473,7 +448,7 @@ class ImageGenerator {
             'VARHA': { primary: '#708090', secondary: '#2F4F4F' },
             'SYLVARIA': { primary: '#228B22', secondary: '#006400' },
             'ECLYPSIA': { primary: '#4B0082', secondary: '#2E0854' },
-            'TERRE DESOLÉ': { primary: '#A0522D', secondary: '#8B4513' },
+            'TERRE_DESOLE': { primary: '#A0522D', secondary: '#8B4513' },
             'DRAK\'TARR': { primary: '#DC143C', secondary: '#8B0000' },
             'URVALA': { primary: '#800080', secondary: '#4B0082' },
             'OMBREFIEL': { primary: '#696969', secondary: '#2F2F2F' },
@@ -481,6 +456,86 @@ class ImageGenerator {
         };
         
         return colors[kingdom] || { primary: '#666666', secondary: '#333333' };
+    }
+
+    getKingdomDescription(kingdom) {
+        const descriptions = {
+            'AEGYRIA': 'golden plains with honor and chivalry, knights with blessed armor',
+            'SOMBRENUIT': 'dark mysterious forests with moon magic and shadow spirits',
+            'KHELOS': 'burning desert with ancient ruins and nomadic warriors',
+            'ABRANTIS': 'coastal fortified cities with naval armor and sea weapons',
+            'VARHA': 'snowy mountains with fur armor and beast hunting weapons',
+            'SYLVARIA': 'magical bright forests with nature magic and elven design',
+            'ECLYPSIA': 'dark lands under eclipse with shadow magic and dark robes',
+            'TERRE_DESOLE': 'post-apocalyptic wasteland with scavenged armor and improvised weapons',
+            'DRAK_TARR': 'volcanic peaks with dragon-scale armor and fire-forged weapons',
+            'URVALA': 'misty swamps with alchemical gear and necromantic accessories',
+            'OMBREFIEL': 'gray plains with mercenary armor and practical weapons',
+            'KHALDAR': 'tropical jungles with light armor and poison weapons'
+        };
+        
+        return descriptions[kingdom] || 'mysterious lands with unknown customs';
+    }
+
+    getPowerLevelDescription(level) {
+        const descriptions = {
+            'G': 'very weak beginner',
+            'F': 'weak apprentice fighter',
+            'E': 'moderate basic soldier',
+            'D': 'experienced combatant',
+            'C': 'strong experienced warrior',
+            'B': 'elite combat specialist',
+            'A': 'master level fighter'
+        };
+        
+        return descriptions[level] || 'unknown power level';
+    }
+
+    async generateCharacterImageFallback(character) {
+        const canvas = createCanvas(600, 800);
+        const ctx = canvas.getContext('2d');
+
+        // Background selon le royaume
+        const kingdomColors = this.getKingdomColors(character.kingdom);
+        const gradient = ctx.createLinearGradient(0, 0, 600, 800);
+        gradient.addColorStop(0, kingdomColors.primary);
+        gradient.addColorStop(1, kingdomColors.secondary);
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 600, 800);
+
+        // Cadre du personnage
+        ctx.fillStyle = '#000000';
+        ctx.fillRect(50, 100, 500, 600);
+
+        // Modèle 3D placeholder
+        ctx.fillStyle = character.gender === 'male' ? '#8B4513' : '#DEB887';
+        ctx.fillRect(200, 200, 200, 400);
+
+        // Tête
+        ctx.beginPath();
+        ctx.arc(300, 180, 40, 0, 2 * Math.PI);
+        ctx.fill();
+
+        // Titre
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 24px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(character.name, 300, 50);
+
+        // Informations du personnage
+        ctx.font = '16px serif';
+        ctx.textAlign = 'left';
+        ctx.fillText(`Royaume: ${character.kingdom}`, 60, 720);
+        ctx.fillText(`Ordre: ${character.order || 'Aucun'}`, 60, 745);
+        ctx.fillText(`Niveau: ${character.level} (${character.powerLevel})`, 60, 770);
+
+        // Barres de vie et énergie
+        this.drawHealthBar(ctx, 400, 720, character.currentLife, character.maxLife);
+        this.drawEnergyBar(ctx, 400, 750, character.currentEnergy, character.maxEnergy);
+
+        const buffer = canvas.toBuffer('image/png');
+        return buffer;
     }
 
     formatEquipmentForImage(equipment) {
@@ -496,6 +551,76 @@ class ImageGenerator {
         }
         
         return formatted || '• Aucun équipement';
+    }
+
+    // Méthodes fallback utilisant Canvas en cas d'indisponibilité de l'IA
+    async generateMenuImageFallback() {
+        const canvas = createCanvas(800, 600);
+        const ctx = canvas.getContext('2d');
+
+        // Background steampunk
+        const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+        gradient.addColorStop(0, '#2c1810');
+        gradient.addColorStop(0.5, '#4a2c1a');
+        gradient.addColorStop(1, '#1a0f08');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 800, 600);
+
+        // Titre "FRICTION ULTIMATE"
+        ctx.fillStyle = '#d4af37';
+        ctx.font = 'bold 48px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('FRICTION ULTIMATE', 400, 100);
+
+        // Image de combat placeholder
+        ctx.fillStyle = '#8b4513';
+        ctx.fillRect(150, 180, 500, 300);
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 16px serif';
+        ctx.fillText('🥊 JEUNE HOMME vs DÉMON 👹', 400, 330);
+
+        const buffer = canvas.toBuffer('image/png');
+        this.imageCache.set('menu_fallback', buffer);
+        return buffer;
+    }
+
+    async generateKingdomsOverviewFallback() {
+        const canvas = createCanvas(1000, 800);
+        const ctx = canvas.getContext('2d');
+
+        // Background
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, 1000, 800);
+
+        // Titre
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 36px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('LES 12 ROYAUMES', 500, 50);
+
+        // Grille simple des royaumes
+        const kingdoms = [
+            'AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS',
+            'VARHA', 'SYLVARIA', 'ECLYPSIA', 'TERRE_DESOLE',
+            'DRAK\'TARR', 'URVALA', 'OMBREFIEL', 'KHALDAR'
+        ];
+
+        kingdoms.forEach((kingdom, index) => {
+            const x = 100 + (index % 4) * 250;
+            const y = 150 + Math.floor(index / 4) * 200;
+
+            ctx.fillStyle = this.getKingdomColors(kingdom).primary;
+            ctx.fillRect(x, y, 200, 150);
+            
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 14px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(kingdom, x + 100, y + 75);
+        });
+
+        const buffer = canvas.toBuffer('image/png');
+        return buffer;
     }
 
     clearCache() {
