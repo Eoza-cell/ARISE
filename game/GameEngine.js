@@ -196,6 +196,15 @@ class GameEngine {
             return await this.handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator });
         }
 
+        // Gestion du nom de personnage (si en cours de création)
+        const tempGender = await dbManager.getTemporaryData(player.id, 'creation_gender');
+        const tempKingdom = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
+        
+        if (tempGender && tempKingdom) {
+            // Le joueur est en train de donner le nom de son personnage
+            return await this.handleCharacterNameInput({ player, name: message, dbManager, imageGenerator });
+        }
+
         // Traitement des actions de jeu normales avec IA Gemini
         return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
     }
@@ -365,6 +374,151 @@ class GameEngine {
                   `💀 **Chaque région est dangereuse !**`,
             image: await imageGenerator.generateWorldMap()
         };
+    }
+    async handleGenderSelection({ player, message, dbManager, imageGenerator }) {
+        // Marquer le début de la création si pas déjà fait
+        await dbManager.setTemporaryData(player.id, 'creation_started', true);
+        
+        // Convertir l'entrée du joueur en genre
+        let gender;
+        if (message === '1' || message.toUpperCase() === 'HOMME') {
+            gender = 'male';
+        } else if (message === '2' || message.toUpperCase() === 'FEMME') {
+            gender = 'female';
+        } else {
+            return {
+                text: `❌ Choix invalide ! \n\n` +
+                      `Tape **1** pour HOMME ou **2** pour FEMME`
+            };
+        }
+
+        // Stocker temporairement le genre (en attendant le royaume)
+        await dbManager.setTemporaryData(player.id, 'creation_gender', gender);
+
+        const kingdoms = await dbManager.getAllKingdoms();
+        let kingdomText = `👤 **Sexe sélectionné :** ${gender === 'male' ? 'HOMME' : 'FEMME'}\n\n` +
+                         `🏰 **Étape 2/3 - Choisis ton royaume :**\n\n`;
+
+        kingdoms.forEach((kingdom, index) => {
+            kingdomText += `**${index + 1}.** ${kingdom.name} - ${kingdom.description}\n`;
+        });
+
+        kingdomText += `\n⚡ **Tape le numéro du royaume (1 à 12)**`;
+
+        return {
+            text: kingdomText,
+            image: await imageGenerator.generateKingdomsOverview()
+        };
+    }
+
+    async handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator }) {
+        const kingdoms = await dbManager.getAllKingdoms();
+        
+        if (kingdomNumber < 1 || kingdomNumber > kingdoms.length) {
+            return {
+                text: `❌ Royaume invalide ! \n\n` +
+                      `Choisis un numéro entre 1 et ${kingdoms.length}`
+            };
+        }
+
+        const selectedKingdom = kingdoms[kingdomNumber - 1];
+        
+        // Récupérer le genre stocké temporairement
+        const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
+        
+        if (!gender) {
+            return {
+                text: `❌ Erreur : genre non trouvé. Recommence la création avec /créer`
+            };
+        }
+
+        // Stocker le royaume temporairement
+        await dbManager.setTemporaryData(player.id, 'creation_kingdom', selectedKingdom.id);
+
+        return {
+            text: `🏰 **Royaume sélectionné :** ${selectedKingdom.name}\n\n` +
+                  `👤 **Sexe :** ${gender === 'male' ? 'HOMME' : 'FEMME'}\n` +
+                  `🏰 **Royaume :** ${selectedKingdom.name}\n\n` +
+                  `📝 **Étape 3/3 - Donne un nom à ton personnage :**\n\n` +
+                  `✍️ Écris simplement le nom que tu veux pour ton personnage.\n` +
+                  `⚠️ **Attention :** Le nom ne peut pas être modifié après !`,
+            image: await imageGenerator.generateKingdomImage(selectedKingdom.id)
+        };
+    }
+
+    async handleCharacterNameInput({ player, name, dbManager, imageGenerator }) {
+        // Récupérer les données temporaires
+        const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
+        const kingdomId = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
+        
+        if (!gender || !kingdomId) {
+            return {
+                text: `❌ Erreur : données de création manquantes. Recommence avec /créer`
+            };
+        }
+
+        // Valider le nom (lettres, chiffres, espaces, accents)
+        const nameRegex = /^[a-zA-Z0-9àâäéèêëïîôöùûüÿç\s]{2,20}$/;
+        if (!nameRegex.test(name)) {
+            return {
+                text: `❌ Le nom doit contenir entre 2 et 20 caractères (lettres, chiffres, espaces uniquement) !`
+            };
+        }
+
+        // Vérifier si le nom existe déjà
+        const existingCharacter = await dbManager.getCharacterByName(name.trim());
+        if (existingCharacter) {
+            return {
+                text: `❌ Ce nom est déjà pris ! Choisis un autre nom.`
+            };
+        }
+
+        // Créer le personnage
+        const characterData = {
+            playerId: player.id,
+            name: name,
+            gender: gender,
+            kingdom: kingdomId,
+            level: 1,
+            experience: 0,
+            powerLevel: 'G',
+            frictionLevel: 'G',
+            currentLife: 100,
+            maxLife: 100,
+            currentEnergy: 100,
+            maxEnergy: 100,
+            currentLocation: `Capitale de ${kingdomId}`,
+            coins: 100,
+            equipment: {},
+            inventory: [],
+            learnedTechniques: []
+        };
+
+        try {
+            const newCharacter = await dbManager.createCharacter(characterData);
+            
+            // Nettoyer TOUTES les données temporaires de création
+            await dbManager.clearTemporaryData(player.id, 'creation_started');
+            await dbManager.clearTemporaryData(player.id, 'creation_gender');
+            await dbManager.clearTemporaryData(player.id, 'creation_kingdom');
+
+            return {
+                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !**\n\n` +
+                      `👤 **Nom :** ${newCharacter.name}\n` +
+                      `👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}\n` +
+                      `🏰 **Royaume :** ${kingdomId}\n` +
+                      `⚔️ **Niveau :** ${newCharacter.level}\n` +
+                      `🌟 **Niveau de puissance :** ${newCharacter.powerLevel}\n\n` +
+                      `🎮 Utilise **/menu** pour découvrir tes options !`,
+                image: await imageGenerator.generateCharacterImage(newCharacter)
+            };
+            
+        } catch (error) {
+            console.error('❌ Erreur lors de la création du personnage:', error);
+            return {
+                text: `❌ Erreur lors de la création du personnage. Réessaie plus tard.`
+            };
+        }
     }
 }
 

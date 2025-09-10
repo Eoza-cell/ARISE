@@ -266,6 +266,70 @@ class DatabaseManager {
             await this.pool.end();
         }
     }
+
+    // Méthodes pour les données temporaires (création de personnage)
+    async setTemporaryData(playerId, key, value) {
+        try {
+            if (!this.tempData) {
+                this.tempData = new Map();
+            }
+            
+            const playerKey = `${playerId}_${key}`;
+            this.tempData.set(playerKey, value);
+            
+            // Auto-nettoyage après 10 minutes
+            setTimeout(() => {
+                this.tempData.delete(playerKey);
+            }, 10 * 60 * 1000);
+            
+        } catch (error) {
+            console.error('❌ Erreur lors de la sauvegarde temporaire:', error);
+        }
+    }
+
+    async getTemporaryData(playerId, key) {
+        try {
+            if (!this.tempData) {
+                return null;
+            }
+            
+            const playerKey = `${playerId}_${key}`;
+            return this.tempData.get(playerKey) || null;
+            
+        } catch (error) {
+            console.error('❌ Erreur lors de la récupération temporaire:', error);
+            return null;
+        }
+    }
+
+    async clearTemporaryData(playerId, key) {
+        try {
+            if (!this.tempData) {
+                return;
+            }
+            
+            const playerKey = `${playerId}_${key}`;
+            this.tempData.delete(playerKey);
+            
+        } catch (error) {
+            console.error('❌ Erreur lors du nettoyage temporaire:', error);
+        }
+    }
+
+    async getCharacterByName(name) {
+        try {
+            const [character] = await this.db
+                .select()
+                .from(schema.characters)
+                .where(eq(schema.characters.name, name))
+                .limit(1);
+            
+            return character || null;
+        } catch (error) {
+            console.error('❌ Erreur lors de la recherche par nom:', error);
+            return null;
+        }
+    }
 }
 
 module.exports = DatabaseManager;
