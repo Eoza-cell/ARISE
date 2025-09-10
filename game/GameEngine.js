@@ -107,6 +107,9 @@ class GameEngine {
     }
 
     async startCharacterCreation({ player, dbManager, imageGenerator }) {
+        // Marquer le début de la création pour sécuriser le processus
+        await dbManager.setTemporaryData(player.id, 'creation_started', true);
+        
         // Processus simplifié en 3 étapes courtes
         let creationText = `⚔️ **CRÉATION RAPIDE DE PERSONNAGE**\n\n` +
                           `🎯 **Étape 1/3 - Sexe**\n` +
@@ -179,22 +182,25 @@ class GameEngine {
     async handleGameAction({ player, chatId, message, dbManager, imageGenerator }) {
         // D'abord traiter les actions de création de personnage (avant de vérifier si personnage existe)
         
-        // Traitement des actions de création de personnage en cours
-        if (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME' || message === '1' || message === '2') {
+        // Vérifier si une création est en cours
+        const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
+        
+        // Traitement des actions de création de personnage en cours (seulement si création initiée)
+        if (creationStarted && (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME' || message === '1' || message === '2')) {
             return await this.handleGenderSelection({ player, message, dbManager, imageGenerator });
         }
 
-        // Gestion des numéros de royaumes (1-12)
+        // Gestion des numéros de royaumes (1-12) - seulement si le genre est déjà sélectionné
+        const tempGender = await dbManager.getTemporaryData(player.id, 'creation_gender');
         const kingdomNumber = parseInt(message);
-        if (kingdomNumber >= 1 && kingdomNumber <= 12) {
+        if (creationStarted && tempGender && kingdomNumber >= 1 && kingdomNumber <= 12) {
             return await this.handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator });
         }
 
-        // Gestion du nom de personnage (si en cours de création)
-        const tempGender = await dbManager.getTemporaryData(player.id, 'creation_gender');
+        // Gestion du nom de personnage (si en cours de création)  
         const tempKingdom = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
         
-        if (tempGender && tempKingdom) {
+        if (creationStarted && tempGender && tempKingdom) {
             // Le joueur est en train de donner le nom de son personnage
             return await this.handleCharacterNameInput({ player, name: message, dbManager, imageGenerator });
         }
