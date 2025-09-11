@@ -5,7 +5,7 @@ integrations = ["javascript_gemini:1.0.0", "javascript_database:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["libuuid", "curl", "bash"]
+packages = ["libuuid"]
 
 [workflows]
 runButton = "Start Friction Bot"
