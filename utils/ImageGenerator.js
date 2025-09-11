@@ -69,11 +69,18 @@ class ImageGenerator {
 
             const imagePath = path.join(this.tempPath, 'menu_main_ai.png');
             
-            // Essayer d'abord Bytez (priorité)
+            // Essayer d'abord Bytez (priorité) avec timeout rapide
             if (this.hasBytez && this.bytezClient) {
                 try {
-                    console.log('🎨 Génération de l\'image de menu avec Bytez...');
-                    await this.bytezClient.generateMenuImage(imagePath);
+                    console.log('🎨 Génération de l\'image de menu avec Bytez (rapide)...');
+                    
+                    // Timeout rapide pour Bytez - si trop lent, passer au fallback
+                    const bytezPromise = this.bytezClient.generateMenuImage(imagePath);
+                    const timeoutPromise = new Promise((_, reject) =>
+                        setTimeout(() => reject(new Error('Bytez trop lent, fallback utilisé')), 20000)
+                    );
+
+                    await Promise.race([bytezPromise, timeoutPromise]);
                     
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                     if (imageBuffer) {
@@ -82,7 +89,7 @@ class ImageGenerator {
                         return imageBuffer;
                     }
                 } catch (bytezError) {
-                    console.log('⚠️ Erreur Bytez, tentative avec Gemini:', bytezError.message);
+                    console.log('⚠️ Bytez lent/erreur, fallback rapide:', bytezError.message);
                 }
             }
 
@@ -328,6 +335,59 @@ class ImageGenerator {
         } catch (error) {
             console.error('❌ Erreur lors de la génération de l\'inventaire:', error);
             return null;
+        }
+    }
+
+    async generateKingdomImage(kingdomId) {
+        try {
+            const cacheKey = `kingdom_${kingdomId}_ai`;
+            if (this.imageCache.has(cacheKey)) {
+                return this.imageCache.get(cacheKey);
+            }
+
+            console.log(`🎨 Génération de l'image du royaume ${kingdomId}...`);
+            
+            const kingdomDesc = this.getKingdomDescription(kingdomId);
+            const prompt = `Create a detailed fantasy kingdom landscape for ${kingdomId}: ${kingdomDesc}, epic fantasy environment, cinematic lighting, detailed architecture, high quality rendering`;
+
+            const imagePath = path.join(this.tempPath, `kingdom_${kingdomId}_ai.png`);
+            
+            // Essayer Bytez en priorité
+            if (this.hasBytez && this.bytezClient) {
+                try {
+                    await this.bytezClient.generateKingdomImage(kingdomId, { description: kingdomDesc }, imagePath);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log(`✅ Image du royaume ${kingdomId} générée par Bytez`);
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (bytezError) {
+                    console.log('⚠️ Erreur Bytez, tentative avec Gemini:', bytezError.message);
+                }
+            }
+
+            // Fallback Gemini
+            if (this.hasGemini && this.geminiClient) {
+                try {
+                    await this.geminiClient.generateImage(prompt, imagePath);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log(`✅ Image du royaume ${kingdomId} générée par Gemini`);
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (geminiError) {
+                    console.log('⚠️ Erreur Gemini, fallback Canvas:', geminiError.message);
+                }
+            }
+
+            // Fallback Canvas rapide
+            return await this.generateKingdomImageFallback(kingdomId);
+
+        } catch (error) {
+            console.error(`❌ Erreur génération image royaume ${kingdomId}:`, error);
+            return await this.generateKingdomImageFallback(kingdomId);
         }
     }
 
@@ -618,6 +678,59 @@ class ImageGenerator {
 
         const buffer = canvas.toBuffer('image/png');
         this.imageCache.set('menu_fallback', buffer);
+        return buffer;
+    }
+
+    async generateKingdomImageFallback(kingdomId) {
+        const canvas = createCanvas(800, 600);
+        const ctx = canvas.getContext('2d');
+
+        // Background selon le royaume
+        const kingdomColors = this.getKingdomColors(kingdomId);
+        const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+        gradient.addColorStop(0, kingdomColors.primary);
+        gradient.addColorStop(1, kingdomColors.secondary);
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, 800, 600);
+
+        // Titre du royaume
+        ctx.fillStyle = '#ffffff';
+        ctx.font = 'bold 48px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(kingdomId, 400, 100);
+
+        // Description
+        ctx.font = '18px serif';
+        const description = this.getKingdomDescription(kingdomId);
+        const words = description.split(' ');
+        let line = '';
+        let y = 200;
+        
+        for (let i = 0; i < words.length; i++) {
+            const testLine = line + words[i] + ' ';
+            const metrics = ctx.measureText(testLine);
+            const testWidth = metrics.width;
+            
+            if (testWidth > 700 && i > 0) {
+                ctx.fillText(line, 400, y);
+                line = words[i] + ' ';
+                y += 30;
+            } else {
+                line = testLine;
+            }
+        }
+        ctx.fillText(line, 400, y);
+
+        // Emblème simple
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(400, 450, 50, 0, 2 * Math.PI);
+        ctx.stroke();
+        ctx.font = 'bold 24px serif';
+        ctx.fillText('🏰', 400, 460);
+
+        const buffer = canvas.toBuffer('image/png');
         return buffer;
     }
 
