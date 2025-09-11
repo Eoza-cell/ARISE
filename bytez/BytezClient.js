@@ -49,23 +49,23 @@ class BytezClient {
             // Optimiser le prompt pour Stable Diffusion
             const optimizedPrompt = this.optimizePromptForSD(prompt);
 
-            // Générer l'image directement avec model.run() comme dans l'exemple
+            // Générer l'image directement avec model.run() - timeout allongé pour Bytez
             const result = await Promise.race([
                 model.run(optimizedPrompt),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation timeout')), 15000))
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation timeout')), 25000)) // Timeout allongé pour éviter les échecs
             ]);
 
             // Gestion du résultat selon l'API Bytez
             const { error, output } = result || {};
 
-            // Retry rapide en cas d'erreur de concurrence
-            if (error && (error.includes('concurrency') || error.includes('rate limit'))) {
-                console.log('⏳ Erreur de concurrence Bytez, retry dans 1 seconde...');
-                await new Promise(resolve => setTimeout(resolve, 1000));
+            // Retry amélioré en cas d'erreur de concurrence
+            if (error && (error.includes('concurrency') || error.includes('rate limit') || error.includes('busy'))) {
+                console.log('⏳ Erreur de concurrence Bytez, retry dans 2 secondes...');
+                await new Promise(resolve => setTimeout(resolve, 2000)); // Délai plus long
                 
                 const retryResult = await Promise.race([
                     model.run(optimizedPrompt),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation retry timeout')), 10000))
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation retry timeout')), 20000)) // Timeout plus long pour retry
                 ]);
                 
                 if (retryResult.error) {
@@ -103,8 +103,8 @@ class BytezClient {
     }
 
     async waitForSlot() {
-        // Délai réduit pour réponses plus rapides
-        await new Promise(resolve => setTimeout(resolve, 200));
+        // Délai optimisé pour éviter les conflits de concurrence
+        await new Promise(resolve => setTimeout(resolve, 500));
     }
 
     optimizePromptForSD(prompt) {

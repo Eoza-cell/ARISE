@@ -39,7 +39,7 @@ class ImageGenerator {
 
         // Log du mode de fonctionnement
         if (this.hasBytez) {
-            console.log('🎨 Mode: Bytez (priorité) + Gemini (fallback) + Canvas (dernier recours)');
+            console.log('🎨 Mode: Bytez (UNIQUEMENT) + Canvas (fallback) - Gemini images DÉSACTIVÉ');
         } else if (this.hasGemini) {
             console.log('🎨 Mode: Gemini (principal) + Canvas (fallback)');
         } else {
@@ -874,9 +874,10 @@ class ImageGenerator {
     }
 
     async generateWithFallback(prompt, imagePath, fallbackFunction) {
-        // Essayer Bytez en priorité
+        // Essayer Bytez UNIQUEMENT (Gemini désactivé pour les images)
         if (this.hasBytez && this.bytezClient) {
             try {
+                console.log('🎨 Génération avec Bytez (priorité absolue)...');
                 await this.bytezClient.generateImage(prompt, imagePath);
                 const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                 if (imageBuffer) {
@@ -884,25 +885,12 @@ class ImageGenerator {
                     return imageBuffer;
                 }
             } catch (bytezError) {
-                console.log('⚠️ Erreur Bytez, essai Gemini:', bytezError.message);
+                console.log('⚠️ Erreur Bytez, fallback Canvas direct:', bytezError.message);
             }
         }
 
-        // Fallback Gemini
-        if (this.hasGemini && this.geminiClient) {
-            try {
-                await this.geminiClient.generateImage(prompt, imagePath);
-                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                if (imageBuffer) {
-                    console.log('✅ Image générée avec Gemini');
-                    return imageBuffer;
-                }
-            } catch (geminiError) {
-                console.log('⚠️ Erreur Gemini, fallback Canvas:', geminiError.message);
-            }
-        }
-
-        // Fallback Canvas
+        // Fallback Canvas directement (Gemini images désactivé)
+        console.log('🎨 Fallback Canvas - Gemini images désactivé par configuration');
         return await fallbackFunction();
     }
 
