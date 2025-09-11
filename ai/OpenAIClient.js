@@ -1,38 +1,63 @@
 const OpenAI = require('openai');
 
-// Simple in-memory conversation history per session (could be persisted or improved)
+// Persistent database-backed AI memory system
 class AIMemory {
-    constructor(maxHistory = 10) {
-        this.sessions = new Map(); // sessionId => [{role, content}, ...]
+    constructor(dbManager, maxHistory = 20) {
+        this.dbManager = dbManager;
         this.maxHistory = maxHistory;
     }
 
-    getHistory(sessionId) {
-        return this.sessions.get(sessionId) || [];
+    async getHistory(sessionId) {
+        if (!this.dbManager) return [];
+        return await this.dbManager.getConversationMemory(sessionId, this.maxHistory);
     }
 
-    addMessage(sessionId, role, content) {
-        if (!this.sessions.has(sessionId)) {
-            this.sessions.set(sessionId, []);
-        }
-        const history = this.sessions.get(sessionId);
-        history.push({ role, content });
-        // Limite la taille de l'historique
-        if (history.length > this.maxHistory) {
-            history.splice(0, history.length - this.maxHistory);
-        }
-        this.sessions.set(sessionId, history);
+    async addMessage(sessionId, role, content, contextData = {}) {
+        if (!this.dbManager) return;
+        
+        await this.dbManager.saveConversationMemory(sessionId, role, content, {
+            ...contextData,
+            importance: this.calculateImportance(content, role),
+            memoryType: this.determineMemoryType(content)
+        });
     }
 
-    clearHistory(sessionId) {
-        this.sessions.set(sessionId, []);
+    async getImportantMemories(sessionId) {
+        if (!this.dbManager) return [];
+        return await this.dbManager.getImportantMemories(sessionId, 7, 5);
+    }
+
+    calculateImportance(content, role) {
+        // Calcul de l'importance basé sur le contenu
+        let importance = 5; // Base
+        
+        if (role === 'system') importance += 2;
+        if (content.includes('combat') || content.includes('mort') || content.includes('niveau')) importance += 3;
+        if (content.includes('royaume') || content.includes('ordre')) importance += 2;
+        if (content.length > 200) importance += 1;
+        
+        return Math.min(10, importance);
+    }
+
+    determineMemoryType(content) {
+        if (content.includes('combat') || content.includes('attaque')) return 'combat';
+        if (content.includes('voyage') || content.includes('déplace')) return 'location';
+        if (content.includes('rencontre') || content.includes('PNJ')) return 'character';
+        if (content.includes('découvre') || content.includes('trouve')) return 'event';
+        return 'conversation';
+    }
+
+    async clearHistory(sessionId) {
+        // Ne pas supprimer définitivement, juste marquer comme archivé
+        console.log(`🧹 Archivage historique session: ${sessionId}`);
     }
 }
 
 class OpenAIClient {
-    constructor() {
+    constructor(dbManager = null) {
         this.isAvailable = false;
-        this.memory = new AIMemory(10); // max 10 messages de contexte
+        this.dbManager = dbManager;
+        this.memory = new AIMemory(dbManager, 20); // max 20 messages avec persistance
 
         // Check if OpenAI API key is available
         const apiKey = process.env.OPENAI_API_KEY;
@@ -62,24 +87,38 @@ class OpenAIClient {
         try {
             const prompt = this.buildNarrationPrompt(context);
 
-            // Ajouter contexte de localisation pour continuité
-            const locationContext = `Le personnage ${context.character.name} est actuellement dans : ${context.character.currentLocation}. Il ne vient pas d'y arriver, il y est déjà depuis un moment.`;
+            // Récupérer l'historique persistant et les souvenirs importants
+            const recentHistory = await this.memory.getHistory(sessionId);
+            const importantMemories = await this.memory.getImportantMemories(sessionId);
+            
+            // Construire le contexte enrichi avec mémoire persistante
+            let memoryContext = "";
+            if (importantMemories.length > 0) {
+                memoryContext = "\n\nSouvenirs importants:\n" + 
+                    importantMemories.map(m => `- ${m.content} (${m.location || 'lieu inconnu'})`).join('\n');
+            }
+            
+            const locationContext = `Le personnage ${context.character.name} est dans : ${context.character.currentLocation}. Il connaît déjà ce lieu.${memoryContext}`;
 
-            // Ajoute le message système avec contexte amélioré
+            // Message système avec contexte enrichi par la mémoire persistante
             const systemMsg = {
                 role: "system",
-                content: `Tu es le narrateur omniscient de FRICTION ULTIMATE, un monde médiéval-technologique impitoyable. Réponds toujours en français avec un style immersif et dramatique.
+                content: `Tu es le narrateur omniscient de FRICTION ULTIMATE. Utilise la MÉMOIRE PERSISTANTE pour maintenir la cohérence narrative.
 
-CONTEXTE IMPORTANT : ${locationContext}
+CONTEXTE ACTUEL : ${locationContext}
 
-RÈGLES DE CONTINUITÉ :
-- Le personnage est DÉJÀ dans le lieu indiqué, ne dis pas qu'il "arrive" ou "entre" sauf si l'action le précise
-- Utilise la mémoire précédente pour maintenir la cohérence
-- Chaque lieu a son ambiance permanente que le personnage connaît déjà
-- Focus sur les NOUVELLES actions/événements, pas sur la redécouverte du lieu`
+RÈGLES DE CONTINUITÉ AVANCÉES :
+- Utilise les souvenirs importants pour créer de la cohérence narrative
+- Le personnage se souvient de ses actions passées dans ce lieu
+- Référence subtilement les événements marquants précédents
+- Crée des conséquences aux actions passées
+- Développe les relations avec les PNJ rencontrés
+
+MÉMOIRE RÉCENTE :
+${recentHistory.slice(-5).map(h => `${h.role}: ${h.content.substring(0, 100)}`).join('\n')}`
             };
-            const memoryHistory = this.memory.getHistory(sessionId);
-            const messages = [systemMsg, ...memoryHistory, { role: "user", content: prompt }];
+            
+            const messages = [systemMsg, { role: "user", content: prompt }];
 
             const completion = await this.openai.chat.completions.create({
                 model: "gpt-4o-mini",
@@ -89,10 +128,20 @@ RÈGLES DE CONTINUITÉ :
             });
 
             const aiReply = completion.choices[0].message.content;
-            // Sauvegarde l'interaction dans la mémoire avec contexte enrichi
-            const contextualPrompt = `${locationContext}\nAction: ${context.action}`;
-            this.memory.addMessage(sessionId, "user", contextualPrompt);
-            this.memory.addMessage(sessionId, "assistant", aiReply);
+            
+            // Sauvegarde enrichie avec métadonnées contextuelles
+            await this.memory.addMessage(sessionId, "user", context.action, {
+                location: context.character.currentLocation,
+                playerId: context.character.playerId,
+                characterId: context.character.id,
+                action: context.action
+            });
+            
+            await this.memory.addMessage(sessionId, "assistant", aiReply, {
+                location: context.character.currentLocation,
+                playerId: context.character.playerId,
+                characterId: context.character.id
+            });
 
             return aiReply;
         } catch (error) {

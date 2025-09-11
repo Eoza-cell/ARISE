@@ -107,6 +107,35 @@ const gameSessions = pgTable('game_sessions', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Table pour la mémoire contextuelle de l'IA
+const conversationMemory = pgTable('conversation_memory', {
+  id: serial('id').primaryKey(),
+  sessionId: text('session_id').notNull(), // player_X ou global
+  playerId: integer('player_id').references(() => players.id),
+  characterId: integer('character_id').references(() => characters.id),
+  role: text('role').notNull(), // 'user', 'assistant', 'system'
+  content: text('content').notNull(),
+  location: text('location'),
+  action: text('action'),
+  contextData: json('context_data'), // Données contextuelles supplémentaires
+  timestamp: timestamp('timestamp').defaultNow().notNull(),
+  importance: integer('importance').default(5).notNull(), // 1-10 pour prioriser les souvenirs
+  memoryType: text('memory_type').default('conversation').notNull(), // 'conversation', 'location', 'event', 'character'
+});
+
+// Table pour les événements marquants du personnage (mémoire longue terme)
+const characterMemories = pgTable('character_memories', {
+  id: serial('id').primaryKey(),
+  characterId: integer('character_id').notNull().references(() => characters.id),
+  memoryTitle: text('memory_title').notNull(),
+  memoryContent: text('memory_content').notNull(),
+  location: text('location'),
+  participants: json('participants'), // Autres personnages impliqués
+  memoryType: text('memory_type').notNull(), // 'achievement', 'trauma', 'discovery', 'relationship'
+  importance: integer('importance').default(5).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
 // Relations
 const playersRelations = relations(players, ({ many }) => ({
   characters: many(characters),
@@ -132,6 +161,25 @@ const gameSessionsRelations = relations(gameSessions, ({ one }) => ({
   }),
 }));
 
+// Relations pour la mémoire
+const conversationMemoryRelations = relations(conversationMemory, ({ one }) => ({
+  player: one(players, {
+    fields: [conversationMemory.playerId],
+    references: [players.id],
+  }),
+  character: one(characters, {
+    fields: [conversationMemory.characterId],
+    references: [characters.id],
+  }),
+}));
+
+const characterMemoriesRelations = relations(characterMemories, ({ one }) => ({
+  character: one(characters, {
+    fields: [characterMemories.characterId],
+    references: [characters.id],
+  }),
+}));
+
 // Exports
 module.exports = {
   players,
@@ -141,7 +189,11 @@ module.exports = {
   techniques,
   equipment,
   gameSessions,
+  conversationMemory,
+  characterMemories,
   playersRelations,
   charactersRelations,
-  gameSessionsRelations
+  gameSessionsRelations,
+  conversationMemoryRelations,
+  characterMemoriesRelations
 };

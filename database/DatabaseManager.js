@@ -164,10 +164,44 @@ class DatabaseManager {
                 updated_at TIMESTAMP DEFAULT NOW() NOT NULL
             );
 
+            -- Table pour la mémoire contextuelle de l'IA
+            CREATE TABLE IF NOT EXISTS conversation_memory (
+                id SERIAL PRIMARY KEY,
+                session_id TEXT NOT NULL,
+                player_id INTEGER REFERENCES players(id),
+                character_id INTEGER REFERENCES characters(id),
+                role TEXT NOT NULL,
+                content TEXT NOT NULL,
+                location TEXT,
+                action TEXT,
+                context_data JSON,
+                timestamp TIMESTAMP DEFAULT NOW() NOT NULL,
+                importance INTEGER DEFAULT 5 NOT NULL,
+                memory_type TEXT DEFAULT 'conversation' NOT NULL
+            );
+
+            -- Table pour les événements marquants du personnage
+            CREATE TABLE IF NOT EXISTS character_memories (
+                id SERIAL PRIMARY KEY,
+                character_id INTEGER NOT NULL REFERENCES characters(id),
+                memory_title TEXT NOT NULL,
+                memory_content TEXT NOT NULL,
+                location TEXT,
+                participants JSON,
+                memory_type TEXT NOT NULL,
+                importance INTEGER DEFAULT 5 NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+
             -- Index pour améliorer les performances
             CREATE INDEX IF NOT EXISTS idx_players_whatsapp ON players(whatsapp_number);
             CREATE INDEX IF NOT EXISTS idx_characters_player ON characters(player_id);
             CREATE INDEX IF NOT EXISTS idx_game_sessions_player_chat ON game_sessions(player_id, chat_id);
+            CREATE INDEX IF NOT EXISTS idx_conversation_memory_session ON conversation_memory(session_id);
+            CREATE INDEX IF NOT EXISTS idx_conversation_memory_timestamp ON conversation_memory(timestamp DESC);
+            CREATE INDEX IF NOT EXISTS idx_conversation_memory_importance ON conversation_memory(importance DESC);
+            CREATE INDEX IF NOT EXISTS idx_character_memories_character ON character_memories(character_id);
+            CREATE INDEX IF NOT EXISTS idx_character_memories_importance ON character_memories(importance DESC);
         `;
 
         await this.pool.query(createTablesSQL);
@@ -453,6 +487,134 @@ class DatabaseManager {
         } catch (error) {
             console.error('❌ Erreur lors de la recherche par nom:', error);
             return null;
+        }
+    }
+
+    // Méthodes pour la gestion de la mémoire IA persistante
+    async saveConversationMemory(sessionId, role, content, contextData = {}) {
+        try {
+            const memoryData = {
+                sessionId,
+                role,
+                content,
+                location: contextData.location || null,
+                action: contextData.action || null,
+                contextData: contextData.additionalData || null,
+                importance: contextData.importance || 5,
+                memoryType: contextData.memoryType || 'conversation',
+                playerId: contextData.playerId || null,
+                characterId: contextData.characterId || null
+            };
+
+            const [memory] = await this.db
+                .insert(schema.conversationMemory)
+                .values(memoryData)
+                .returning();
+            
+            return memory;
+        } catch (error) {
+            console.error('❌ Erreur lors de la sauvegarde mémoire:', error);
+            throw error;
+        }
+    }
+
+    async getConversationMemory(sessionId, limit = 20) {
+        try {
+            const memories = await this.db
+                .select()
+                .from(schema.conversationMemory)
+                .where(eq(schema.conversationMemory.sessionId, sessionId))
+                .orderBy(schema.conversationMemory.timestamp)
+                .limit(limit);
+            
+            return memories;
+        } catch (error) {
+            console.error('❌ Erreur lors de la récupération mémoire:', error);
+            return [];
+        }
+    }
+
+    async getImportantMemories(sessionId, importance = 7, limit = 10) {
+        try {
+            const memories = await this.db
+                .select()
+                .from(schema.conversationMemory)
+                .where(
+                    and(
+                        eq(schema.conversationMemory.sessionId, sessionId),
+                        gte(schema.conversationMemory.importance, importance)
+                    )
+                )
+                .orderBy(desc(schema.conversationMemory.importance))
+                .limit(limit);
+            
+            return memories;
+        } catch (error) {
+            console.error('❌ Erreur lors de la récupération mémoires importantes:', error);
+            return [];
+        }
+    }
+
+    async saveCharacterMemory(characterId, title, content, memoryType, contextData = {}) {
+        try {
+            const memoryData = {
+                characterId,
+                memoryTitle: title,
+                memoryContent: content,
+                memoryType,
+                location: contextData.location || null,
+                participants: contextData.participants || null,
+                importance: contextData.importance || 5
+            };
+
+            const [memory] = await this.db
+                .insert(schema.characterMemories)
+                .values(memoryData)
+                .returning();
+            
+            return memory;
+        } catch (error) {
+            console.error('❌ Erreur lors de la sauvegarde mémoire personnage:', error);
+            throw error;
+        }
+    }
+
+    async getCharacterMemories(characterId, limit = 10) {
+        try {
+            const memories = await this.db
+                .select()
+                .from(schema.characterMemories)
+                .where(eq(schema.characterMemories.characterId, characterId))
+                .orderBy(desc(schema.characterMemories.importance))
+                .limit(limit);
+            
+            return memories;
+        } catch (error) {
+            console.error('❌ Erreur lors de la récupération mémoires personnage:', error);
+            return [];
+        }
+    }
+
+    // Nettoyage périodique des anciens souvenirs peu importants
+    async cleanupOldMemories(daysOld = 30, minImportance = 3) {
+        try {
+            const cutoffDate = new Date();
+            cutoffDate.setDate(cutoffDate.getDate() - daysOld);
+            
+            const deleted = await this.db
+                .delete(schema.conversationMemory)
+                .where(
+                    and(
+                        lt(schema.conversationMemory.timestamp, cutoffDate),
+                        lt(schema.conversationMemory.importance, minImportance)
+                    )
+                );
+            
+            console.log(`🧹 Nettoyage mémoire: ${deleted.rowCount} entrées supprimées`);
+            return deleted.rowCount;
+        } catch (error) {
+            console.error('❌ Erreur lors du nettoyage mémoire:', error);
+            return 0;
         }
     }
 }

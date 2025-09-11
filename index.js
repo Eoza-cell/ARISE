@@ -16,8 +16,9 @@ const { initializeGameData } = require('./data/GameData');
 class FrictionUltimateBot {
     constructor() {
         this.sock = null;
-        this.gameEngine = new GameEngine();
+        // Initialiser le moteur de jeu avec accès à la base de données
         this.dbManager = new DatabaseManager();
+        this.gameEngine = new GameEngine(this.dbManager);
         this.imageGenerator = new ImageGenerator();
         this.isConnected = false;
         this.processedMessages = new Set(); // Système de déduplication

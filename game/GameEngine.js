@@ -4,8 +4,9 @@ const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
 
 class GameEngine {
-    constructor() {
-        this.openAIClient = new OpenAIClient();
+    constructor(dbManager = null) {
+        this.dbManager = dbManager;
+        this.openAIClient = new OpenAIClient(dbManager);
         this.ollamaClient = new OllamaClient();
         this.geminiClient = new GeminiClient();
         this.groqClient = new GroqClient();
