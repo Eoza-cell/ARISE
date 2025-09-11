@@ -243,3 +243,35 @@ Réponds en JSON:
 }
 
 module.exports = GeminiClient;
+class GeminiClient {
+    constructor() {
+        this.apiKey = process.env.GEMINI_API_KEY;
+    }
+
+    async generateText(prompt, context = {}) {
+        try {
+            // Pour l'instant, retourner une réponse simple
+            // Vous pouvez implémenter l'intégration Gemini plus tard
+            return {
+                text: `🤖 Réponse automatique : "${prompt}"\n\nLe système d'IA Gemini sera intégré prochainement.`
+            };
+        } catch (error) {
+            console.error('❌ Erreur Gemini:', error);
+            return {
+                text: '❌ Erreur lors de la génération de réponse IA.'
+            };
+        }
+    }
+
+    async generateImage(prompt, character) {
+        try {
+            // Pour l'instant, pas de génération d'image
+            return null;
+        } catch (error) {
+            console.error('❌ Erreur génération image Gemini:', error);
+            return null;
+        }
+    }
+}
+
+module.exports = GeminiClient;

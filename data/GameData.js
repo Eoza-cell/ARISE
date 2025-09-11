@@ -290,3 +290,253 @@ module.exports = {
     getStartingLocation,
     getDefaultCharacterData
 };
+// Données de jeu pour Friction Ultimate
+
+const KINGDOMS_DATA = [
+    {
+        id: 'AEGYRIA',
+        name: 'Aegyria',
+        description: 'Royaume des chevaliers honorables',
+        geography: 'Plaines fertiles et collines verdoyantes',
+        culture: 'Honneur, chevalerie et justice',
+        specialties: ['Combat à l\'épée', 'Magie de lumière', 'Artisanat d\'armures'],
+        particularities: 'Code d\'honneur strict et traditions chevaleresques'
+    },
+    {
+        id: 'SOMBRENUIT',
+        name: 'Sombrenuit',
+        description: 'Royaume des maîtres des ombres',
+        geography: 'Forêts sombres et marécages mystérieux',
+        culture: 'Mystère, magie noire et secrets',
+        specialties: ['Magie des ombres', 'Assassinat', 'Alchimie noire'],
+        particularities: 'Maîtres de la discrétion et des arts occultes'
+    },
+    {
+        id: 'KHELOS',
+        name: 'Khelos',
+        description: 'Royaume des nomades du désert',
+        geography: 'Vastes déserts et oasis cachées',
+        culture: 'Nomadisme, commerce et survie',
+        specialties: ['Combat au cimeterre', 'Magie du sable', 'Commerce'],
+        particularities: 'Excellents navigateurs et marchands'
+    },
+    {
+        id: 'ABRANTIS',
+        name: 'Abrantis',
+        description: 'Royaume des marins intrépides',
+        geography: 'Côtes rocheuses et îles dispersées',
+        culture: 'Navigation, exploration et liberté',
+        specialties: ['Combat naval', 'Magie de l\'eau', 'Cartographie'],
+        particularities: 'Maîtres des océans et explorateurs'
+    },
+    {
+        id: 'VARHA',
+        name: 'Varha',
+        description: 'Royaume des chasseurs montagnards',
+        geography: 'Montagnes enneigées et vallées glaciales',
+        culture: 'Chasse, survie et harmonie avec la nature',
+        specialties: ['Tir à l\'arc', 'Dressage d\'animaux', 'Herboristerie'],
+        particularities: 'Excellents traqueurs et survivants'
+    },
+    {
+        id: 'SYLVARIA',
+        name: 'Sylvaria',
+        description: 'Royaume des gardiens de la forêt',
+        geography: 'Forêts ancestrales et arbres géants',
+        culture: 'Communion avec la nature et protection de l\'environnement',
+        specialties: ['Magie naturelle', 'Combat à distance', 'Guérison'],
+        particularities: 'Gardiens de l\'équilibre naturel'
+    },
+    {
+        id: 'ECLYPSIA',
+        name: 'Eclypsia',
+        description: 'Royaume des seigneurs des éclipses',
+        geography: 'Terres crépusculaires et phénomènes astronomiques',
+        culture: 'Astrologie, prophéties et magie cosmique',
+        specialties: ['Magie stellaire', 'Divination', 'Manipulation temporelle'],
+        particularities: 'Maîtres du temps et de l\'espace'
+    },
+    {
+        id: 'TERRE_DESOLE',
+        name: 'Terre Désolée',
+        description: 'Royaume des survivants post-apocalyptiques',
+        geography: 'Terres ravagées et ruines industrielles',
+        culture: 'Survie, récupération et reconstruction',
+        specialties: ['Ingénierie', 'Armes à feu', 'Technologie'],
+        particularities: 'Experts en technologie et survie extrême'
+    },
+    {
+        id: 'DRAK_TARR',
+        name: 'Drak\'Tarr',
+        description: 'Royaume des forgeurs draconiques',
+        geography: 'Volcans actifs et cavernes de lave',
+        culture: 'Forge, artisanat et respect des dragons',
+        specialties: ['Forge draconique', 'Magie du feu', 'Métallurgie'],
+        particularities: 'Créateurs des meilleures armes et armures'
+    },
+    {
+        id: 'URVALA',
+        name: 'Urvala',
+        description: 'Royaume des alchimistes nécromants',
+        geography: 'Cimetières anciens et laboratoires souterrains',
+        culture: 'Alchimie, nécromancie et expérimentation',
+        specialties: ['Nécromancie', 'Alchimie', 'Mutation'],
+        particularities: 'Maîtres de la vie et de la mort'
+    },
+    {
+        id: 'OMBREFIEL',
+        name: 'Ombrefiel',
+        description: 'Royaume des mercenaires exilés',
+        geography: 'Terres neutres et villes fortifiées',
+        culture: 'Mercenariat, neutralité et profit',
+        specialties: ['Combat mercenaire', 'Stratégie', 'Diplomatie'],
+        particularities: 'Neutres dans les conflits, loyaux au plus offrant'
+    },
+    {
+        id: 'KHALDAR',
+        name: 'Khaldar',
+        description: 'Royaume des pirates des jungles',
+        geography: 'Jungles tropicales et rivières serpentines',
+        culture: 'Piraterie, liberté et aventure',
+        specialties: ['Piraterie fluviale', 'Poisons', 'Acrobaties'],
+        particularities: 'Maîtres des voies fluviales et de la guérilla'
+    }
+];
+
+const ORDERS_DATA = [
+    {
+        id: 'ORDER_LIGHT',
+        name: 'Ordre de la Lumière',
+        description: 'Gardiens de la justice et protecteurs des innocents',
+        hierarchy: [
+            { rank: 'Novice', title: 'Aspirant' },
+            { rank: 'Initié', title: 'Gardien' },
+            { rank: 'Expert', title: 'Paladin' },
+            { rank: 'Maître', title: 'Grand Paladin' }
+        ],
+        specialties: ['Magie de lumière', 'Guérison', 'Protection'],
+        location: 'Sanctuaire de la Lumière Éternelle',
+        kingdom: null
+    },
+    {
+        id: 'ORDER_SHADOW',
+        name: 'Ordre de l\'Ombre',
+        description: 'Assassins et espions maîtrisant les arts sombres',
+        hierarchy: [
+            { rank: 'Novice', title: 'Apprenti Ombre' },
+            { rank: 'Initié', title: 'Lame Silencieuse' },
+            { rank: 'Expert', title: 'Maître Assassin' },
+            { rank: 'Maître', title: 'Seigneur des Ombres' }
+        ],
+        specialties: ['Assassinat', 'Discrétion', 'Magie des ombres'],
+        location: 'Forteresse des Ombres Éternelles',
+        kingdom: null
+    },
+    {
+        id: 'ORDER_FIRE',
+        name: 'Ordre du Feu',
+        description: 'Guerriers destructeurs maîtrisant les flammes',
+        hierarchy: [
+            { rank: 'Novice', title: 'Étincelle' },
+            { rank: 'Initié', title: 'Brasier' },
+            { rank: 'Expert', title: 'Inferno' },
+            { rank: 'Maître', title: 'Seigneur des Flammes' }
+        ],
+        specialties: ['Magie du feu', 'Destruction', 'Combat destructeur'],
+        location: 'Citadelle des Flammes Éternelles',
+        kingdom: null
+    },
+    {
+        id: 'ORDER_EARTH',
+        name: 'Ordre de la Terre',
+        description: 'Défenseurs inébranlables et gardiens de la stabilité',
+        hierarchy: [
+            { rank: 'Novice', title: 'Roc' },
+            { rank: 'Initié', title: 'Montagne' },
+            { rank: 'Expert', title: 'Titan' },
+            { rank: 'Maître', title: 'Seigneur de la Terre' }
+        ],
+        specialties: ['Magie de terre', 'Défense', 'Endurance'],
+        location: 'Sanctuaire de la Terre Mère',
+        kingdom: null
+    },
+    {
+        id: 'ORDER_WIND',
+        name: 'Ordre du Vent',
+        description: 'Guerriers rapides maîtrisant la vitesse et l\'agilité',
+        hierarchy: [
+            { rank: 'Novice', title: 'Brise' },
+            { rank: 'Initié', title: 'Bourrasque' },
+            { rank: 'Expert', title: 'Tempête' },
+            { rank: 'Maître', title: 'Seigneur des Vents' }
+        ],
+        specialties: ['Vitesse', 'Agilité', 'Magie du vent'],
+        location: 'Tour des Vents Éternels',
+        kingdom: null
+    },
+    {
+        id: 'ORDER_ICE',
+        name: 'Ordre de la Glace',
+        description: 'Maîtres du froid et de la conservation',
+        hierarchy: [
+            { rank: 'Novice', title: 'Cristal' },
+            { rank: 'Initié', title: 'Glacier' },
+            { rank: 'Expert', title: 'Blizzard' },
+            { rank: 'Maître', title: 'Seigneur de Glace' }
+        ],
+        specialties: ['Magie de glace', 'Contrôle', 'Ralentissement'],
+        location: 'Forteresse de Glace Éternelle',
+        kingdom: null
+    },
+    {
+        id: 'ORDER_CHAOS',
+        name: 'Ordre du Chaos',
+        description: 'Agents du changement et maîtres de l\'imprévisible',
+        hierarchy: [
+            { rank: 'Novice', title: 'Anarchiste' },
+            { rank: 'Initié', title: 'Perturbateur' },
+            { rank: 'Expert', title: 'Maître du Chaos' },
+            { rank: 'Maître', title: 'Seigneur du Chaos' }
+        ],
+        specialties: ['Magie chaotique', 'Imprévisibilité', 'Mutation'],
+        location: 'Sanctuaire du Chaos Primordial',
+        kingdom: null
+    }
+];
+
+async function initializeGameData(dbManager) {
+    try {
+        console.log('🎮 Initialisation des données de jeu...');
+
+        // Vérifier si les données existent déjà
+        const existingKingdoms = await dbManager.getAllKingdoms();
+        if (existingKingdoms.length === 0) {
+            // Insérer les royaumes
+            for (const kingdom of KINGDOMS_DATA) {
+                await dbManager.insertKingdom(kingdom);
+            }
+            console.log('✅ Royaumes initialisés');
+        }
+
+        const existingOrders = await dbManager.getAllOrders();
+        if (existingOrders.length === 0) {
+            // Insérer les ordres
+            for (const order of ORDERS_DATA) {
+                await dbManager.insertOrder(order);
+            }
+            console.log('✅ Ordres initialisés');
+        }
+
+        console.log('✅ Données de jeu initialisées');
+        
+    } catch (error) {
+        console.error('❌ Erreur lors de l\'initialisation des données:', error);
+        throw error;
+    }
+}
+
+module.exports = {
+    initializeGameData,
+    KINGDOMS_DATA,
+    ORDERS_DATA
+};

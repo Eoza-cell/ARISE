@@ -666,3 +666,100 @@ class ImageGenerator {
 }
 
 module.exports = ImageGenerator;
+const fs = require('fs');
+const path = require('path');
+
+class ImageGenerator {
+    constructor() {
+        this.tempDir = path.join(__dirname, '../temp');
+        this.assetsDir = path.join(__dirname, '../assets');
+        
+        // Créer les dossiers s'ils n'existent pas
+        if (!fs.existsSync(this.tempDir)) {
+            fs.mkdirSync(this.tempDir, { recursive: true });
+        }
+        if (!fs.existsSync(this.assetsDir)) {
+            fs.mkdirSync(this.assetsDir, { recursive: true });
+        }
+    }
+
+    async generateMenuImage() {
+        try {
+            // Image simple pour le menu principal
+            const imagePath = path.join(this.tempDir, 'menu_main.png');
+            
+            // Pour l'instant, retourner un buffer vide ou une image par défaut
+            // Vous pouvez implémenter la génération d'image avec canvas plus tard
+            if (fs.existsSync(imagePath)) {
+                return fs.readFileSync(imagePath);
+            }
+            
+            return null; // Pas d'image pour l'instant
+        } catch (error) {
+            console.error('❌ Erreur génération image menu:', error);
+            return null;
+        }
+    }
+
+    async generateCharacterImage(character) {
+        try {
+            // Image du personnage
+            return null; // Pas d'image pour l'instant
+        } catch (error) {
+            console.error('❌ Erreur génération image personnage:', error);
+            return null;
+        }
+    }
+
+    async generateCharacterSheet(character) {
+        try {
+            // Fiche de personnage
+            return null; // Pas d'image pour l'instant
+        } catch (error) {
+            console.error('❌ Erreur génération fiche personnage:', error);
+            return null;
+        }
+    }
+
+    async generateKingdomsOverview() {
+        try {
+            // Vue d'ensemble des royaumes
+            return null; // Pas d'image pour l'instant
+        } catch (error) {
+            console.error('❌ Erreur génération overview royaumes:', error);
+            return null;
+        }
+    }
+
+    async generateKingdomImage(kingdomId) {
+        try {
+            // Image d'un royaume spécifique
+            return null; // Pas d'image pour l'instant
+        } catch (error) {
+            console.error('❌ Erreur génération image royaume:', error);
+            return null;
+        }
+    }
+
+    async generateInventoryImage(character) {
+        try {
+            // Image de l'inventaire
+            return null; // Pas d'image pour l'instant
+        } catch (error) {
+            console.error('❌ Erreur génération image inventaire:', error);
+            return null;
+        }
+    }
+
+    async generateWorldMap() {
+        try {
+            // Carte du monde
+            return null; // Pas d'image pour l'instant
+        } catch (error) {
+            console.error('❌ Erreur génération carte du monde:', error);
+            return null;
+        }
+    }
+}
+
+module.exports = ImageGenerator;

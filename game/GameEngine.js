@@ -497,6 +497,7 @@ class GameEngine {
             currentEnergy: 100,
             maxEnergy: 100,
             currentLocation: `Capitale de ${kingdomId}`,
+            position: { x: 0, y: 0, z: 0 },
             coins: 100,
             equipment: {},
             inventory: [],
