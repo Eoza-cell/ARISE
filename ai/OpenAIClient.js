@@ -62,10 +62,21 @@ class OpenAIClient {
         try {
             const prompt = this.buildNarrationPrompt(context);
 
-            // Ajoute le message système et l'historique de la session
+            // Ajouter contexte de localisation pour continuité
+            const locationContext = `Le personnage ${context.character.name} est actuellement dans : ${context.character.currentLocation}. Il ne vient pas d'y arriver, il y est déjà depuis un moment.`;
+
+            // Ajoute le message système avec contexte amélioré
             const systemMsg = {
                 role: "system",
-                content: "Tu es le narrateur omniscient de FRICTION ULTIMATE, un monde médiéval-technologique impitoyable. Réponds toujours en français avec un style immersif et dramatique."
+                content: `Tu es le narrateur omniscient de FRICTION ULTIMATE, un monde médiéval-technologique impitoyable. Réponds toujours en français avec un style immersif et dramatique.
+
+CONTEXTE IMPORTANT : ${locationContext}
+
+RÈGLES DE CONTINUITÉ :
+- Le personnage est DÉJÀ dans le lieu indiqué, ne dis pas qu'il "arrive" ou "entre" sauf si l'action le précise
+- Utilise la mémoire précédente pour maintenir la cohérence
+- Chaque lieu a son ambiance permanente que le personnage connaît déjà
+- Focus sur les NOUVELLES actions/événements, pas sur la redécouverte du lieu`
             };
             const memoryHistory = this.memory.getHistory(sessionId);
             const messages = [systemMsg, ...memoryHistory, { role: "user", content: prompt }];
@@ -78,8 +89,9 @@ class OpenAIClient {
             });
 
             const aiReply = completion.choices[0].message.content;
-            // Sauvegarde l'interaction dans la mémoire
-            this.memory.addMessage(sessionId, "user", prompt);
+            // Sauvegarde l'interaction dans la mémoire avec contexte enrichi
+            const contextualPrompt = `${locationContext}\nAction: ${context.action}`;
+            this.memory.addMessage(sessionId, "user", contextualPrompt);
             this.memory.addMessage(sessionId, "assistant", aiReply);
 
             return aiReply;

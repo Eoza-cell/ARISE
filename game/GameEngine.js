@@ -288,12 +288,14 @@ class GameEngine {
 
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
+            const sessionId = `player_${player.id}`; // Session unique par joueur
+            
             // Analyser l'action du joueur avec OpenAI
             const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
                 character: character,
                 location: character.currentLocation,
                 kingdom: character.kingdom
-            });
+            }, sessionId);
 
             // Générer la narration: Ollama > Gemini > OpenAI
             let narration;
@@ -301,8 +303,7 @@ class GameEngine {
                 // Priorité absolue à Groq pour la vitesse et qualité
                 if (this.groqClient && this.groqClient.hasValidClient()) {
                     console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
-                    const explorationPrompt = `Action du joueur: "${message}" - Lieu: ${character.currentLocation} (Royaume: ${character.kingdom})`;
-                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message);
+                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId);
                     console.log('✅ Narration générée avec Groq');
                 } else {
                     throw new Error('Groq non disponible, essai Ollama');
@@ -329,7 +330,7 @@ class GameEngine {
                                 kingdom: character.kingdom
                             }
                         };
-                        narration = await this.geminiClient.generateNarration(context);
+                        narration = await this.geminiClient.generateNarration(context, sessionId);
                         console.log('✅ Narration générée avec Gemini');
                     } catch (geminiError) {
                         console.log('⚠️ Fallback OpenAI pour narration:', geminiError.message);
@@ -342,7 +343,7 @@ class GameEngine {
                                 energy: character.currentEnergy,
                                 powerLevel: character.powerLevel
                             }
-                        });
+                        }, sessionId);
                     }
                 }
             }

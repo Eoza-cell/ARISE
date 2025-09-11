@@ -6,7 +6,38 @@ class GroqClient {
         this.client = null;
         this.isAvailable = false;
         this.model = 'llama-3.3-70b-versatile'; // Modèle Groq récent pour la narration
+        this.sessionMemory = new Map(); // sessionId => [{role, content, timestamp, location}]
+        this.maxMemoryPerSession = 12; // Mémoire plus longue pour Groq
         this.initializeClient();
+    }
+
+    addToMemory(sessionId, role, content, location = null) {
+        if (!this.sessionMemory.has(sessionId)) {
+            this.sessionMemory.set(sessionId, []);
+        }
+        const memories = this.sessionMemory.get(sessionId);
+        memories.push({ 
+            role, 
+            content, 
+            location, 
+            timestamp: Date.now() 
+        });
+        
+        // Limiter la taille mémoire
+        if (memories.length > this.maxMemoryPerSession) {
+            memories.splice(0, memories.length - this.maxMemoryPerSession);
+        }
+        this.sessionMemory.set(sessionId, memories);
+    }
+
+    getLocationContinuity(sessionId, currentLocation) {
+        const memories = this.sessionMemory.get(sessionId) || [];
+        const locationMemories = memories.filter(m => m.location === currentLocation);
+        
+        if (locationMemories.length > 0) {
+            return `Le personnage est dans ${currentLocation} depuis plusieurs actions. Contexte précédent dans ce lieu: ${locationMemories.slice(-3).map(m => m.content).join('; ')}`;
+        }
+        return `Première fois dans ${currentLocation} selon la mémoire.`;
     }
 
     async initializeClient() {
@@ -95,15 +126,32 @@ class GroqClient {
         return await this.generateNarration(prompt, maxTokens);
     }
 
-    async generateExplorationNarration(location, action, maxTokens = 300) {
+    async generateExplorationNarration(location, action, sessionId = "default", maxTokens = 300) {
+        const locationContinuity = this.getLocationContinuity(sessionId, location);
+        
         const prompt = `Décris cette exploration dans un monde RPG:
         Lieu: ${location}
         Action du joueur: ${action}
         
+        ${locationContinuity}
+        
+        RÈGLE IMPORTANTE: Le personnage est DÉJÀ dans ce lieu. Ne dis pas qu'il "arrive", "entre" ou "découvre" le lieu sauf si l'action le précise explicitement.
+        
         Contexte: Monde médiéval-steampunk avec 12 royaumes, magie, technologie à vapeur, 
         créatures fantastiques et aventures épiques.`;
 
-        return await this.generateNarration(prompt, maxTokens);
+        try {
+            const narration = await this.generateNarration(prompt, maxTokens);
+            
+            // Ajouter à la mémoire
+            this.addToMemory(sessionId, "user", `Action: ${action}`, location);
+            this.addToMemory(sessionId, "assistant", narration, location);
+            
+            return narration;
+        } catch (error) {
+            console.error('❌ Erreur génération exploration Groq:', error.message);
+            throw error;
+        }
     }
 
     async generateCharacterCreationNarration(characterData, maxTokens = 200) {

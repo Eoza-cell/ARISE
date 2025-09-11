@@ -4,6 +4,8 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
 class GeminiClient {
     constructor() {
         this.isAvailable = false;
+        this.memory = new Map(); // sessionId => [{role, content, timestamp}]
+        this.maxMemorySize = 15; // Augmenter la taille de la mémoire
         
         try {
             if (!process.env.GEMINI_API_KEY) {
@@ -27,18 +29,51 @@ class GeminiClient {
         }
     }
 
-    async generateNarration(context) {
+    addMemory(sessionId, role, content) {
+        if (!this.memory.has(sessionId)) {
+            this.memory.set(sessionId, []);
+        }
+        const memories = this.memory.get(sessionId);
+        memories.push({ role, content, timestamp: Date.now() });
+        
+        // Limiter la taille de la mémoire
+        if (memories.length > this.maxMemorySize) {
+            memories.splice(0, memories.length - this.maxMemorySize);
+        }
+        this.memory.set(sessionId, memories);
+    }
+
+    getMemoryContext(sessionId) {
+        const memories = this.memory.get(sessionId) || [];
+        return memories.map(m => `${m.role}: ${m.content}`).join('\n');
+    }
+
+    async generateNarration(context, sessionId = "default") {
         if (!this.isAvailable) {
             return "Le narrateur semble momentanément absent. L'action continue sans description détaillée.";
         }
         
         try {
             const prompt = this.buildNarrationPrompt(context);
+            const memoryContext = this.getMemoryContext(sessionId);
             
-            const result = await this.model.generateContent(prompt);
+            const enhancedPrompt = `MÉMOIRE RÉCENTE:
+${memoryContext}
+
+CONTEXTE ACTUEL:
+${prompt}
+
+IMPORTANT: Le personnage est DÉJÀ dans ${context.character.currentLocation}. Ne dis pas qu'il y arrive ou y entre, sauf si l'action le précise explicitement.`;
+            
+            const result = await this.model.generateContent(enhancedPrompt);
             const response = await result.response;
+            const narration = response.text();
             
-            return response.text();
+            // Sauvegarder dans la mémoire
+            this.addMemory(sessionId, "user", `Action: ${context.action} | Lieu: ${context.character.currentLocation}`);
+            this.addMemory(sessionId, "assistant", narration);
+            
+            return narration;
         } catch (error) {
             console.error('❌ Erreur lors de la génération de narration:', error);
             return "Le narrateur semble momentanément absent. L'action continue sans description détaillée.";
