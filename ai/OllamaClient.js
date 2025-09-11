@@ -9,12 +9,12 @@ class OllamaClient {
 
     async initializeClient() {
         try {
-            // Test la connexion à Ollama
-            await ollama.list();
-            this.isAvailable = true;
-            console.log('✅ Client Ollama initialisé avec succès');
+            // Ollama n'est pas compatible avec l'environnement Replit
+            // Utilisation d'une API externe compatible ou fallback
+            console.log('⚠️ Ollama non compatible avec Replit - utilisation alternative en développement');
+            this.isAvailable = false;
         } catch (error) {
-            console.log('⚠️ Ollama non disponible - le service n\'est pas démarré ou installé');
+            console.log('⚠️ Ollama non disponible - environnement non compatible');
             this.isAvailable = false;
         }
     }
