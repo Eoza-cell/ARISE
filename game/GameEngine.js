@@ -1,7 +1,9 @@
 const GeminiClient = require('../gemini/GeminiClient');
+const OpenAIClient = require('../ai/OpenAIClient');
 
 class GameEngine {
     constructor() {
+        this.openAIClient = new OpenAIClient();
         this.commandHandlers = {
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
@@ -273,13 +275,61 @@ class GameEngine {
     }
 
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
-        // Cette méthode sera étendue avec l'intégration Gemini pour la narration
-        return {
-            text: `🎮 **Action en cours de traitement...**\n\n` +
-                  `Ton personnage **${character.name}** dans le royaume de **${character.kingdom}**\n\n` +
-                  `Action demandée : "${message}"\n\n` +
-                  `💀 Le système de narration IA sera bientôt intégré !`
-        };
+        try {
+            // Analyser l'action du joueur avec OpenAI
+            const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
+                character: character,
+                location: character.currentLocation,
+                kingdom: character.kingdom
+            });
+
+            // Générer la narration avec OpenAI
+            const narration = await this.openAIClient.generateNarration({
+                character: character,
+                location: character.currentLocation,
+                action: message,
+                gameState: {
+                    life: character.currentLife,
+                    energy: character.currentEnergy,
+                    powerLevel: character.powerLevel
+                }
+            });
+
+            // Appliquer les coûts énergétiques
+            const energyCost = Math.min(actionAnalysis.energyCost, character.currentEnergy);
+            character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
+
+            // Sauvegarder les changements
+            await dbManager.updateCharacter(character.id, {
+                currentEnergy: character.currentEnergy
+            });
+
+            const riskEmoji = {
+                'low': '🟢',
+                'medium': '🟡', 
+                'high': '🟠',
+                'extreme': '🔴'
+            }[actionAnalysis.riskLevel] || '⚪';
+
+            return {
+                text: `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
+                      `📖 **Narration :**\n${narration}\n\n` +
+                      `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy} (-${energyCost})\n` +
+                      `${riskEmoji} **Niveau de risque :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
+                      `🎯 **Type d'action :** ${actionAnalysis.actionType}\n\n` +
+                      `💭 *Que fais-tu ensuite ?*`,
+                image: await imageGenerator.generateCharacterImage(character)
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur lors du traitement IA:', error);
+            return {
+                text: `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
+                      `📖 **Action :** "${message}"\n\n` +
+                      `⚠️ Le narrateur analyse ton action...\n\n` +
+                      `💭 *Continue ton aventure...*`
+            };
+        }
     }
 
     // Méthodes utilitaires
@@ -606,10 +656,6 @@ class GameEngine {
             };
         }
     }
-}
-
-module.exports = GameEngine;
-
 
     async finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage = false, imageBuffer = null }) {
         // Récupérer toutes les données temporaires
