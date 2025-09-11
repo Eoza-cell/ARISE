@@ -363,14 +363,27 @@ class GameEngine {
                 'extreme': '🔴'
             }[actionAnalysis.riskLevel] || '⚪';
 
-            return {
-                text: `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
-                      `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy} (-${energyCost})\n` +
-                      `${riskEmoji} **Niveau de risque :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
-                      `🎯 **Type d'action :** ${actionAnalysis.actionType}\n\n` +
-                      `💭 *Que fais-tu ensuite ?*`,
-                image: await imageGenerator.generateCharacterActionImage(character, message, narration)
-            };
+            // Préparer la réponse avec narration Groq prioritaire
+            const responseText = `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
+                               `📖 **Narration :** ${narration}\n\n` +
+                               `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy} (-${energyCost})\n` +
+                               `${riskEmoji} **Niveau de risque :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
+                               `🎯 **Type d'action :** ${actionAnalysis.actionType}\n\n` +
+                               `💭 *Que fais-tu ensuite ?*`;
+
+            // Essayer de générer l'image, mais ne pas bloquer l'envoi si ça échoue
+            try {
+                const image = await imageGenerator.generateCharacterActionImage(character, message, narration);
+                return {
+                    text: responseText,
+                    image: image
+                };
+            } catch (imageError) {
+                console.log('⚠️ Image échouée, envoi narration seule:', imageError.message);
+                return {
+                    text: responseText
+                };
+            }
 
         } catch (error) {
             console.error('❌ Erreur lors du traitement IA:', error);

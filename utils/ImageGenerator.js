@@ -874,7 +874,7 @@ class ImageGenerator {
     }
 
     async generateWithFallback(prompt, imagePath, fallbackFunction) {
-        // Essayer Bytez en priorité
+        // Essayer Bytez en priorité (timeout réduit pour éviter les blocages)
         if (this.hasBytez && this.bytezClient) {
             try {
                 console.log('🎨 Génération avec Bytez (priorité)...');
@@ -885,27 +885,12 @@ class ImageGenerator {
                     return imageBuffer;
                 }
             } catch (bytezError) {
-                console.log('⚠️ Erreur Bytez, essai Gemini:', bytezError.message);
+                console.log('⚠️ Erreur Bytez (ne pas bloquer narration):', bytezError.message);
             }
         }
 
-        // Fallback Gemini (réactivé temporairement)
-        if (this.hasGemini && this.geminiClient) {
-            try {
-                console.log('🎨 Génération avec Gemini AI (fallback)...');
-                await this.geminiClient.generateImage(prompt, imagePath);
-                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                if (imageBuffer) {
-                    console.log('✅ Image générée avec Gemini');
-                    return imageBuffer;
-                }
-            } catch (geminiError) {
-                console.log('⚠️ Erreur Gemini, fallback Canvas:', geminiError.message);
-            }
-        }
-
-        // Fallback Canvas final
-        console.log('🎨 Fallback Canvas - derniers recours');
+        // Fallback Canvas direct (pas d'attente Gemini pour images)
+        console.log('🎨 Fallback Canvas direct - priorité narration');
         return await fallbackFunction();
     }
 
