@@ -26,7 +26,7 @@ class GameEngine {
                 // Nouveau joueur - créer avec nom temporaire
                 const username = `Joueur_${playerNumber.slice(-4)}`;
                 player = await dbManager.createPlayer(playerNumber, username);
-                
+
                 return {
                     text: `🎮 **Bienvenue dans FRICTION ULTIMATE !**\n\n` +
                           `Tu es maintenant enregistré en tant que : **${username}**\n\n` +
@@ -45,7 +45,7 @@ class GameEngine {
 
             // Traitement des commandes
             const command = message.toLowerCase().trim();
-            
+
             if (this.commandHandlers[command]) {
                 return await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator });
             }
@@ -63,9 +63,9 @@ class GameEngine {
 
     async handleMenuCommand({ player, dbManager, imageGenerator }) {
         const character = await dbManager.getCharacterByPlayer(player.id);
-        
+
         let menuText = `🎮 **FRICTION ULTIMATE - Menu Principal**\n\n`;
-        
+
         if (character) {
             menuText += `👤 **Personnage :** ${character.name}\n` +
                        `🏰 **Royaume :** ${character.kingdom}\n` +
@@ -92,7 +92,7 @@ class GameEngine {
 
     async handleCreateCharacterCommand({ player, dbManager, imageGenerator }) {
         const existingCharacter = await dbManager.getCharacterByPlayer(player.id);
-        
+
         if (existingCharacter) {
             return {
                 text: `👤 Tu as déjà un personnage : **${existingCharacter.name}**\n\n` +
@@ -111,7 +111,7 @@ class GameEngine {
     async startCharacterCreation({ player, dbManager, imageGenerator }) {
         // Marquer le début de la création pour sécuriser le processus
         await dbManager.setTemporaryData(player.id, 'creation_started', true);
-        
+
         // Processus simplifié en 3 étapes courtes
         let creationText = `⚔️ **CRÉATION RAPIDE DE PERSONNAGE**\n\n` +
                           `🎯 **Étape 1/3 - Sexe**\n` +
@@ -145,7 +145,7 @@ class GameEngine {
 
     async handleCharacterSheetCommand({ player, dbManager, imageGenerator }) {
         const character = await dbManager.getCharacterByPlayer(player.id);
-        
+
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage !\n\n` +
@@ -186,14 +186,14 @@ class GameEngine {
         if (imageMessage) {
             const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
             const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
-            
+
             if (creationStarted && tempName) {
                 try {
                     console.log('📸 Réception d\'une image pour la création de personnage...');
-                    
+
                     // Télécharger l'image
                     const imageBuffer = await sock.downloadMediaMessage(imageMessage);
-                    
+
                     if (imageBuffer) {
                         console.log(`✅ Image téléchargée: ${imageBuffer.length} bytes`);
                         return await this.finalizeCharacterCreation({ 
@@ -224,10 +224,10 @@ class GameEngine {
             };
         }
         // D'abord traiter les actions de création de personnage (avant de vérifier si personnage existe)
-        
+
         // Vérifier si une création est en cours
         const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
-        
+
         // Traitement des actions de création de personnage en cours (seulement si création initiée)
         if (creationStarted && (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME' || message === '1' || message === '2')) {
             return await this.handleGenderSelection({ player, message, dbManager, imageGenerator });
@@ -243,7 +243,7 @@ class GameEngine {
         // Gestion du nom de personnage (si en cours de création)  
         const tempKingdom = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
         const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
-        
+
         if (creationStarted && tempGender && tempKingdom && !tempName) {
             // Le joueur est en train de donner le nom de son personnage
             return await this.handleCharacterNameInput({ player, name: message, dbManager, imageGenerator });
@@ -263,7 +263,7 @@ class GameEngine {
 
         // Maintenant vérifier si le personnage existe pour les actions de jeu normales
         const character = await dbManager.getCharacterByPlayer(player.id);
-        
+
         if (!character) {
             return {
                 text: `❌ Tu dois d'abord créer un personnage avec /créer !`
@@ -337,7 +337,7 @@ class GameEngine {
         const percentage = Math.round((current / max) * 100);
         const filledBars = Math.round(percentage / 20);
         const emptyBars = 5 - filledBars;
-        
+
         return icon.repeat(filledBars) + '⬜'.repeat(emptyBars) + ` (${percentage}%)`;
     }
 
@@ -345,14 +345,14 @@ class GameEngine {
         if (!equipment || Object.keys(equipment).length === 0) {
             return '• Aucun équipement';
         }
-        
+
         let formatted = '';
         if (equipment.weapon) formatted += `• Arme : ${equipment.weapon}\n`;
         if (equipment.armor) formatted += `• Armure : ${equipment.armor}\n`;
         if (equipment.accessories && equipment.accessories.length > 0) {
             formatted += `• Accessoires : ${equipment.accessories.join(', ')}\n`;
         }
-        
+
         return formatted || '• Aucun équipement';
     }
 
@@ -360,7 +360,7 @@ class GameEngine {
         if (!techniques || techniques.length === 0) {
             return '• Aucune technique apprise';
         }
-        
+
         return techniques.map(tech => `• ${tech}`).join('\n');
     }
 
@@ -385,9 +385,9 @@ class GameEngine {
 
     async handleKingdomsCommand({ dbManager }) {
         const kingdoms = await dbManager.getAllKingdoms();
-        
+
         let kingdomsText = `🏰 **LES 12 ROYAUMES DE FRICTION ULTIMATE**\n\n`;
-        
+
         kingdoms.forEach((kingdom, index) => {
             kingdomsText += `**${index + 1}. ${kingdom.name} (${kingdom.id})**\n` +
                            `${kingdom.description}\n` +
@@ -402,9 +402,9 @@ class GameEngine {
 
     async handleOrdersCommand({ dbManager }) {
         const orders = await dbManager.getAllOrders();
-        
+
         let ordersText = `⚔️ **LES 7 ORDRES DE FRICTION ULTIMATE**\n\n`;
-        
+
         orders.forEach((order, index) => {
             ordersText += `**${index + 1}. ${order.name}**\n` +
                          `${order.description}\n` +
@@ -439,7 +439,7 @@ class GameEngine {
 
     async handleInventoryCommand({ player, dbManager, imageGenerator }) {
         const character = await dbManager.getCharacterByPlayer(player.id);
-        
+
         if (!character) {
             return {
                 text: `❌ Tu dois d'abord créer un personnage avec /créer !`
@@ -465,7 +465,7 @@ class GameEngine {
         if (!inventory || inventory.length === 0) {
             return '• Inventaire vide';
         }
-        
+
         return inventory.map(item => `• ${item.itemId} (x${item.quantity})`).join('\n');
     }
 
@@ -491,7 +491,7 @@ class GameEngine {
     async handleGenderSelection({ player, message, dbManager, imageGenerator }) {
         // Marquer le début de la création si pas déjà fait
         await dbManager.setTemporaryData(player.id, 'creation_started', true);
-        
+
         // Convertir l'entrée du joueur en genre
         let gender;
         if (message === '1' || message.toUpperCase() === 'HOMME') {
@@ -526,7 +526,7 @@ class GameEngine {
 
     async handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator }) {
         const kingdoms = await dbManager.getAllKingdoms();
-        
+
         if (kingdomNumber < 1 || kingdomNumber > kingdoms.length) {
             return {
                 text: `❌ Royaume invalide ! \n\n` +
@@ -535,10 +535,10 @@ class GameEngine {
         }
 
         const selectedKingdom = kingdoms[kingdomNumber - 1];
-        
+
         // Récupérer le genre stocké temporairement
         const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
-        
+
         if (!gender) {
             return {
                 text: `❌ Erreur : genre non trouvé. Recommence la création avec /créer`
@@ -547,7 +547,7 @@ class GameEngine {
 
         // Stocker le royaume temporairement avec son ID
         await dbManager.setTemporaryData(player.id, 'creation_kingdom', selectedKingdom.id);
-        
+
         console.log(`✅ Royaume sélectionné: ${selectedKingdom.name} (ID: ${selectedKingdom.id}) pour le joueur ${player.id}`);
 
         return {
@@ -565,7 +565,7 @@ class GameEngine {
         // Récupérer les données temporaires
         const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
         const kingdomId = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
-        
+
         if (!gender || !kingdomId) {
             return {
                 text: `❌ Erreur : données de création manquantes. Recommence avec /créer`
@@ -605,7 +605,7 @@ class GameEngine {
         // Récupérer les détails du royaume
         const kingdom = await dbManager.getKingdomById(kingdomId);
         const kingdomName = kingdom ? kingdom.name : kingdomId;
-        
+
         // Créer le personnage
         const characterData = {
             playerId: player.id,
@@ -627,12 +627,12 @@ class GameEngine {
             inventory: [],
             learnedTechniques: []
         };
-        
+
         console.log(`✅ Création personnage: ${name}, Royaume: ${kingdomName} (${kingdomId}), Genre: ${gender}`);
 
         try {
             const newCharacter = await dbManager.createCharacter(characterData);
-            
+
             // Nettoyer TOUTES les données temporaires de création
             await dbManager.clearTemporaryData(player.id, 'creation_started');
             await dbManager.clearTemporaryData(player.id, 'creation_gender');
@@ -648,7 +648,7 @@ class GameEngine {
                       `🎮 Utilise **/menu** pour découvrir tes options !`,
                 image: await imageGenerator.generateCharacterImage(newCharacter)
             };
-            
+
         } catch (error) {
             console.error('❌ Erreur lors de la création du personnage:', error);
             return {
@@ -662,7 +662,7 @@ class GameEngine {
         const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
         const kingdomId = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
         const name = await dbManager.getTemporaryData(player.id, 'creation_name');
-        
+
         if (!gender || !kingdomId || !name) {
             return {
                 text: `❌ Erreur : données de création manquantes. Recommence avec /créer`
@@ -672,7 +672,7 @@ class GameEngine {
         // Récupérer les détails du royaume
         const kingdom = await dbManager.getKingdomById(kingdomId);
         const kingdomName = kingdom ? kingdom.name : kingdomId;
-        
+
         // Créer le personnage
         const characterData = {
             playerId: player.id,
@@ -695,17 +695,17 @@ class GameEngine {
             learnedTechniques: [],
             customImage: hasCustomImage // Marquer si le personnage a une image personnalisée
         };
-        
+
         console.log(`✅ Création personnage: ${name}, Royaume: ${kingdomName} (${kingdomId}), Genre: ${gender}, Image: ${hasCustomImage}`);
 
         try {
             const newCharacter = await dbManager.createCharacter(characterData);
-            
+
             // Si image personnalisée, la stocker
             if (hasCustomImage && imageBuffer) {
                 await imageGenerator.saveCustomCharacterImage(newCharacter.id, imageBuffer);
             }
-            
+
             // Nettoyer TOUTES les données temporaires de création
             await dbManager.clearTemporaryData(player.id, 'creation_started');
             await dbManager.clearTemporaryData(player.id, 'creation_gender');
@@ -725,7 +725,7 @@ class GameEngine {
                       `🎮 Utilise **/menu** pour découvrir tes options !`,
                 image: await imageGenerator.generateCharacterImage(newCharacter)
             };
-            
+
         } catch (error) {
             console.error('❌ Erreur lors de la création du personnage:', error);
             return {
@@ -733,3 +733,7 @@ class GameEngine {
             };
         }
     }
+
+}
+
+module.exports = GameEngine;
