@@ -16,7 +16,7 @@ class GameEngine {
         };
     }
 
-    async processPlayerMessage({ playerNumber, chatId, message, dbManager, imageGenerator }) {
+    async processPlayerMessage({ playerNumber, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
         try {
             // Récupération ou création du joueur
             let player = await dbManager.getPlayerByWhatsApp(playerNumber);
@@ -49,7 +49,7 @@ class GameEngine {
             }
 
             // Si ce n'est pas une commande, traiter comme action de jeu
-            return await this.handleGameAction({ player, chatId, message, dbManager, imageGenerator });
+            return await this.handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator });
 
         } catch (error) {
             console.error('❌ Erreur dans le moteur de jeu:', error);
@@ -179,7 +179,48 @@ class GameEngine {
         };
     }
 
-    async handleGameAction({ player, chatId, message, dbManager, imageGenerator }) {
+    async handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
+        // Gestion des images pour la création de personnage
+        if (imageMessage) {
+            const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
+            const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
+            
+            if (creationStarted && tempName) {
+                try {
+                    console.log('📸 Réception d\'une image pour la création de personnage...');
+                    
+                    // Télécharger l'image
+                    const imageBuffer = await sock.downloadMediaMessage(imageMessage);
+                    
+                    if (imageBuffer) {
+                        console.log(`✅ Image téléchargée: ${imageBuffer.length} bytes`);
+                        return await this.finalizeCharacterCreation({ 
+                            player, 
+                            dbManager, 
+                            imageGenerator, 
+                            hasCustomImage: true, 
+                            imageBuffer 
+                        });
+                    } else {
+                        return {
+                            text: `❌ Erreur lors du téléchargement de l'image. Réessaie ou écris "SANS_PHOTO".`
+                        };
+                    }
+                } catch (error) {
+                    console.error('❌ Erreur traitement image:', error);
+                    return {
+                        text: `❌ Erreur lors du traitement de l'image. Réessaie ou écris "SANS_PHOTO".`
+                    };
+                }
+            }
+        }
+
+        // Si on a une image mais qu'on n'est pas en création, ignorer
+        if (imageMessage && !message) {
+            return {
+                text: `📸 Image reçue, mais aucune action prévue pour les images pour le moment.`
+            };
+        }
         // D'abord traiter les actions de création de personnage (avant de vérifier si personnage existe)
         
         // Vérifier si une création est en cours
@@ -199,10 +240,23 @@ class GameEngine {
 
         // Gestion du nom de personnage (si en cours de création)  
         const tempKingdom = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
+        const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
         
-        if (creationStarted && tempGender && tempKingdom) {
+        if (creationStarted && tempGender && tempKingdom && !tempName) {
             // Le joueur est en train de donner le nom de son personnage
             return await this.handleCharacterNameInput({ player, name: message, dbManager, imageGenerator });
+        }
+
+        // Gestion de la finalisation de création (après nom, en attente d'image ou "SANS_PHOTO")
+        if (creationStarted && tempGender && tempKingdom && tempName) {
+            if (message.toUpperCase() === 'SANS_PHOTO') {
+                return await this.finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage: false });
+            }
+            // Si c'est un autre message texte, redemander l'image
+            return {
+                text: `📸 **En attente de ta photo de visage...**\n\n` +
+                      `🖼️ Envoie une image de ton visage ou écris "SANS_PHOTO" pour continuer sans photo personnalisée.`
+            };
         }
 
         // Maintenant vérifier si le personnage existe pour les actions de jeu normales
@@ -450,7 +504,7 @@ class GameEngine {
             text: `🏰 **Royaume sélectionné :** ${selectedKingdom.name}\n\n` +
                   `👤 **Sexe :** ${gender === 'male' ? 'HOMME' : 'FEMME'}\n` +
                   `🏰 **Royaume :** ${selectedKingdom.name}\n\n` +
-                  `📝 **Étape 3/3 - Donne un nom à ton personnage :**\n\n` +
+                  `📝 **Étape 3/4 - Donne un nom à ton personnage :**\n\n` +
                   `✍️ Écris simplement le nom que tu veux pour ton personnage.\n` +
                   `⚠️ **Attention :** Le nom ne peut pas être modifié après !`,
             image: await imageGenerator.generateKingdomImage(selectedKingdom.id)
@@ -483,6 +537,20 @@ class GameEngine {
                 text: `❌ Ce nom est déjà pris ! Choisis un autre nom.`
             };
         }
+
+        // Stocker le nom temporairement et demander l'image
+        await dbManager.setTemporaryData(player.id, 'creation_name', name.trim());
+
+        return {
+            text: `✅ **Nom accepté :** ${name}\n\n` +
+                  `📸 **Étape 4/4 - Photo de ton visage :**\n\n` +
+                  `🖼️ Envoie maintenant une photo de ton visage pour ton personnage.\n` +
+                  `⚠️ **Important :**\n` +
+                  `• Seule la zone du visage sera utilisée\n` +
+                  `• Photo claire et bien éclairée recommandée\n` +
+                  `• Si tu n'as pas de photo, écris "SANS_PHOTO"\n\n` +
+                  `📷 **Envoie ta photo maintenant...**`
+        };
 
         // Récupérer les détails du royaume
         const kingdom = await dbManager.getKingdomById(kingdomId);
@@ -541,3 +609,81 @@ class GameEngine {
 }
 
 module.exports = GameEngine;
+
+
+    async finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage = false, imageBuffer = null }) {
+        // Récupérer toutes les données temporaires
+        const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
+        const kingdomId = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
+        const name = await dbManager.getTemporaryData(player.id, 'creation_name');
+        
+        if (!gender || !kingdomId || !name) {
+            return {
+                text: `❌ Erreur : données de création manquantes. Recommence avec /créer`
+            };
+        }
+
+        // Récupérer les détails du royaume
+        const kingdom = await dbManager.getKingdomById(kingdomId);
+        const kingdomName = kingdom ? kingdom.name : kingdomId;
+        
+        // Créer le personnage
+        const characterData = {
+            playerId: player.id,
+            name: name,
+            gender: gender,
+            kingdom: kingdomId,
+            level: 1,
+            experience: 0,
+            powerLevel: 'G',
+            frictionLevel: 'G',
+            currentLife: 100,
+            maxLife: 100,
+            currentEnergy: 100,
+            maxEnergy: 100,
+            currentLocation: `Capitale de ${kingdomName}`,
+            position: { x: 0, y: 0, z: 0 },
+            coins: 100,
+            equipment: {},
+            inventory: [],
+            learnedTechniques: [],
+            customImage: hasCustomImage // Marquer si le personnage a une image personnalisée
+        };
+        
+        console.log(`✅ Création personnage: ${name}, Royaume: ${kingdomName} (${kingdomId}), Genre: ${gender}, Image: ${hasCustomImage}`);
+
+        try {
+            const newCharacter = await dbManager.createCharacter(characterData);
+            
+            // Si image personnalisée, la stocker
+            if (hasCustomImage && imageBuffer) {
+                await imageGenerator.saveCustomCharacterImage(newCharacter.id, imageBuffer);
+            }
+            
+            // Nettoyer TOUTES les données temporaires de création
+            await dbManager.clearTemporaryData(player.id, 'creation_started');
+            await dbManager.clearTemporaryData(player.id, 'creation_gender');
+            await dbManager.clearTemporaryData(player.id, 'creation_kingdom');
+            await dbManager.clearTemporaryData(player.id, 'creation_name');
+
+            const imageType = hasCustomImage ? "avec ta photo personnalisée" : "avec une image générée";
+
+            return {
+                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !**\n\n` +
+                      `👤 **Nom :** ${newCharacter.name}\n` +
+                      `👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}\n` +
+                      `🏰 **Royaume :** ${kingdomName}\n` +
+                      `📸 **Image :** ${imageType}\n` +
+                      `⚔️ **Niveau :** ${newCharacter.level}\n` +
+                      `🌟 **Niveau de puissance :** ${newCharacter.powerLevel}\n\n` +
+                      `🎮 Utilise **/menu** pour découvrir tes options !`,
+                image: await imageGenerator.generateCharacterImage(newCharacter)
+            };
+            
+        } catch (error) {
+            console.error('❌ Erreur lors de la création du personnage:', error);
+            return {
+                text: `❌ Erreur lors de la création du personnage. Réessaie plus tard.`
+            };
+        }
+    }

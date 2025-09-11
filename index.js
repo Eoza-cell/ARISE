@@ -99,9 +99,11 @@ class FrictionUltimateBot {
         try {
             const from = message.key.remoteJid;
             const messageText = this.extractMessageText(message);
+            const messageImage = this.extractMessageImage(message);
             const messageId = message.key.id;
             
-            if (!messageText) return;
+            // Si pas de texte ni d'image, ignorer
+            if (!messageText && !messageImage) return;
 
             // Gestion des groupes : ignorer les messages sans participant (doublons)
             if (from.includes('@g.us') && !message.key.participant) {
@@ -151,7 +153,9 @@ class FrictionUltimateBot {
             const response = await this.gameEngine.processPlayerMessage({
                 playerNumber,
                 chatId: from,
-                message: messageText.trim(),
+                message: messageText ? messageText.trim() : null,
+                imageMessage: messageImage,
+                sock: this.sock,
                 dbManager: this.dbManager,
                 imageGenerator: this.imageGenerator
             });
@@ -179,6 +183,13 @@ class FrictionUltimateBot {
         return null;
     }
 
+    extractMessageImage(message) {
+        if (message.message?.imageMessage) {
+            return message.message.imageMessage;
+        }
+        return null;
+    }
+
     async sendResponse(chatId, response) {
         try {
             if (response.image) {
@@ -201,6 +212,9 @@ class FrictionUltimateBot {
 
 // Démarrage du bot
 const bot = new FrictionUltimateBot();
+
+// Démarrer le serveur keep-alive pour UptimeRobot
+require('./server/keepalive');
 
 // Gestion propre de l'arrêt du processus
 process.on('SIGINT', () => {

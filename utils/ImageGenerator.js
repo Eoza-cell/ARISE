@@ -131,6 +131,15 @@ class ImageGenerator {
 
     async generateCharacterImage(character) {
         try {
+            // Vérifier si le personnage a une image personnalisée
+            if (character.customImage) {
+                const customImage = await this.getCustomCharacterImage(character.id);
+                if (customImage) {
+                    console.log(`🖼️ Utilisation de l'image personnalisée pour ${character.name}`);
+                    return customImage;
+                }
+            }
+
             const cacheKey = `character_${character.id}_ai`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
@@ -779,3 +788,52 @@ class ImageGenerator {
 }
 
 module.exports = ImageGenerator;
+
+
+
+    async saveCustomCharacterImage(characterId, imageBuffer) {
+        try {
+            const imagePath = path.join(this.tempPath, `character_custom_${characterId}.jpg`);
+            
+            // Utiliser Sharp pour traiter l'image (recadrer le visage, optimiser)
+            await sharp(imageBuffer)
+                .resize(400, 400, { 
+                    fit: 'cover', 
+                    position: 'centre' 
+                })
+                .jpeg({ quality: 85 })
+                .toFile(imagePath);
+            
+            console.log(`✅ Image personnalisée sauvegardée pour le personnage ${characterId}`);
+            
+            // Mettre en cache
+            const processedBuffer = await fs.readFile(imagePath);
+            this.imageCache.set(`character_custom_${characterId}`, processedBuffer);
+            
+            return imagePath;
+        } catch (error) {
+            console.error('❌ Erreur lors de la sauvegarde de l\'image personnalisée:', error);
+            return null;
+        }
+    }
+
+    async getCustomCharacterImage(characterId) {
+        try {
+            const cacheKey = `character_custom_${characterId}`;
+            if (this.imageCache.has(cacheKey)) {
+                return this.imageCache.get(cacheKey);
+            }
+
+            const imagePath = path.join(this.tempPath, `character_custom_${characterId}.jpg`);
+            const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+            
+            if (imageBuffer) {
+                this.imageCache.set(cacheKey, imageBuffer);
+                return imageBuffer;
+            }
+        } catch (error) {
+            console.error('❌ Erreur lors de la récupération de l\'image personnalisée:', error);
+        }
+        
+        return null;
+    }
