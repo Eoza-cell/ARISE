@@ -22,22 +22,37 @@ class FreepikClient {
                 throw new Error('Client Freepik non disponible - vérifiez FREEPIK_API_KEY');
             }
 
-            console.log(`🎨 Génération d'image Freepik: "${prompt.substring(0, 100)}..."`);
+            console.log(`🎨 Génération d'image Freepik avec prompt original: "${prompt}"`);
 
             // Configuration par défaut
             const style = options.style || '3d'; // 3d ou 2d
             const perspective = options.perspective || 'first_person'; // first_person, second_person, third_person
             const nudity = options.nudity || true; // Autoriser la nudité complète
             
+            console.log(`⚙️ Options: style=${style}, perspective=${perspective}, nudity=${nudity}`);
+            
             // Optimiser le prompt selon les options
             const optimizedPrompt = this.optimizePrompt(prompt, style, perspective, nudity);
+            
+            console.log(`✨ Prompt final optimisé: "${optimizedPrompt}"`);
+            console.log(`📏 Longueur du prompt: ${optimizedPrompt.length} caractères`);
+
+            // Construire un negative prompt plus précis
+            let negativePrompt = 'blurry, low quality, distorted, deformed, bad anatomy, ugly';
+            if (style === '3d') {
+                negativePrompt += ', cartoon, anime, 2d, flat art, drawing';
+            } else {
+                negativePrompt += ', photorealistic, 3d render, CGI, realistic photo';
+            }
 
             const requestData = {
                 prompt: optimizedPrompt,
-                negative_prompt: style === '3d' ? 'cartoon, anime, 2d' : '3d, photorealistic',
+                negative_prompt: negativePrompt,
                 image: {
                     size: "1024x1024"
-                }
+                },
+                num_inference_steps: 30,
+                guidance_scale: 7.5
             };
 
             const response = await axios.post(`${this.baseURL}/ai/text-to-image`, requestData, {
@@ -112,30 +127,41 @@ class FreepikClient {
     optimizePrompt(prompt, style, perspective, nudity) {
         let optimized = prompt;
 
-        // Ajouter la perspective
+        // Nettoyer le prompt de base
+        optimized = optimized.trim();
+
+        // Ajouter le style en premier pour définir le rendu
+        if (style === '3d') {
+            optimized = `photorealistic 3D rendering, highly detailed CGI, ${optimized}`;
+        } else {
+            optimized = `detailed anime illustration, manga art style, 2D digital art, ${optimized}`;
+        }
+
+        // Ajouter la perspective de manière plus précise
         const perspectiveMap = {
-            'first_person': 'first person view, POV perspective, seen from character eyes',
-            'second_person': 'second person view, facing the character directly',
-            'third_person': 'third person view, external perspective, full body visible'
+            'first_person': 'POV shot, first person perspective',
+            'second_person': 'front view, facing camera directly', 
+            'third_person': 'full body shot, third person view, complete character visible'
         };
         
-        optimized = `${perspectiveMap[perspective]}, ${optimized}`;
+        optimized = `${optimized}, ${perspectiveMap[perspective]}`;
 
-        // Ajouter le style
-        if (style === '3d') {
-            optimized = `3D realistic, highly detailed 3D rendering, photorealistic, ${optimized}`;
-        } else {
-            optimized = `2D anime style, manga art style, detailed anime illustration, ${optimized}`;
-        }
-
-        // Gestion de la nudité
+        // Gestion de la nudité (plus subtile)
         if (nudity) {
-            optimized = `${optimized}, detailed anatomy, nude, naked, visible genitals, uncensored, explicit content allowed`;
+            optimized = `${optimized}, anatomically correct, detailed body, artistic nude`;
+        } else {
+            optimized = `${optimized}, clothed, appropriate attire`;
         }
 
-        // Mots-clés de qualité
-        optimized = `masterpiece, best quality, ultra-detailed, 8k resolution, ${optimized}`;
+        // Mots-clés de qualité essentiels
+        optimized = `${optimized}, masterpiece quality, 8K resolution, professional artwork, detailed textures`;
 
+        // Limiter la longueur pour éviter la confusion
+        if (optimized.length > 400) {
+            optimized = optimized.substring(0, 400);
+        }
+
+        console.log(`🔧 Prompt optimisé final: "${optimized}"`);
         return optimized;
     }
 

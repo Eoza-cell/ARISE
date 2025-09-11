@@ -867,10 +867,29 @@ class GameEngine {
             // Nettoyer et optimiser la description utilisateur
             const cleanDescription = description.trim();
             
-            const fullPrompt = `Detailed fantasy ${genderDesc} from ${character.kingdom} kingdom: ${cleanDescription}. ${kingdomDesc}. Fantasy RPG character, full body portrait, detailed armor and weapons, epic fantasy art style`;
+            // Construire un prompt plus structuré et précis
+            const basePrompt = `fantasy ${genderDesc} warrior`;
+            const kingdomContext = `from ${character.kingdom} kingdom (${kingdomDesc})`;
+            const userCustomization = cleanDescription;
+            const artStyle = 'detailed fantasy RPG character art, full body portrait, epic fantasy style';
+            
+            const fullPrompt = `${basePrompt} ${kingdomContext}, appearance: ${userCustomization}, ${artStyle}`;
+            
+            console.log(`🎨 Prompt de modification généré: "${fullPrompt}"`);
+            
+            // Vérifier que la description utilisateur est bien intégrée
+            if (!fullPrompt.toLowerCase().includes(cleanDescription.toLowerCase().substring(0, 20))) {
+                console.log('⚠️ Description utilisateur mal intégrée, correction...');
+                const correctedPrompt = `${userCustomization}, ${basePrompt} ${kingdomContext}, ${artStyle}`;
+                console.log(`🔧 Prompt corrigé: "${correctedPrompt}"`);
+                fullPrompt = correctedPrompt;
+            }
 
             // Générer l'image avec Freepik
             const imagePath = `temp/character_modified_${character.id}_${Date.now()}.png`;
+            
+            console.log(`📝 Description originale: "${cleanDescription}"`);
+            console.log(`🎯 Prompt final envoyé: "${fullPrompt}"`);
             
             await imageGenerator.freepikClient.generateImage(fullPrompt, imagePath, {
                 style: '3d',
