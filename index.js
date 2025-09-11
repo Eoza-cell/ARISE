@@ -102,10 +102,21 @@ class FrictionUltimateBot {
             const messageId = message.key.id;
             
             // Si pas de texte ni d'image, ignorer
-            if (!messageText && !messageImage) return;
+            if (!messageText && !messageImage) {
+                console.log('⚠️ Message ignoré: pas de texte ni d\'image');
+                return;
+            }
 
-            // Gestion des groupes : ignorer les messages sans participant (doublons)
-            if (from.includes('@g.us') && !message.key.participant) {
+            // Log des types de message pour debug
+            if (messageImage) {
+                console.log('📸 Message avec image détecté');
+            }
+            if (messageText) {
+                console.log(`📝 Message texte: "${messageText}"`);
+            }
+
+            // Gestion des groupes : ignorer les messages sans participant (doublons) SAUF pour les images
+            if (from.includes('@g.us') && !message.key.participant && !messageImage) {
                 console.log(`⚠️ Message de groupe sans participant ignoré (doublon): ${messageText}`);
                 return;
             }
@@ -114,7 +125,8 @@ class FrictionUltimateBot {
             const realSender = message.key.participant || from;
             
             // Déduplication basée sur messageId + contenu du message (plus robuste)
-            const uniqueKey = `${messageId}-${messageText.trim()}`;
+            const messageTextForKey = messageText ? messageText.trim() : '';
+            const uniqueKey = `${messageId}-${messageTextForKey}`;
             
             if (this.processedMessages.has(uniqueKey)) {
                 console.log(`⚠️ Message dupliqué ignoré: ${messageText} (messageId: ${messageId})`);
@@ -184,7 +196,12 @@ class FrictionUltimateBot {
 
     extractMessageImage(message) {
         if (message.message?.imageMessage) {
+            console.log('📸 Image détectée dans le message');
             return message.message.imageMessage;
+        }
+        if (message.message?.viewOnceMessage?.message?.imageMessage) {
+            console.log('📸 Image view-once détectée');
+            return message.message.viewOnceMessage.message.imageMessage;
         }
         return null;
     }

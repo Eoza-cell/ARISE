@@ -184,18 +184,22 @@ class GameEngine {
     async handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
         // Gestion des images pour la création de personnage
         if (imageMessage) {
+            console.log('📸 Image reçue - vérification du contexte de création...');
             const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
             const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
+
+            console.log(`🔍 Contexte création: started=${!!creationStarted}, name=${!!tempName}`);
 
             if (creationStarted && tempName) {
                 try {
                     console.log('📸 Réception d\'une image pour la création de personnage...');
+                    console.log('🔄 Tentative de téléchargement de l\'image...');
 
                     // Télécharger l'image
                     const imageBuffer = await sock.downloadMediaMessage(imageMessage);
 
-                    if (imageBuffer) {
-                        console.log(`✅ Image téléchargée: ${imageBuffer.length} bytes`);
+                    if (imageBuffer && imageBuffer.length > 0) {
+                        console.log(`✅ Image téléchargée avec succès: ${imageBuffer.length} bytes`);
                         return await this.finalizeCharacterCreation({ 
                             player, 
                             dbManager, 
@@ -204,16 +208,19 @@ class GameEngine {
                             imageBuffer 
                         });
                     } else {
+                        console.log('❌ Échec du téléchargement - buffer vide ou null');
                         return {
                             text: `❌ Erreur lors du téléchargement de l'image. Réessaie ou écris "SANS_PHOTO".`
                         };
                     }
                 } catch (error) {
-                    console.error('❌ Erreur traitement image:', error);
+                    console.error('❌ Erreur traitement image:', error.message, error.stack);
                     return {
-                        text: `❌ Erreur lors du traitement de l'image. Réessaie ou écris "SANS_PHOTO".`
+                        text: `❌ Erreur lors du traitement de l'image (${error.message}). Réessaie ou écris "SANS_PHOTO".`
                     };
                 }
+            } else {
+                console.log('📸 Image reçue mais pas en cours de création de personnage');
             }
         }
 
@@ -313,12 +320,11 @@ class GameEngine {
 
             return {
                 text: `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
-                      `📖 **Narration :**\n${narration}\n\n` +
                       `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy} (-${energyCost})\n` +
                       `${riskEmoji} **Niveau de risque :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
                       `🎯 **Type d'action :** ${actionAnalysis.actionType}\n\n` +
                       `💭 *Que fais-tu ensuite ?*`,
-                image: await imageGenerator.generateCharacterImage(character)
+                image: await imageGenerator.generateCharacterActionImage(character, message, narration)
             };
 
         } catch (error) {
@@ -364,7 +370,7 @@ class GameEngine {
         return techniques.map(tech => `• ${tech}`).join('\n');
     }
 
-    async handleHelpCommand() {
+    async handleHelpCommand({ imageGenerator }) {
         return {
             text: `📱 **AIDE - FRICTION ULTIMATE**\n\n` +
                   `🎮 **Commandes de base :**\n` +
@@ -379,11 +385,12 @@ class GameEngine {
                   `• /combat - Système de combat\n` +
                   `• /inventaire - Gestion équipement\n\n` +
                   `💀 **Le monde de Friction est impitoyable !**\n` +
-                  `Chaque action doit être précise et réfléchie.`
+                  `Chaque action doit être précise et réfléchie.`,
+            image: await imageGenerator.generateHelpImage()
         };
     }
 
-    async handleKingdomsCommand({ dbManager }) {
+    async handleKingdomsCommand({ dbManager, imageGenerator }) {
         const kingdoms = await dbManager.getAllKingdoms();
 
         let kingdomsText = `🏰 **LES 12 ROYAUMES DE FRICTION ULTIMATE**\n\n`;
@@ -397,10 +404,13 @@ class GameEngine {
                            `✨ **Particularités :** ${kingdom.particularities}\n\n`;
         });
 
-        return { text: kingdomsText };
+        return { 
+            text: kingdomsText,
+            image: await imageGenerator.generateKingdomsOverview()
+        };
     }
 
-    async handleOrdersCommand({ dbManager }) {
+    async handleOrdersCommand({ dbManager, imageGenerator }) {
         const orders = await dbManager.getAllOrders();
 
         let ordersText = `⚔️ **LES 7 ORDRES DE FRICTION ULTIMATE**\n\n`;
@@ -412,10 +422,13 @@ class GameEngine {
                          `⚔️ **Spécialités :** ${order.specialties.join(', ')}\n\n`;
         });
 
-        return { text: ordersText };
+        return { 
+            text: ordersText,
+            image: await imageGenerator.generateOrdersOverview()
+        };
     }
 
-    async handleCombatCommand() {
+    async handleCombatCommand({ imageGenerator }) {
         return {
             text: `⚔️ **SYSTÈME DE COMBAT - FRICTION ULTIMATE**\n\n` +
                   `🌟 **Niveaux de puissance (G à A) :**\n` +
@@ -433,7 +446,8 @@ class GameEngine {
                   `• Mouvement exact (distance en mètres)\n` +
                   `• Arme utilisée et angle d'attaque\n` +
                   `• Partie du corps visée\n\n` +
-                  `🎯 **Sans précision = vulnérabilité !**`
+                  `🎯 **Sans précision = vulnérabilité !**`,
+            image: await imageGenerator.generateCombatGuideImage()
         };
     }
 

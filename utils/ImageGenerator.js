@@ -129,6 +129,18 @@ class ImageGenerator {
         }
     }
 
+    async generateCharacterActionImage(character, action, narration) {
+        try {
+            const prompt = `Fantasy RPG scene: ${character.name}, ${character.gender === 'male' ? 'male' : 'female'} warrior from ${character.kingdom} kingdom, performing action: "${action}". ${narration}. Epic anime style, detailed character design, cinematic lighting, professional illustration`;
+            
+            const imagePath = path.join(this.tempPath, `character_action_${character.id}_${Date.now()}.png`);
+            return await this.generateWithFallback(prompt, imagePath, () => this.generateCharacterImage(character));
+        } catch (error) {
+            console.error('❌ Erreur génération image action personnage:', error);
+            return await this.generateCharacterImage(character);
+        }
+    }
+
     async generateCharacterImage(character) {
         try {
             // Vérifier si le personnage a une image personnalisée
@@ -826,6 +838,120 @@ class ImageGenerator {
         }
         
         return null;
+    }
+
+    async generateHelpImage() {
+        try {
+            const prompt = "Fantasy RPG help guide scroll, ancient parchment with mystical symbols, quills and ink, magical atmosphere, detailed medieval fantasy art style, anime style, professional illustration";
+            const imagePath = path.join(this.tempPath, 'help_guide.png');
+            return await this.generateWithFallback(prompt, imagePath, () => this.generateHelpImageFallback());
+        } catch (error) {
+            console.error('❌ Erreur génération image aide:', error);
+            return await this.generateHelpImageFallback();
+        }
+    }
+
+    async generateOrdersOverview() {
+        try {
+            const prompt = "Seven mysterious warrior orders fantasy illustration, different banners and emblems, medieval organizations, mystical symbols, dark fantasy atmosphere, anime style, detailed character design";
+            const imagePath = path.join(this.tempPath, 'orders_overview.png');
+            return await this.generateWithFallback(prompt, imagePath, () => this.generateOrdersOverviewFallback());
+        } catch (error) {
+            console.error('❌ Erreur génération image ordres:', error);
+            return await this.generateOrdersOverviewFallback();
+        }
+    }
+
+    async generateCombatGuideImage() {
+        try {
+            const prompt = "Epic fantasy combat training scene, warriors sparring with swords, power levels visualization, energy bars, steampunk medieval setting, anime style, highly detailed, professional illustration";
+            const imagePath = path.join(this.tempPath, 'combat_guide.png');
+            return await this.generateWithFallback(prompt, imagePath, () => this.generateCombatGuideFallback());
+        } catch (error) {
+            console.error('❌ Erreur génération image combat:', error);
+            return await this.generateCombatGuideFallback();
+        }
+    }
+
+    async generateWithFallback(prompt, imagePath, fallbackFunction) {
+        // Essayer Bytez en priorité
+        if (this.hasBytez && this.bytezClient) {
+            try {
+                await this.bytezClient.generateImage(prompt, imagePath);
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    console.log('✅ Image générée avec Bytez');
+                    return imageBuffer;
+                }
+            } catch (bytezError) {
+                console.log('⚠️ Erreur Bytez, essai Gemini:', bytezError.message);
+            }
+        }
+
+        // Fallback Gemini
+        if (this.hasGemini && this.geminiClient) {
+            try {
+                await this.geminiClient.generateImage(prompt, imagePath);
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    console.log('✅ Image générée avec Gemini');
+                    return imageBuffer;
+                }
+            } catch (geminiError) {
+                console.log('⚠️ Erreur Gemini, fallback Canvas:', geminiError.message);
+            }
+        }
+
+        // Fallback Canvas
+        return await fallbackFunction();
+    }
+
+    async generateHelpImageFallback() {
+        const canvas = createCanvas(600, 400);
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = '#2c1810';
+        ctx.fillRect(0, 0, 600, 400);
+        
+        ctx.fillStyle = '#d4af37';
+        ctx.font = 'bold 24px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('📱 GUIDE D\'AIDE', 300, 50);
+        ctx.fillText('FRICTION ULTIMATE', 300, 80);
+        
+        return canvas.toBuffer('image/png');
+    }
+
+    async generateOrdersOverviewFallback() {
+        const canvas = createCanvas(600, 400);
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = '#1a1a1a';
+        ctx.fillRect(0, 0, 600, 400);
+        
+        ctx.fillStyle = '#d4af37';
+        ctx.font = 'bold 24px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚔️ LES 7 ORDRES', 300, 50);
+        ctx.fillText('ORGANISATIONS MYSTIQUES', 300, 80);
+        
+        return canvas.toBuffer('image/png');
+    }
+
+    async generateCombatGuideFallback() {
+        const canvas = createCanvas(600, 400);
+        const ctx = canvas.getContext('2d');
+        
+        ctx.fillStyle = '#8b0000';
+        ctx.fillRect(0, 0, 600, 400);
+        
+        ctx.fillStyle = '#ffd700';
+        ctx.font = 'bold 24px serif';
+        ctx.textAlign = 'center';
+        ctx.fillText('⚔️ GUIDE DE COMBAT', 300, 50);
+        ctx.fillText('SYSTÈME DE PUISSANCE', 300, 80);
+        
+        return canvas.toBuffer('image/png');
     }
 
     clearCache() {
