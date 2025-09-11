@@ -14,6 +14,7 @@ class GameEngine {
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
             '/créer_personnage': this.handleCreateCharacterCommand.bind(this),
+            '/modifier': this.handleModifyCharacterCommand.bind(this),
             '/fiche': this.handleCharacterSheetCommand.bind(this),
             '/aide': this.handleHelpCommand.bind(this),
             '/royaumes': this.handleKingdomsCommand.bind(this),
@@ -80,7 +81,8 @@ class GameEngine {
         }
 
         menuText += `📱 **Commandes disponibles :**\n` +
-                   `• /créer - Créer/modifier ton personnage\n` +
+                   `• /créer - Créer ton personnage\n` +
+                   `• /modifier - Modifier ton personnage\n` +
                    `• /fiche - Voir ta fiche de personnage\n` +
                    `• /royaumes - Explorer les 12 royaumes\n` +
                    `• /ordres - Découvrir les 7 ordres\n` +
@@ -274,6 +276,12 @@ class GameEngine {
             };
         }
 
+        // Gestion de la modification de personnage
+        const modificationStarted = await dbManager.getTemporaryData(player.id, 'modification_started');
+        if (modificationStarted) {
+            return await this.handleModificationDescription({ player, description: message, dbManager, imageGenerator });
+        }
+
         // Maintenant vérifier si le personnage existe pour les actions de jeu normales
         const character = await dbManager.getCharacterByPlayer(player.id);
 
@@ -436,6 +444,7 @@ class GameEngine {
                   `🎮 **Commandes de base :**\n` +
                   `• /menu - Menu principal\n` +
                   `• /créer - Créer un personnage\n` +
+                  `• /modifier - Modifier l'apparence de ton personnage\n` +
                   `• /fiche - Fiche de personnage\n\n` +
                   `🌍 **Exploration :**\n` +
                   `• /royaumes - Les 12 royaumes\n` +
@@ -806,6 +815,119 @@ class GameEngine {
                 text: `❌ Erreur lors de la création du personnage. Réessaie plus tard.`
             };
         }
+    }
+
+    async handleModifyCharacterCommand({ player, dbManager, imageGenerator }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage !\n\n` +
+                      `Utilise la commande /créer pour en créer un.`
+            };
+        }
+
+        // Marquer le début de la modification
+        await dbManager.setTemporaryData(player.id, 'modification_started', true);
+
+        return {
+            text: `✨ **MODIFICATION DE PERSONNAGE**\n\n` +
+                  `👤 **Personnage actuel :** ${character.name}\n` +
+                  `🏰 **Royaume :** ${character.kingdom}\n` +
+                  `👤 **Sexe :** ${character.gender === 'male' ? 'Homme' : 'Femme'}\n\n` +
+                  `🎨 **Nouvelle apparence personnalisée :**\n\n` +
+                  `📝 Décris en détail l'apparence que tu veux pour ton personnage :\n` +
+                  `• Couleur des cheveux, des yeux\n` +
+                  `• Taille, corpulence\n` +
+                  `• Style vestimentaire\n` +
+                  `• Armes et accessoires\n` +
+                  `• Cicatrices, tatouages, etc.\n\n` +
+                  `✍️ **Écris ta description complète en un seul message :**`,
+            image: await imageGenerator.generateCharacterImage(character)
+        };
+    }
+
+    async handleModificationDescription({ player, description, dbManager, imageGenerator }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+
+        if (!character) {
+            await dbManager.clearTemporaryData(player.id, 'modification_started');
+            return {
+                text: `❌ Personnage non trouvé. Utilise /créer pour créer un personnage.`
+            };
+        }
+
+        try {
+            console.log(`🎨 Génération nouvelle image pour ${character.name} avec description personnalisée...`);
+
+            // Construire le prompt optimisé pour Freepik
+            const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
+            const kingdomDesc = this.getKingdomDescription(character.kingdom);
+            
+            // Nettoyer et optimiser la description utilisateur
+            const cleanDescription = description.trim();
+            
+            const fullPrompt = `Detailed fantasy ${genderDesc} from ${character.kingdom} kingdom: ${cleanDescription}. ${kingdomDesc}. Fantasy RPG character, full body portrait, detailed armor and weapons, epic fantasy art style`;
+
+            // Générer l'image avec Freepik
+            const imagePath = `temp/character_modified_${character.id}_${Date.now()}.png`;
+            
+            await imageGenerator.freepikClient.generateImage(fullPrompt, imagePath, {
+                style: '3d',
+                perspective: 'third_person',
+                nudity: false
+            });
+
+            // Lire l'image générée
+            const fs = require('fs').promises;
+            const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+
+            // Nettoyer les données temporaires
+            await dbManager.clearTemporaryData(player.id, 'modification_started');
+
+            if (imageBuffer) {
+                return {
+                    text: `✨ **PERSONNAGE MODIFIÉ AVEC SUCCÈS !**\n\n` +
+                          `👤 **${character.name}** - Nouvelle apparence générée\n\n` +
+                          `📝 **Description appliquée :**\n"${cleanDescription}"\n\n` +
+                          `🎨 **Image générée par Freepik avec IA**\n\n` +
+                          `✅ Ton personnage a maintenant une apparence unique basée sur ta description !`,
+                    image: imageBuffer
+                };
+            } else {
+                return {
+                    text: `❌ Erreur lors de la génération de l'image. Réessaie avec /modifier`
+                };
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur lors de la modification:', error);
+            await dbManager.clearTemporaryData(player.id, 'modification_started');
+            
+            return {
+                text: `❌ Erreur lors de la génération de l'image personnalisée.\n\n` +
+                      `Réessaie avec une description plus simple ou utilise /modifier à nouveau.`
+            };
+        }
+    }
+
+    getKingdomDescription(kingdom) {
+        const descriptions = {
+            'AEGYRIA': 'golden plains kingdom with honor and chivalry, blessed armor and noble weapons',
+            'SOMBRENUIT': 'dark mysterious forests with moon magic and shadow spirits, dark robes',
+            'KHELOS': 'burning desert kingdom with ancient ruins and nomadic culture, desert garb',
+            'ABRANTIS': 'coastal kingdom with naval tradition, sea-themed armor and weapons',
+            'VARHA': 'snowy mountain kingdom with beast hunters, fur armor and winter gear',
+            'SYLVARIA': 'magical forest kingdom with nature magic, elven-style clothing and equipment',
+            'ECLYPSIA': 'dark eclipse lands with shadow magic, dark mystical robes and artifacts',
+            'TERRE_DESOLE': 'post-apocalyptic wasteland, scavenged armor and improvised weapons',
+            'DRAK_TARR': 'volcanic kingdom with dragon themes, dragon-scale armor and fire weapons',
+            'URVALA': 'misty swamp kingdom with alchemy, alchemical gear and mystical accessories',
+            'OMBREFIEL': 'gray plains with mercenaries, practical armor and versatile weapons',
+            'KHALDAR': 'tropical jungle kingdom, light armor and nature-based weapons'
+        };
+
+        return descriptions[kingdom] || 'fantasy kingdom with unique customs and equipment';
     }
 
 }
