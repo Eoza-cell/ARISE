@@ -126,38 +126,25 @@ class GroqClient {
         return await this.generateNarration(prompt, maxTokens);
     }
 
-    async generateExplorationNarration(location, action, sessionId = "default", gameState = {}, maxTokens = 400) {
+    async generateExplorationNarration(location, action, sessionId = "default", maxTokens = 300) {
         const locationContinuity = this.getLocationContinuity(sessionId, location);
         
-        const prompt = `Décris cette exploration dans un monde RPG impitoyable comme Dark Souls:
+        const prompt = `Décris cette exploration dans un monde RPG:
         Lieu: ${location}
         Action du joueur: ${action}
         
         ${locationContinuity}
         
-        ÉTAT DU PERSONNAGE:
-        - Vie: ${gameState.life || 'Inconnue'}/${gameState.maxLife || 'Inconnue'}
-        - Énergie: ${gameState.energy || 'Inconnue'}/${gameState.maxEnergy || 'Inconnue'}
-        - Équipement: ${gameState.equipment ? Object.values(gameState.equipment).join(', ') : 'Aucun'}
-        - Pièces: ${gameState.coins || 0}
+        RÈGLE IMPORTANTE: Le personnage est DÉJÀ dans ce lieu. Ne dis pas qu'il "arrive", "entre" ou "découvre" le lieu sauf si l'action le précise explicitement.
         
-        RÈGLES DE NARRATION:
-        1. Le personnage est DÉJÀ dans ${location}
-        2. Le monde est hostile et dangereux comme Dark Souls
-        3. Mentionne l'état physique si pertinent (fatigue, blessures)
-        4. Intègre l'équipement et les ressources du personnage
-        5. Décris les conséquences précises et réalistes
-        6. Raconte une histoire COMPLÈTE en 3-4 phrases
-        7. Connecte avec l'inventaire/équipement si l'action le nécessite
-        
-        Contexte: Monde médiéval-steampunk impitoyable avec 12 royaumes, magie, technologie à vapeur, 
-        créatures fantastiques et dangers permanents.`;
+        Contexte: Monde médiéval-steampunk avec 12 royaumes, magie, technologie à vapeur, 
+        créatures fantastiques et aventures épiques.`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);
             
             // Ajouter à la mémoire
-            this.addToMemory(sessionId, "user", `Action: ${action} | État: Vie ${gameState.life}/${gameState.maxLife}`, location);
+            this.addToMemory(sessionId, "user", `Action: ${action}`, location);
             this.addToMemory(sessionId, "assistant", narration, location);
             
             return narration;

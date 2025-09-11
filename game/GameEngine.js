@@ -21,8 +21,7 @@ class GameEngine {
             '/ordres': this.handleOrdersCommand.bind(this),
             '/combat': this.handleCombatCommand.bind(this),
             '/inventaire': this.handleInventoryCommand.bind(this),
-            '/carte': this.handleMapCommand.bind(this),
-            '/auberge': this.handleInnCommand.bind(this)
+            '/carte': this.handleMapCommand.bind(this)
         };
     }
 
@@ -245,17 +244,14 @@ class GameEngine {
         const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
 
         // Traitement des actions de création de personnage en cours (seulement si création initiée)
-        const tempGender = await dbManager.getTemporaryData(player.id, 'creation_gender');
-        const tempKingdom = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
-        
-        // Étape 1: Sélection du genre (seulement si aucun genre n'est déjà sélectionné)
-        if (creationStarted && !tempGender && (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME' || message === '1' || message === '2')) {
+        if (creationStarted && (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME' || message === '1' || message === '2')) {
             return await this.handleGenderSelection({ player, message, dbManager, imageGenerator });
         }
 
-        // Étape 2: Gestion des numéros de royaumes (1-12) - seulement si le genre est sélectionné mais pas le royaume
+        // Gestion des numéros de royaumes (1-12) - seulement si le genre est déjà sélectionné
+        const tempGender = await dbManager.getTemporaryData(player.id, 'creation_gender');
         const kingdomNumber = parseInt(message);
-        if (creationStarted && tempGender && !tempKingdom && kingdomNumber >= 1 && kingdomNumber <= 12) {
+        if (creationStarted && tempGender && kingdomNumber >= 1 && kingdomNumber <= 12) {
             return await this.handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator });
         }
 
@@ -295,14 +291,6 @@ class GameEngine {
             };
         }
 
-        // Gestion des actions d'auberge (équiper, repos, acheter, vendre)
-        if (message.toLowerCase().startsWith('équiper ') || 
-            message.toLowerCase().startsWith('repos') ||
-            message.toLowerCase().startsWith('acheter ') ||
-            message.toLowerCase().startsWith('vendre ')) {
-            return await this.handleInnAction({ player, character, message, dbManager, imageGenerator });
-        }
-
         // Traitement des actions de jeu normales avec IA Gemini
         return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
     }
@@ -318,24 +306,13 @@ class GameEngine {
                 kingdom: character.kingdom
             }, sessionId);
 
-            // Générer la narration avec état du jeu intégré
+            // Générer la narration: Ollama > Gemini > OpenAI
             let narration;
-            const gameState = {
-                life: character.currentLife,
-                maxLife: character.maxLife,
-                energy: character.currentEnergy,
-                maxEnergy: character.maxEnergy,
-                equipment: character.equipment,
-                coins: character.coins,
-                powerLevel: character.powerLevel,
-                kingdom: character.kingdom
-            };
-
             try {
                 // Priorité absolue à Groq pour la vitesse et qualité
                 if (this.groqClient && this.groqClient.hasValidClient()) {
                     console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
-                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId, gameState);
+                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId);
                     console.log('✅ Narration générée avec Groq');
                 } else {
                     throw new Error('Groq non disponible, essai Ollama');
@@ -432,18 +409,10 @@ class GameEngine {
     // Méthodes utilitaires
     generateBar(current, max, icon) {
         const percentage = Math.round((current / max) * 100);
-        const filledBars = Math.round(percentage / 10); // Barre sur 10 segments pour plus de précision
-        const emptyBars = 10 - filledBars;
+        const filledBars = Math.round(percentage / 20);
+        const emptyBars = 5 - filledBars;
 
-        let barColor = '';
-        if (percentage > 70) barColor = '🟩'; // Vert
-        else if (percentage > 40) barColor = '🟨'; // Jaune  
-        else if (percentage > 20) barColor = '🟧'; // Orange
-        else barColor = '🟥'; // Rouge
-
-        const bar = barColor.repeat(filledBars) + '⬛'.repeat(emptyBars);
-        
-        return `${icon} ${bar} ${current}/${max} (${percentage}%)`;
+        return icon.repeat(filledBars) + '⬜'.repeat(emptyBars) + ` (${percentage}%)`;
     }
 
     formatEquipment(equipment) {
@@ -600,51 +569,6 @@ class GameEngine {
                   `• Et d'autres lieux mystérieux...\n\n` +
                   `💀 **Chaque région est dangereuse !**`,
             image: await imageGenerator.generateWorldMap()
-        };
-    }
-
-    async handleInnCommand({ player, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu dois d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        // Vérifier si le personnage est dans une auberge
-        const isInInn = character.currentLocation.toLowerCase().includes('auberge') || 
-                       character.currentLocation.toLowerCase().includes('taverne') ||
-                       character.currentLocation.toLowerCase().includes('capitale');
-
-        if (!isInInn) {
-            return {
-                text: `🏠 **AUBERGE NON ACCESSIBLE**\n\n` +
-                      `❌ Tu n'es pas dans une auberge ou une capitale !\n\n` +
-                      `📍 **Position actuelle :** ${character.currentLocation}\n\n` +
-                      `🚶‍♂️ Déplace-toi vers "l'auberge de la capitale" ou "taverne du village" pour accéder aux services.`
-            };
-        }
-
-        const lifeBar = this.generateBar(character.currentLife, character.maxLife, '❤️');
-        const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '⚡');
-
-        return {
-            text: `🏠 **AUBERGE DE ${character.currentLocation.toUpperCase()}**\n\n` +
-                  `👤 **${character.name}** - Bienvenue !\n\n` +
-                  `${lifeBar}\n` +
-                  `${energyBar}\n\n` +
-                  `🏪 **Services disponibles :**\n` +
-                  `• **équiper [arme/armure]** - Changer d'équipement (50 pièces)\n` +
-                  `• **repos** - Restaurer vie et énergie (100 pièces)\n` +
-                  `• **acheter [objet]** - Acheter équipement\n` +
-                  `• **vendre [objet]** - Vendre équipement\n\n` +
-                  `💰 **Tes pièces :** ${character.coins}\n\n` +
-                  `⚔️ **Équipement actuel :**\n` +
-                  `${this.formatEquipment(character.equipment)}\n\n` +
-                  `📦 **Inventaire :**\n` +
-                  `${this.formatInventory(character.inventory)}`,
-            image: await imageGenerator.generateInventoryImage(character)
         };
     }
     async handleGenderSelection({ player, message, dbManager, imageGenerator }) {
@@ -1004,94 +928,6 @@ class GameEngine {
                       `Réessaie avec une description plus simple ou utilise /modifier à nouveau.`
             };
         }
-    }
-
-    async handleInnAction({ player, character, message, dbManager, imageGenerator }) {
-        const isInInn = character.currentLocation.toLowerCase().includes('auberge') || 
-                       character.currentLocation.toLowerCase().includes('taverne') ||
-                       character.currentLocation.toLowerCase().includes('capitale');
-
-        if (!isInInn) {
-            return {
-                text: `🏠 **SERVICE NON DISPONIBLE**\n\n` +
-                      `❌ Tu dois être dans une auberge, taverne ou capitale pour utiliser ces services !\n\n` +
-                      `📍 **Position actuelle :** ${character.currentLocation}`
-            };
-        }
-
-        const action = message.toLowerCase().trim();
-
-        if (action === 'repos') {
-            if (character.coins < 100) {
-                return {
-                    text: `💰 **FONDS INSUFFISANTS**\n\n` +
-                          `❌ Le repos coûte 100 pièces.\n` +
-                          `💰 Tu n'as que ${character.coins} pièces.`
-                };
-            }
-
-            // Restaurer complètement vie et énergie
-            await dbManager.updateCharacter(character.id, {
-                currentLife: character.maxLife,
-                currentEnergy: character.maxEnergy,
-                coins: character.coins - 100
-            });
-
-            const lifeBar = this.generateBar(character.maxLife, character.maxLife, '❤️');
-            const energyBar = this.generateBar(character.maxEnergy, character.maxEnergy, '⚡');
-
-            return {
-                text: `🛏️ **REPOS COMPLET**\n\n` +
-                      `✅ Tu te reposes dans un lit confortable...\n\n` +
-                      `${lifeBar}\n` +
-                      `${energyBar}\n\n` +
-                      `💰 **Pièces restantes :** ${character.coins - 100}\n\n` +
-                      `🌅 Tu te réveilles complètement reposé et prêt pour l'aventure !`
-            };
-        }
-
-        if (action.startsWith('équiper ')) {
-            const itemName = action.replace('équiper ', '').trim();
-            
-            if (character.coins < 50) {
-                return {
-                    text: `💰 **FONDS INSUFFISANTS**\n\n` +
-                          `❌ Changer d'équipement coûte 50 pièces.\n` +
-                          `💰 Tu n'as que ${character.coins} pièces.`
-                };
-            }
-
-            // Équiper l'item (simulation)
-            const newEquipment = { ...character.equipment };
-            if (itemName.includes('épée') || itemName.includes('arme')) {
-                newEquipment.weapon = itemName;
-            } else if (itemName.includes('armure') || itemName.includes('cuirasse')) {
-                newEquipment.armor = itemName;
-            } else {
-                newEquipment.accessory = itemName;
-            }
-
-            await dbManager.updateCharacter(character.id, {
-                equipment: newEquipment,
-                coins: character.coins - 50
-            });
-
-            return {
-                text: `⚔️ **ÉQUIPEMENT CHANGÉ**\n\n` +
-                      `✅ Tu équipes : **${itemName}**\n\n` +
-                      `💰 **Coût :** 50 pièces\n` +
-                      `💰 **Pièces restantes :** ${character.coins - 50}\n\n` +
-                      `🎒 **Nouvel équipement :**\n` +
-                      `${this.formatEquipment(newEquipment)}`
-            };
-        }
-
-        return {
-            text: `🏠 **COMMANDE NON RECONNUE**\n\n` +
-                  `❌ Services disponibles :\n` +
-                  `• **repos** - Restaurer vie et énergie (100 pièces)\n` +
-                  `• **équiper [nom]** - Changer d'équipement (50 pièces)`
-        };
     }
 
     getKingdomDescription(kingdom) {
