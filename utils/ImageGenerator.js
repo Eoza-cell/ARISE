@@ -781,16 +781,6 @@ class ImageGenerator {
         return buffer;
     }
 
-    clearCache() {
-        this.imageCache.clear();
-        console.log('🗑️ Cache d\'images vidé');
-    }
-}
-
-module.exports = ImageGenerator;
-
-
-
     async saveCustomCharacterImage(characterId, imageBuffer) {
         try {
             const imagePath = path.join(this.tempPath, `character_custom_${characterId}.jpg`);
@@ -837,3 +827,11 @@ module.exports = ImageGenerator;
         
         return null;
     }
+
+    clearCache() {
+        this.imageCache.clear();
+        console.log('🗑️ Cache d\'images vidé');
+    }
+}
+
+module.exports = ImageGenerator;
