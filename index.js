@@ -28,7 +28,7 @@ class FrictionUltimateBot {
 
     async initialize() {
         console.log('🎮 Initialisation de Friction Ultimate Bot...');
-        
+
         try {
             // Initialiser la base de données
             await this.dbManager.initialize();
@@ -40,7 +40,7 @@ class FrictionUltimateBot {
 
             // Démarrer la connexion WhatsApp
             await this.startWhatsApp();
-            
+
         } catch (error) {
             console.error('❌ Erreur lors de l\'initialisation:', error);
             process.exit(1);
@@ -49,9 +49,9 @@ class FrictionUltimateBot {
 
     async startWhatsApp() {
         console.log('📱 Démarrage de la connexion WhatsApp...');
-        
+
         const { state, saveCreds } = await useMultiFileAuthState('auth_info');
-        
+
         this.sock = makeWASocket({
             auth: state,
             browser: ['Friction Ultimate', 'Desktop', '1.0.0']
@@ -60,16 +60,16 @@ class FrictionUltimateBot {
         // Gestion des événements de connexion
         this.sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
-            
+
             if (qr) {
                 console.log('📱 QR Code généré - Scannez avec WhatsApp:');
                 qrcode.generate(qr, { small: true });
             }
-            
+
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                 console.log('❌ Connexion fermée, reconnexion:', shouldReconnect);
-                
+
                 if (shouldReconnect) {
                     setTimeout(() => this.startWhatsApp(), 3000);
                 }
@@ -103,7 +103,7 @@ class FrictionUltimateBot {
             const messageText = this.extractMessageText(message);
             const messageImage = this.extractMessageImage(message);
             const messageId = message.key.id;
-            
+
             // Si pas de texte ni d'image, ignorer
             if (!messageText && !messageImage) {
                 console.log('⚠️ Message ignoré: pas de texte ni d\'image');
@@ -126,18 +126,18 @@ class FrictionUltimateBot {
 
             // Définir le vrai expéditeur pour l'affichage et la déduplication
             const realSender = message.key.participant || from;
-            
+
             // Déduplication basée sur messageId + contenu du message (plus robuste)
             const messageTextForKey = messageText ? messageText.trim() : '';
             const uniqueKey = `${messageId}-${messageTextForKey}`;
-            
+
             if (this.processedMessages.has(uniqueKey)) {
                 console.log(`⚠️ Message dupliqué ignoré: ${messageText} (messageId: ${messageId})`);
                 return;
             }
-            
+
             this.processedMessages.add(uniqueKey);
-            
+
             // Nettoyer la cache toutes les 500 messages pour éviter les fuites mémoire
             if (this.processedMessages.size > 500) {
                 // Garder seulement les 100 derniers pour performance
@@ -157,12 +157,12 @@ class FrictionUltimateBot {
                 // Message privé - utiliser l'expéditeur direct
                 playerNumber = from.split('@')[0];
             }
-            
+
             // Nettoyer les formats @lid 
             if (playerNumber.includes(':')) {
                 playerNumber = playerNumber.split(':')[0];
             }
-            
+
             // Traitement du message par le moteur de jeu
             const response = await this.gameEngine.processPlayerMessage({
                 playerNumber,

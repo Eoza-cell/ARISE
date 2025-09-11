@@ -21,7 +21,7 @@
     "@neondatabase/serverless": "^1.0.1",
     "@types/node": "^24.3.1",
     "@whiskeysockets/baileys": "^7.0.0-rc.2",
-    "axios": "^1.11.0",
+    "axios": "^1.12.0",
     "bytez.js": "^1.1.15",
     "canvas": "^3.2.0",
     "drizzle-kit": "^0.31.4",
