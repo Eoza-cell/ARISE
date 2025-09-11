@@ -51,19 +51,42 @@ class FreepikClient {
 
             if (response.data && response.data.data && response.data.data.length > 0) {
                 const imageData = response.data.data[0];
-                const imageUrl = imageData.url || imageData.base64;
+                
+                // Vérifier différents formats de réponse possible
+                let imageUrl = null;
+                if (imageData.url) {
+                    imageUrl = imageData.url;
+                } else if (imageData.base64) {
+                    imageUrl = imageData.base64;
+                } else if (imageData.image && imageData.image.url) {
+                    imageUrl = imageData.image.url;
+                } else if (typeof imageData === 'string') {
+                    imageUrl = imageData;
+                }
+                
+                console.log('🔍 Type de réponse Freepik:', typeof imageData);
+                console.log('🔍 URL reçue:', imageUrl ? imageUrl.substring(0, 100) + '...' : 'null');
                 
                 if (imageUrl) {
-                    if (imageUrl.startsWith('data:image')) {
-                        // Image en base64
-                        await this.saveBase64Image(imageUrl, outputPath);
-                    } else {
-                        // URL d'image
-                        await this.downloadAndSaveImage(imageUrl, outputPath);
+                    try {
+                        if (imageUrl.startsWith('data:image')) {
+                            // Image en base64
+                            await this.saveBase64Image(imageUrl, outputPath);
+                        } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+                            // URL d'image valide
+                            await this.downloadAndSaveImage(imageUrl, outputPath);
+                        } else {
+                            // Probablement base64 sans préfixe
+                            const base64Image = `data:image/png;base64,${imageUrl}`;
+                            await this.saveBase64Image(base64Image, outputPath);
+                        }
+                        
+                        console.log(`✅ Image Freepik générée: ${outputPath}`);
+                        return outputPath;
+                    } catch (urlError) {
+                        console.error('❌ Erreur traitement URL:', urlError.message);
+                        console.log('🔍 Données complètes:', JSON.stringify(response.data, null, 2));
                     }
-                    
-                    console.log(`✅ Image Freepik générée: ${outputPath}`);
-                    return outputPath;
                 }
             }
 
@@ -73,8 +96,15 @@ class FreepikClient {
             console.error('❌ Erreur génération Freepik:', error.message);
             if (error.response) {
                 console.error('Response status:', error.response.status);
-                console.error('Response data:', error.response.data);
+                console.error('Response headers:', error.response.headers);
+                console.error('Response data:', JSON.stringify(error.response.data, null, 2));
             }
+            
+            // Log de debug pour comprendre la structure
+            if (response && response.data) {
+                console.log('🔍 Structure réponse complète:', JSON.stringify(response.data, null, 2));
+            }
+            
             throw error;
         }
     }
@@ -111,17 +141,33 @@ class FreepikClient {
 
     async saveBase64Image(base64Data, outputPath) {
         try {
-            const base64Image = base64Data.split(';base64,').pop();
+            let base64Image;
+            
+            if (base64Data.includes(';base64,')) {
+                base64Image = base64Data.split(';base64,').pop();
+            } else if (base64Data.startsWith('data:image')) {
+                // Format sans ;base64, mais avec data:image
+                base64Image = base64Data.split(',').pop();
+            } else {
+                // Données base64 brutes
+                base64Image = base64Data;
+            }
+            
+            // Nettoyer les caractères indésirables
+            base64Image = base64Image.replace(/[^A-Za-z0-9+/=]/g, '');
+            
+            console.log(`💾 Longueur base64: ${base64Image.length}`);
             const imageBuffer = Buffer.from(base64Image, 'base64');
             
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
             
             await fs.writeFile(outputPath, imageBuffer);
-            console.log(`💾 Image base64 sauvegardée: ${outputPath}`);
+            console.log(`💾 Image base64 sauvegardée: ${outputPath} (${imageBuffer.length} bytes)`);
 
         } catch (error) {
             console.error('❌ Erreur sauvegarde image base64:', error.message);
+            console.error('❌ Données base64 problématiques:', base64Data.substring(0, 100) + '...');
             throw error;
         }
     }
