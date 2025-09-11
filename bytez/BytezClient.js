@@ -43,25 +43,25 @@ class BytezClient {
             // Délai pour éviter les problèmes de concurrence
             await this.waitForSlot();
 
-            // Utiliser le modèle Stable Diffusion XL
-            const model = this.sdk.model("stabilityai/stable-diffusion-xl-base-1.0");
+            // Utiliser le modèle animagine-xl-3.0
+            const model = this.sdk.model("Linaqruf/animagine-xl-3.0");
 
             // Optimiser le prompt pour Stable Diffusion
             const optimizedPrompt = this.optimizePromptForSD(prompt);
 
-            // Générer l'image avec retry en cas d'erreur de concurrence et un timeout
+            // Générer l'image avec le modèle animagine-xl-3.0 et timeout réduit pour réponses rapides
             let { error, output } = await Promise.race([
                 model.run(optimizedPrompt),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation timeout')), 60000)) // 60s timeout for generation
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation timeout')), 15000)) // 15s timeout pour réponses rapides
             ]);
 
-            // Retry une fois en cas d'erreur de concurrence
+            // Retry rapide en cas d'erreur de concurrence
             if (error && error.includes('concurrency')) {
-                console.log('⏳ Erreur de concurrence Bytez, retry dans 3 secondes...');
-                await new Promise(resolve => setTimeout(resolve, 3000));
+                console.log('⏳ Erreur de concurrence Bytez, retry dans 1 seconde...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
                 ({ error, output } = await Promise.race([
                     model.run(optimizedPrompt),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation retry timeout')), 60000)) // 60s timeout for retry
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation retry timeout')), 10000)) // 10s timeout rapide pour retry
                 ]));
             }
 
@@ -89,15 +89,15 @@ class BytezClient {
     }
 
     async waitForSlot() {
-        // Ajouter un petit délai pour éviter les conflits de concurrence
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        // Délai réduit pour réponses plus rapides
+        await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     optimizePromptForSD(prompt) {
-        // Optimiser le prompt pour Stable Diffusion XL
-        // Ajouter des mots-clés de qualité et de style
-        const qualityKeywords = "masterpiece, best quality, highly detailed, ultra sharp, professional";
-        const styleKeywords = "digital art, concept art, illustration";
+        // Optimiser le prompt pour Animagine XL 3.0 (anime style model)
+        // Ajouter des mots-clés de qualité et de style spécifiques à l'anime
+        const qualityKeywords = "masterpiece, best quality, extremely detailed, 8k, high resolution, ultra-detailed";
+        const styleKeywords = "anime style, detailed character design, vibrant colors, professional illustration";
 
         // Nettoyer et optimiser le prompt
         let optimized = prompt
@@ -128,7 +128,7 @@ class BytezClient {
             // Utiliser fetch pour télécharger l'image avec un timeout
             const response = await Promise.race([
                 fetch(imageUrl),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez download timeout')), 30000)) // 30s timeout for download
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez download timeout')), 10000)) // 10s timeout rapide pour download
             ]);
 
             if (!response.ok) {
