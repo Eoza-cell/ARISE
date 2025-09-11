@@ -238,18 +238,18 @@ class FreepikClient {
 
         return await this.generateImage(prompt, outputPath, {
             style: options.style || '3d',
-            perspective: options.perspective || 'third_person',
+            perspective: options.perspective || 'first_person',
             nudity: options.nudity || false
         });
     }
 
     async generateActionImage(character, action, narration, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male' : 'female';
-        const prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom, performing: ${action}. ${narration}. Epic fantasy scene, detailed environment`;
+        const prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom, performing: ${action}. ${narration}. Epic fantasy scene, detailed environment, first person POV perspective`;
 
         return await this.generateImage(prompt, outputPath, {
             style: options.style || '3d',
-            perspective: options.perspective || 'first_person',
+            perspective: 'first_person',
             nudity: options.nudity || false
         });
     }

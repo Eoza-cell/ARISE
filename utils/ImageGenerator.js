@@ -167,6 +167,43 @@ class ImageGenerator {
         }
     }
 
+    async generateCharacterSheet(character) {
+        try {
+            const cacheKey = `character_sheet_${character.id}`;
+            if (this.imageCache.has(cacheKey)) {
+                return this.imageCache.get(cacheKey);
+            }
+
+            const imagePath = path.join(this.tempPath, `character_sheet_${character.id}.png`);
+
+            if (this.hasFreepik && this.freepikClient) {
+                console.log(`🎨 Génération fiche personnage pour ${character.name}...`);
+                
+                const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
+                const prompt = `Character sheet portrait of ${character.name}, detailed ${genderDesc} from ${character.kingdom} kingdom, level ${character.level}, power level ${character.powerLevel}, fantasy RPG character portrait, detailed armor and equipment, first person POV perspective`;
+
+                await this.freepikClient.generateImage(prompt, imagePath, {
+                    style: this.defaultStyle,
+                    perspective: 'first_person',
+                    nudity: this.allowNudity
+                });
+
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    console.log(`✅ Fiche personnage générée par Freepik`);
+                    this.imageCache.set(cacheKey, imageBuffer);
+                    return imageBuffer;
+                }
+            }
+
+            throw new Error('Impossible de générer la fiche personnage avec Freepik');
+
+        } catch (error) {
+            console.error('❌ Erreur génération fiche personnage:', error);
+            throw error;
+        }
+    }
+
     async generateInventoryImage(character) {
         try {
             const canvas = createCanvas(1200, 300); // Format horizontal
