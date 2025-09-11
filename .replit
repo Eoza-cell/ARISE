@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["libuuid"]
 
 [workflows]
-runButton = "Project"
+runButton = "Start Friction Bot"
 
 [[workflows.workflow]]
 name = "Project"
@@ -29,3 +29,12 @@ args = "node index.js"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[[workflows.workflow]]
+name = "Start Friction Bot"
+author = 47446986
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
