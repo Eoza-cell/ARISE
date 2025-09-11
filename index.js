@@ -51,7 +51,6 @@ class FrictionUltimateBot {
         
         this.sock = makeWASocket({
             auth: state,
-            printQRInTerminal: true,
             browser: ['Friction Ultimate', 'Desktop', '1.0.0']
         });
 

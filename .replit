@@ -1,4 +1,4 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "typescript-language-server"]
 [agent]
 expertMode = true
 integrations = ["javascript_gemini:1.0.0", "javascript_database:1.0.0"]
@@ -38,3 +38,15 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node index.js"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
+
+[[ports]]
+localPort = 36123
+externalPort = 3000
+
+[deployment]
+deploymentTarget = "vm"
+run = ["npm", "start"]

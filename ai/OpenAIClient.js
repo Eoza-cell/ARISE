@@ -34,9 +34,16 @@ class OpenAIClient {
         this.isAvailable = false;
         this.memory = new AIMemory(10); // max 10 messages de contexte
 
+        // Check if OpenAI API key is available
+        const apiKey = process.env.OPENAI_API_KEY;
+        if (!apiKey) {
+            console.log('⚠️ OPENAI_API_KEY non définie - Le bot fonctionnera sans IA OpenAI');
+            return;
+        }
+
         try {
             this.openai = new OpenAI({
-                apiKey: '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'
+                apiKey: apiKey
             });
             this.isAvailable = true;
             console.log('✅ OpenAI Client initialisé avec succès');

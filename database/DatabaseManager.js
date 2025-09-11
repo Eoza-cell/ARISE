@@ -38,14 +38,139 @@ class DatabaseManager {
 
     async pushSchema() {
         try {
-            // Cette méthode sera utilisée pour créer/mettre à jour les tables
             console.log('📊 Initialisation du schéma de base de données...');
-            // Note: En production, utiliser drizzle-kit pour les migrations
+            
+            // Vérifier si les tables existent déjà
+            const tableCheckQuery = `
+                SELECT table_name 
+                FROM information_schema.tables 
+                WHERE table_schema = 'public' 
+                AND table_name IN ('players', 'characters', 'kingdoms', 'orders', 'techniques', 'equipment', 'game_sessions')
+            `;
+            
+            const existingTables = await this.pool.query(tableCheckQuery);
+            
+            if (existingTables.rows.length === 0) {
+                console.log('📊 Création des tables de base de données...');
+                
+                // Créer les tables dans l'ordre correct (dépendances)
+                await this.createTables();
+                
+                console.log('✅ Tables créées avec succès');
+            } else {
+                console.log('✅ Tables de base de données déjà existantes');
+            }
+            
             console.log('✅ Schéma de base de données initialisé');
         } catch (error) {
             console.error('❌ Erreur lors de la création du schéma:', error);
             throw error;
         }
+    }
+
+    async createTables() {
+        // Créer les tables en SQL direct (pour bootstrap initial)
+        const createTablesSQL = `
+            -- Table des joueurs
+            CREATE TABLE IF NOT EXISTS players (
+                id SERIAL PRIMARY KEY,
+                whatsapp_number TEXT NOT NULL UNIQUE,
+                username TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+                last_active TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+
+            -- Table des royaumes
+            CREATE TABLE IF NOT EXISTS kingdoms (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                geography TEXT NOT NULL,
+                culture TEXT NOT NULL,
+                specialties JSON NOT NULL,
+                particularities TEXT NOT NULL
+            );
+
+            -- Table des ordres
+            CREATE TABLE IF NOT EXISTS orders (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                hierarchy JSON NOT NULL,
+                specialties JSON NOT NULL,
+                location TEXT NOT NULL,
+                kingdom TEXT
+            );
+
+            -- Table des techniques
+            CREATE TABLE IF NOT EXISTS techniques (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                required_level INTEGER NOT NULL,
+                required_order TEXT,
+                energy_cost INTEGER NOT NULL,
+                damage INTEGER NOT NULL,
+                type TEXT NOT NULL
+            );
+
+            -- Table des équipements
+            CREATE TABLE IF NOT EXISTS equipment (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL,
+                description TEXT NOT NULL,
+                type TEXT NOT NULL,
+                rarity TEXT NOT NULL,
+                stats JSON NOT NULL,
+                requirements JSON NOT NULL,
+                image_url TEXT
+            );
+
+            -- Table des personnages
+            CREATE TABLE IF NOT EXISTS characters (
+                id SERIAL PRIMARY KEY,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                name TEXT NOT NULL,
+                gender TEXT NOT NULL,
+                kingdom TEXT NOT NULL,
+                "order" TEXT,
+                level INTEGER DEFAULT 1 NOT NULL,
+                experience INTEGER DEFAULT 0 NOT NULL,
+                current_life INTEGER DEFAULT 100 NOT NULL,
+                max_life INTEGER DEFAULT 100 NOT NULL,
+                current_energy INTEGER DEFAULT 100 NOT NULL,
+                max_energy INTEGER DEFAULT 100 NOT NULL,
+                power_level TEXT DEFAULT 'G' NOT NULL,
+                friction_level TEXT DEFAULT 'G' NOT NULL,
+                current_location TEXT NOT NULL,
+                position JSON NOT NULL,
+                equipment JSON NOT NULL,
+                learned_techniques JSON NOT NULL,
+                coins INTEGER DEFAULT 0 NOT NULL,
+                inventory JSON NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+                updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+
+            -- Table des sessions de jeu
+            CREATE TABLE IF NOT EXISTS game_sessions (
+                id SERIAL PRIMARY KEY,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                character_id INTEGER NOT NULL REFERENCES characters(id),
+                chat_id TEXT NOT NULL,
+                game_state JSON NOT NULL,
+                last_action TEXT,
+                created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+                updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+
+            -- Index pour améliorer les performances
+            CREATE INDEX IF NOT EXISTS idx_players_whatsapp ON players(whatsapp_number);
+            CREATE INDEX IF NOT EXISTS idx_characters_player ON characters(player_id);
+            CREATE INDEX IF NOT EXISTS idx_game_sessions_player_chat ON game_sessions(player_id, chat_id);
+        `;
+
+        await this.pool.query(createTablesSQL);
     }
 
     // Gestion des joueurs
