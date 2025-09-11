@@ -43,49 +43,63 @@ class BytezClient {
             // Délai pour éviter les problèmes de concurrence
             await this.waitForSlot();
 
-            // Utiliser le modèle animagine-xl-3.0
+            // Utiliser le modèle animagine-xl-3.0 comme dans l'exemple
             const model = this.sdk.model("Linaqruf/animagine-xl-3.0");
 
             // Optimiser le prompt pour Stable Diffusion
             const optimizedPrompt = this.optimizePromptForSD(prompt);
 
-            // Générer l'image avec le modèle animagine-xl-3.0 et timeout réduit pour réponses rapides
-            let { error, output } = await Promise.race([
+            // Générer l'image directement avec model.run() comme dans l'exemple
+            const result = await Promise.race([
                 model.run(optimizedPrompt),
-                new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation timeout')), 15000)) // 15s timeout pour réponses rapides
+                new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation timeout')), 15000))
             ]);
 
+            // Gestion du résultat selon l'API Bytez
+            const { error, output } = result || {};
+
             // Retry rapide en cas d'erreur de concurrence
-            if (error && error.includes('concurrency')) {
+            if (error && (error.includes('concurrency') || error.includes('rate limit'))) {
                 console.log('⏳ Erreur de concurrence Bytez, retry dans 1 seconde...');
                 await new Promise(resolve => setTimeout(resolve, 1000));
-                ({ error, output } = await Promise.race([
+                
+                const retryResult = await Promise.race([
                     model.run(optimizedPrompt),
-                    new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation retry timeout')), 10000)) // 10s timeout rapide pour retry
-                ]));
+                    new Promise((_, reject) => setTimeout(() => reject(new Error('Bytez generation retry timeout')), 10000))
+                ]);
+                
+                if (retryResult.error) {
+                    throw new Error(`Erreur Bytez API après retry: ${retryResult.error}`);
+                }
+                
+                return await this.processImageOutput(retryResult.output, outputPath);
             }
 
             if (error) {
                 throw new Error(`Erreur Bytez API: ${error}`);
             }
 
-            if (!output || !output.length) {
-                throw new Error('Aucune image générée par Bytez');
-            }
-
-            // L'output de Bytez contient les URLs des images générées
-            const imageUrl = Array.isArray(output) ? output[0] : output;
-
-            // Télécharger et sauvegarder l'image avec un timeout
-            await this.downloadAndSaveImageWithTimeout(imageUrl, outputPath);
-
-            console.log(`✅ Image Bytez générée et sauvegardée: ${outputPath}`);
-            return outputPath;
+            return await this.processImageOutput(output, outputPath);
 
         } catch (error) {
             console.error('❌ Erreur lors de la génération d\'image Bytez:', error.message);
             throw error;
         }
+    }
+
+    async processImageOutput(output, outputPath) {
+        if (!output || !output.length) {
+            throw new Error('Aucune image générée par Bytez');
+        }
+
+        // L'output de Bytez contient les URLs des images générées
+        const imageUrl = Array.isArray(output) ? output[0] : output;
+
+        // Télécharger et sauvegarder l'image avec un timeout
+        await this.downloadAndSaveImageWithTimeout(imageUrl, outputPath);
+
+        console.log(`✅ Image Bytez générée et sauvegardée: ${outputPath}`);
+        return outputPath;
     }
 
     async waitForSlot() {
