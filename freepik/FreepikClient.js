@@ -34,34 +34,47 @@ class FreepikClient {
 
             const requestData = {
                 prompt: optimizedPrompt,
-                num_images: 1,
-                image_size: "1024x1024",
-                style: style === '3d' ? 'photorealistic' : 'anime',
                 negative_prompt: style === '3d' ? 'cartoon, anime, 2d' : '3d, photorealistic',
-                num_inference_steps: 30,
-                guidance_scale: 7.5
+                image: {
+                    size: "1024x1024"
+                }
             };
 
             const response = await axios.post(`${this.baseURL}/ai/text-to-image`, requestData, {
                 headers: {
                     'X-Freepik-API-Key': this.apiKey,
-                    'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
                 },
-                timeout: 30000
+                timeout: 60000
             });
 
-            if (response.data && response.data.data && response.data.data[0]) {
-                const imageUrl = response.data.data[0].url;
-                await this.downloadAndSaveImage(imageUrl, outputPath);
+            if (response.data && response.data.data && response.data.data.length > 0) {
+                const imageData = response.data.data[0];
+                const imageUrl = imageData.url || imageData.base64;
                 
-                console.log(`✅ Image Freepik générée: ${outputPath}`);
-                return outputPath;
-            } else {
-                throw new Error('Aucune image générée par Freepik');
+                if (imageUrl) {
+                    if (imageUrl.startsWith('data:image')) {
+                        // Image en base64
+                        await this.saveBase64Image(imageUrl, outputPath);
+                    } else {
+                        // URL d'image
+                        await this.downloadAndSaveImage(imageUrl, outputPath);
+                    }
+                    
+                    console.log(`✅ Image Freepik générée: ${outputPath}`);
+                    return outputPath;
+                }
             }
+
+            throw new Error('Aucune image générée par Freepik - réponse vide');
 
         } catch (error) {
             console.error('❌ Erreur génération Freepik:', error.message);
+            if (error.response) {
+                console.error('Response status:', error.response.status);
+                console.error('Response data:', error.response.data);
+            }
             throw error;
         }
     }
@@ -96,11 +109,33 @@ class FreepikClient {
         return optimized;
     }
 
+    async saveBase64Image(base64Data, outputPath) {
+        try {
+            const base64Image = base64Data.split(';base64,').pop();
+            const imageBuffer = Buffer.from(base64Image, 'base64');
+            
+            const dir = path.dirname(outputPath);
+            await fs.mkdir(dir, { recursive: true });
+            
+            await fs.writeFile(outputPath, imageBuffer);
+            console.log(`💾 Image base64 sauvegardée: ${outputPath}`);
+
+        } catch (error) {
+            console.error('❌ Erreur sauvegarde image base64:', error.message);
+            throw error;
+        }
+    }
+
     async downloadAndSaveImage(imageUrl, outputPath) {
         try {
+            console.log(`📥 Téléchargement depuis: ${imageUrl}`);
+            
             const response = await axios.get(imageUrl, {
                 responseType: 'arraybuffer',
-                timeout: 15000
+                timeout: 30000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
             });
 
             const dir = path.dirname(outputPath);
@@ -136,7 +171,7 @@ class FreepikClient {
         });
     }
 
-    async generateActionImage(character, action, narration, options = {}) {
+    async generateActionImage(character, action, narration, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male' : 'female';
         const prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom, performing: ${action}. ${narration}. Epic fantasy scene, detailed environment`;
 
