@@ -78,27 +78,22 @@ class ImageGenerator {
             const imagePath = path.join(this.tempPath, 'menu_main_freepik.png');
 
             if (this.hasFreepik && this.freepikClient) {
-                try {
-                    console.log('🎨 Génération image menu avec Freepik...');
-                    await this.freepikClient.generateMenuImage(imagePath);
+                console.log('🎨 Génération image menu avec Freepik...');
+                await this.freepikClient.generateMenuImage(imagePath);
 
-                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                    if (imageBuffer) {
-                        console.log('✅ Image menu générée par Freepik');
-                        this.imageCache.set(cacheKey, imageBuffer);
-                        return imageBuffer;
-                    }
-                } catch (freepikError) {
-                    console.log('⚠️ Erreur Freepik, fallback Canvas:', freepikError.message);
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    console.log('✅ Image menu générée par Freepik');
+                    this.imageCache.set(cacheKey, imageBuffer);
+                    return imageBuffer;
                 }
             }
 
-            // Fallback Canvas
-            return await this.generateMenuImageFallback();
+            throw new Error('Impossible de générer l\'image menu - Freepik requis');
 
         } catch (error) {
             console.error('❌ Erreur génération image menu:', error);
-            return await this.generateMenuImageFallback();
+            throw error;
         }
     }
 
@@ -301,7 +296,7 @@ class ImageGenerator {
                 return this.imageCache.get(cacheKey);
             }
 
-            console.log('🗺️ Génération carte du monde avec Freepik...');
+            console.log('🗺️ Génération carte du monde détaillée avec Freepik...');
 
             const imagePath = path.join(this.tempPath, 'world_map_freepik.png');
 
@@ -312,26 +307,20 @@ class ImageGenerator {
             };
 
             if (this.hasFreepik && this.freepikClient) {
-                try {
-                    await this.freepikClient.generateWorldMap(imagePath, imageOptions);
-                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                    if (imageBuffer) {
-                        console.log('✅ Carte du monde générée par Freepik');
-                        this.imageCache.set(cacheKey, imageBuffer);
-                        return imageBuffer;
-                    }
-                } catch (freepikError) {
-                    console.log('⚠️ Erreur Freepik carte:', freepikError.message);
+                await this.freepikClient.generateDetailedWorldMap(imagePath, imageOptions);
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    console.log('✅ Carte du monde détaillée générée par Freepik');
+                    this.imageCache.set(cacheKey, imageBuffer);
+                    return imageBuffer;
                 }
             }
 
-            // Utilisation de Canva pour la carte du monde détaillée
-            console.log('🗺️ Génération carte du monde détaillée avec Canva...');
-            return await this.generateWorldMapDetailedCanvas();
+            throw new Error('Impossible de générer la carte du monde - Freepik requis');
 
         } catch (error) {
             console.error('❌ Erreur génération carte du monde:', error);
-            return await this.generateWorldMapDetailedCanvas();
+            throw error;
         }
     }
 
@@ -374,90 +363,7 @@ class ImageGenerator {
         return descriptions[kingdom] || 'mysterious lands with unknown customs';
     }
 
-    // Méthodes fallback Canvas (simplifiées)
-    async generateMenuImageFallback() {
-        const canvas = createCanvas(800, 600);
-        const ctx = canvas.getContext('2d');
-
-        ctx.fillStyle = '#2c1810';
-        ctx.fillRect(0, 0, 800, 600);
-
-        ctx.fillStyle = '#d4af37';
-        ctx.font = 'bold 48px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('FRICTION ULTIMATE', 400, 100);
-
-        ctx.fillStyle = '#8b4513';
-        ctx.fillRect(150, 180, 500, 300);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = 'bold 16px serif';
-        ctx.fillText('🥊 JEUNE HOMME vs DÉMON 👹', 400, 330);
-
-        return canvas.toBuffer('image/png');
-    }
-
-    // Nouvelle méthode pour la carte du monde détaillée avec Canva
-    async generateWorldMapDetailedCanvas() {
-        const canvas = createCanvas(1200, 800);
-        const ctx = canvas.getContext('2d');
-
-        // Fond général
-        ctx.fillStyle = '#a0d2eb'; // Couleur de fond pour le monde
-        ctx.fillRect(0, 0, 1200, 800);
-
-        // Dessin des éléments détaillés : routes, maisons, royaumes
-        ctx.fillStyle = '#8b4513'; // Couleur pour les routes
-        ctx.lineWidth = 5;
-        ctx.lineCap = 'round';
-
-        // Exemple de routes (lignes simples)
-        ctx.beginPath();
-        ctx.moveTo(100, 100);
-        ctx.lineTo(300, 200);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(800, 150);
-        ctx.lineTo(1000, 50);
-        ctx.stroke();
-
-        ctx.beginPath();
-        ctx.moveTo(200, 600);
-        ctx.lineTo(700, 700);
-        ctx.stroke();
-
-        // Dessin des maisons (rectangles simples)
-        ctx.fillStyle = '#deb887'; // Couleur pour les maisons
-        ctx.fillRect(250, 180, 50, 50);
-        ctx.fillRect(850, 100, 40, 40);
-        ctx.fillRect(650, 650, 60, 60);
-
-        // Dessin des royaumes (zones colorées avec noms)
-        const kingdomsData = [
-            { name: 'AEGYRIA', color: '#FFD700', x: 50, y: 50, width: 200, height: 150 },
-            { name: 'SOMBRENUIT', color: '#2F2F2F', x: 400, y: 250, width: 250, height: 180 },
-            { name: 'KHELOS', color: '#CD853F', x: 900, y: 300, width: 200, height: 150 },
-            { name: 'SYLVARIA', color: '#228B22', x: 150, y: 400, width: 200, height: 150 },
-        ];
-
-        ctx.font = 'bold 16px serif';
-        ctx.textAlign = 'center';
-
-        kingdomsData.forEach(kingdom => {
-            ctx.fillStyle = kingdom.color;
-            ctx.fillRect(kingdom.x, kingdom.y, kingdom.width, kingdom.height);
-            ctx.fillStyle = '#ffffff'; // Couleur du texte du nom du royaume
-            ctx.fillText(kingdom.name, kingdom.x + kingdom.width / 2, kingdom.y + kingdom.height / 2);
-        });
-
-        // Titre de la carte
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 40px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('CARTE DÉTAILLÉE DU MONDE', 600, 40);
-
-        return canvas.toBuffer('image/png');
-    }
+    
 
     clearCache() {
         this.imageCache.clear();

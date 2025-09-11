@@ -201,6 +201,31 @@ class FreepikClient {
             nudity: false
         });
     }
+
+    async generateDetailedWorldMap(outputPath, options = {}) {
+        const prompt = `Ultra-detailed fantasy world map with 12 distinct kingdoms: 
+        AEGYRIA golden plains with castles and honor banners, 
+        SOMBRENUIT dark mysterious forests with shadow towers, 
+        KHELOS burning desert with ancient pyramids and ruins, 
+        ABRANTIS coastal fortified cities with harbors and ships, 
+        VARHA snowy mountains with ice fortresses, 
+        SYLVARIA magical bright forests with elven cities, 
+        ECLYPSIA dark eclipse lands with obsidian spires, 
+        TERRE_DESOLE post-apocalyptic wasteland with ruins, 
+        DRAK_TARR volcanic peaks with dragon lairs, 
+        URVALA misty swamps with alchemist towers, 
+        OMBREFIEL gray plains with mercenary camps, 
+        KHALDAR tropical jungles with tribal villages. 
+        Show detailed roads connecting kingdoms, trade routes, rivers, mountains, forests, cities, villages, landmarks. 
+        Ancient parchment style with ornate borders, compass rose, legend. 
+        Masterpiece cartography with every detail visible: houses, farms, bridges, watchtowers, temples, markets.`;
+
+        return await this.generateImage(prompt, outputPath, {
+            style: options.style || '3d',
+            perspective: 'third_person',
+            nudity: false
+        });
+    }
 }
 
 module.exports = FreepikClient;
