@@ -21,6 +21,9 @@ class FrictionUltimateBot {
         this.imageGenerator = new ImageGenerator();
         this.isConnected = false;
         this.processedMessages = new Set(); // Système de déduplication
+
+        // Injecter le client Groq dans l'ImageGenerator pour optimisation des prompts
+        this.imageGenerator.setGroqClient(this.gameEngine.groqClient);
     }
 
     async initialize() {

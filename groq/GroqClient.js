@@ -116,6 +116,48 @@ class GroqClient {
 
         return await this.generateNarration(prompt, maxTokens);
     }
+
+    async generateOptimizedImagePrompt(context, maxTokens = 150) {
+        if (!this.hasValidClient()) {
+            throw new Error('Client Groq non disponible');
+        }
+
+        try {
+            const response = await this.client.chat.completions.create({
+                messages: [
+                    {
+                        role: 'system',
+                        content: `Tu es un expert en prompts d'images IA pour Stable Diffusion/anime style.
+                        Génère des prompts détaillés en anglais pour créer des images épiques.
+                        Style: anime, fantasy RPG, steampunk, high quality, detailed.
+                        Format: Descriptif précis avec tags artistiques.`
+                    },
+                    {
+                        role: 'user',
+                        content: `Crée un prompt d'image optimal pour cette scène RPG:
+                        ${context}
+                        
+                        Inclus: style anime, fantasy, détails steampunk, qualité 8K, composition épique.`
+                    }
+                ],
+                model: this.model,
+                max_tokens: maxTokens,
+                temperature: 0.7,
+                top_p: 0.9
+            });
+
+            const prompt = response.choices[0]?.message?.content?.trim();
+            if (!prompt) {
+                throw new Error('Prompt vide de Groq');
+            }
+
+            console.log('✅ Prompt d\'image optimisé par Groq');
+            return prompt;
+        } catch (error) {
+            console.error('❌ Erreur génération prompt image Groq:', error.message);
+            throw error;
+        }
+    }
 }
 
 module.exports = GroqClient;

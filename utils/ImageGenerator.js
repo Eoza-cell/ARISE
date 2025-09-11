@@ -37,9 +37,12 @@ class ImageGenerator {
             this.hasGemini = false;
         }
 
+        // Groq pour optimisation des prompts (injecté plus tard)
+        this.groqClient = null;
+
         // Log du mode de fonctionnement
         if (this.hasBytez) {
-            console.log('🎨 Mode: Bytez (priorité) + Gemini (fallback) + Canvas (dernier recours)');
+            console.log('🎨 Mode: Groq (prompts) + Bytez (images) + Canvas (fallback)');
         } else if (this.hasGemini) {
             console.log('🎨 Mode: Gemini (principal) + Canvas (fallback)');
         } else {
@@ -48,6 +51,11 @@ class ImageGenerator {
         
         // Créer les dossiers nécessaires
         this.initializeFolders();
+    }
+
+    setGroqClient(groqClient) {
+        this.groqClient = groqClient;
+        console.log('🚀 Client Groq injecté pour optimisation des prompts');
     }
 
     async initializeFolders() {
@@ -134,7 +142,7 @@ class ImageGenerator {
             const prompt = `Fantasy RPG scene: ${character.name}, ${character.gender === 'male' ? 'male' : 'female'} warrior from ${character.kingdom} kingdom, performing action: "${action}". ${narration}. Epic anime style, detailed character design, cinematic lighting, professional illustration`;
             
             const imagePath = path.join(this.tempPath, `character_action_${character.id}_${Date.now()}.png`);
-            return await this.generateWithFallback(prompt, imagePath, () => this.generateCharacterImage(character));
+            return await this.generateWithFallback(prompt, imagePath, () => this.generateCharacterImage(character), true, this.groqClient);
         } catch (error) {
             console.error('❌ Erreur génération image action personnage:', error);
             return await this.generateCharacterImage(character);
@@ -873,23 +881,39 @@ class ImageGenerator {
         }
     }
 
-    async generateWithFallback(prompt, imagePath, fallbackFunction) {
-        // Essayer Bytez en priorité (timeout réduit pour éviter les blocages)
+    async generateWithFallback(prompt, imagePath, fallbackFunction, useGroqOptimization = false, groqClient = null) {
+        // Optimiser le prompt avec Groq si disponible
+        let optimizedPrompt = prompt;
+        if (useGroqOptimization && groqClient && groqClient.hasValidClient()) {
+            try {
+                console.log('🚀 Optimisation du prompt avec Groq...');
+                optimizedPrompt = await groqClient.generateOptimizedImagePrompt(prompt);
+                console.log('✅ Prompt optimisé par Groq');
+            } catch (groqError) {
+                console.log('⚠️ Optimisation Groq échouée, prompt original utilisé:', groqError.message);
+            }
+        }
+
+        // Essayer Bytez en priorité avec prompt optimisé
         if (this.hasBytez && this.bytezClient) {
             try {
-                console.log('🎨 Génération avec Bytez (priorité)...');
-                await this.bytezClient.generateImage(prompt, imagePath);
+                console.log('🎨 Génération avec Bytez (prompt Groq optimisé)...');
+                await this.bytezClient.generateImage(optimizedPrompt, imagePath);
                 const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                 if (imageBuffer) {
-                    console.log('✅ Image générée avec Bytez');
+                    console.log('✅ Image générée avec Bytez + Groq');
                     return imageBuffer;
                 }
             } catch (bytezError) {
                 console.log('⚠️ Erreur Bytez (ne pas bloquer narration):', bytezError.message);
+                // Attendre un peu pour éviter les conflits de concurrence
+                if (bytezError.message.includes('concurrency')) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                }
             }
         }
 
-        // Fallback Canvas direct (pas d'attente Gemini pour images)
+        // Fallback Canvas direct
         console.log('🎨 Fallback Canvas direct - priorité narration');
         return await fallbackFunction();
     }
