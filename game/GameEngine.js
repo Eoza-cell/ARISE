@@ -1,12 +1,14 @@
 const GeminiClient = require('../gemini/GeminiClient');
 const OpenAIClient = require('../ai/OpenAIClient');
 const OllamaClient = require('../ai/OllamaClient');
+const GroqClient = require('../groq/GroqClient');
 
 class GameEngine {
     constructor() {
         this.openAIClient = new OpenAIClient();
         this.ollamaClient = new OllamaClient();
         this.geminiClient = new GeminiClient();
+        this.groqClient = new GroqClient();
         this.commandHandlers = {
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
@@ -296,40 +298,52 @@ class GameEngine {
             // Générer la narration: Ollama > Gemini > OpenAI
             let narration;
             try {
-                if (this.ollamaClient.hasValidClient()) {
-                    narration = await this.ollamaClient.generateNarration({}, message, character);
-                    console.log('✅ Narration générée avec Ollama');
+                // Priorité absolue à Groq pour la vitesse et qualité
+                if (this.groqClient && this.groqClient.hasValidClient()) {
+                    console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
+                    const explorationPrompt = `Action du joueur: "${message}" - Lieu: ${character.currentLocation} (Royaume: ${character.kingdom})`;
+                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message);
+                    console.log('✅ Narration générée avec Groq');
                 } else {
-                    throw new Error('Ollama non disponible, essai Gemini');
+                    throw new Error('Groq non disponible, essai Ollama');
                 }
-            } catch (ollamaError) {
+            } catch (groqError) {
                 try {
-                    console.log('🎭 Génération narration avec Gemini...');
-                    const context = {
-                        character: character,
-                        location: character.currentLocation,
-                        action: message,
-                        gameState: {
-                            life: character.currentLife,
-                            energy: character.currentEnergy,
-                            powerLevel: character.powerLevel,
-                            kingdom: character.kingdom
-                        }
-                    };
-                    narration = await this.geminiClient.generateNarration(context);
-                    console.log('✅ Narration générée avec Gemini');
-                } catch (geminiError) {
-                    console.log('⚠️ Fallback OpenAI pour narration:', geminiError.message);
-                    narration = await this.openAIClient.generateNarration({
-                        character: character,
-                        location: character.currentLocation,
-                        action: message,
-                        gameState: {
-                            life: character.currentLife,
-                            energy: character.currentEnergy,
-                            powerLevel: character.powerLevel
-                        }
-                    });
+                    if (this.ollamaClient.hasValidClient()) {
+                        narration = await this.ollamaClient.generateNarration({}, message, character);
+                        console.log('✅ Narration générée avec Ollama');
+                    } else {
+                        throw new Error('Ollama non disponible, essai Gemini');
+                    }
+                } catch (ollamaError) {
+                    try {
+                        console.log('🎭 Génération narration avec Gemini...');
+                        const context = {
+                            character: character,
+                            location: character.currentLocation,
+                            action: message,
+                            gameState: {
+                                life: character.currentLife,
+                                energy: character.currentEnergy,
+                                powerLevel: character.powerLevel,
+                                kingdom: character.kingdom
+                            }
+                        };
+                        narration = await this.geminiClient.generateNarration(context);
+                        console.log('✅ Narration générée avec Gemini');
+                    } catch (geminiError) {
+                        console.log('⚠️ Fallback OpenAI pour narration:', geminiError.message);
+                        narration = await this.openAIClient.generateNarration({
+                            character: character,
+                            location: character.currentLocation,
+                            action: message,
+                            gameState: {
+                                life: character.currentLife,
+                                energy: character.currentEnergy,
+                                powerLevel: character.powerLevel
+                            }
+                        });
+                    }
                 }
             }
 
