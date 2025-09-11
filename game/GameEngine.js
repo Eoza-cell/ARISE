@@ -441,8 +441,10 @@ class GameEngine {
             };
         }
 
-        // Stocker le royaume temporairement
+        // Stocker le royaume temporairement avec son ID
         await dbManager.setTemporaryData(player.id, 'creation_kingdom', selectedKingdom.id);
+        
+        console.log(`✅ Royaume sélectionné: ${selectedKingdom.name} (ID: ${selectedKingdom.id}) pour le joueur ${player.id}`);
 
         return {
             text: `🏰 **Royaume sélectionné :** ${selectedKingdom.name}\n\n` +
@@ -482,6 +484,10 @@ class GameEngine {
             };
         }
 
+        // Récupérer les détails du royaume
+        const kingdom = await dbManager.getKingdomById(kingdomId);
+        const kingdomName = kingdom ? kingdom.name : kingdomId;
+        
         // Créer le personnage
         const characterData = {
             playerId: player.id,
@@ -496,13 +502,15 @@ class GameEngine {
             maxLife: 100,
             currentEnergy: 100,
             maxEnergy: 100,
-            currentLocation: `Capitale de ${kingdomId}`,
+            currentLocation: `Capitale de ${kingdomName}`,
             position: { x: 0, y: 0, z: 0 },
             coins: 100,
             equipment: {},
             inventory: [],
             learnedTechniques: []
         };
+        
+        console.log(`✅ Création personnage: ${name}, Royaume: ${kingdomName} (${kingdomId}), Genre: ${gender}`);
 
         try {
             const newCharacter = await dbManager.createCharacter(characterData);
@@ -516,7 +524,7 @@ class GameEngine {
                 text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !**\n\n` +
                       `👤 **Nom :** ${newCharacter.name}\n` +
                       `👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}\n` +
-                      `🏰 **Royaume :** ${kingdomId}\n` +
+                      `🏰 **Royaume :** ${kingdomName}\n` +
                       `⚔️ **Niveau :** ${newCharacter.level}\n` +
                       `🌟 **Niveau de puissance :** ${newCharacter.powerLevel}\n\n` +
                       `🎮 Utilise **/menu** pour découvrir tes options !`,
