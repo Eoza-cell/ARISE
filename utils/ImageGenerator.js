@@ -154,9 +154,10 @@ class ImageGenerator {
 
     async generateCharacterActionImage(character, action, narration, options = {}) {
         try {
+            // FORCER la vue première personne pour toutes les images d'action IA
             const imageOptions = {
                 style: options.style || this.defaultStyle,
-                perspective: options.perspective || this.defaultPerspective,
+                perspective: 'first_person', // FORCÉ - vue première personne uniquement
                 nudity: options.nudity !== undefined ? options.nudity : this.allowNudity
             };
 
@@ -167,7 +168,7 @@ class ImageGenerator {
                     await this.freepikClient.generateActionImage(character, action, narration, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                     if (imageBuffer) {
-                        console.log('✅ Image action générée par Freepik');
+                        console.log('✅ Image action générée par Freepik (vue première personne)');
                         return imageBuffer;
                     }
                 } catch (freepikError) {
@@ -184,18 +185,26 @@ class ImageGenerator {
 
     async generateCharacterImage(character, options = {}) {
         try {
+            // D'abord vérifier s'il y a une image personnalisée
+            const customImage = await this.getCustomCharacterImage(character.id);
+            if (customImage) {
+                console.log(`✅ Image personnalisée trouvée pour ${character.name}`);
+                return customImage;
+            }
+
             const cacheKey = `character_${character.id}_freepik_${options.style || this.defaultStyle}`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            console.log(`🎨 Génération image personnage ${character.name} avec Freepik...`);
+            console.log(`🎨 Génération image personnage ${character.name} avec Freepik (vue première personne)...`);
 
             const imagePath = path.join(this.tempPath, `character_${character.id}_freepik.png`);
 
+            // FORCER la vue première personne pour toutes les images IA
             const imageOptions = {
                 style: options.style || this.defaultStyle,
-                perspective: options.perspective || this.defaultPerspective,
+                perspective: 'first_person', // FORCÉ - vue première personne uniquement
                 nudity: options.nudity !== undefined ? options.nudity : this.allowNudity
             };
 
@@ -205,7 +214,7 @@ class ImageGenerator {
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
                     if (imageBuffer) {
-                        console.log(`✅ Image personnage ${character.name} générée par Freepik`);
+                        console.log(`✅ Image personnage ${character.name} générée par Freepik (vue première personne)`);
                         this.imageCache.set(cacheKey, imageBuffer);
                         return imageBuffer;
                     }
@@ -224,6 +233,13 @@ class ImageGenerator {
 
     async generateCharacterSheet(character) {
         try {
+            // Vérifier d'abord s'il y a une image personnalisée pour la fiche
+            const customImage = await this.getCustomCharacterImage(character.id);
+            if (customImage) {
+                console.log(`✅ Image personnalisée utilisée pour la fiche de ${character.name}`);
+                return customImage;
+            }
+
             const cacheKey = `character_sheet_${character.id}`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
@@ -232,20 +248,20 @@ class ImageGenerator {
             const imagePath = path.join(this.tempPath, `character_sheet_${character.id}.png`);
 
             if (this.hasFreepik && this.freepikClient) {
-                console.log(`🎨 Génération fiche personnage pour ${character.name}...`);
+                console.log(`🎨 Génération fiche personnage pour ${character.name} (vue première personne)...`);
                 
                 const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
                 const prompt = `Character sheet portrait of ${character.name}, detailed ${genderDesc} from ${character.kingdom} kingdom, level ${character.level}, power level ${character.powerLevel}, fantasy RPG character portrait, detailed armor and equipment, first person POV perspective`;
 
                 await this.freepikClient.generateImage(prompt, imagePath, {
                     style: this.defaultStyle,
-                    perspective: 'first_person',
+                    perspective: 'first_person', // FORCÉ - vue première personne
                     nudity: this.allowNudity
                 });
 
                 const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                 if (imageBuffer) {
-                    console.log(`✅ Fiche personnage générée par Freepik`);
+                    console.log(`✅ Fiche personnage générée par Freepik (vue première personne)`);
                     this.imageCache.set(cacheKey, imageBuffer);
                     return imageBuffer;
                 }

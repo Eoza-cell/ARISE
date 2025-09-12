@@ -1053,18 +1053,18 @@ class GameEngine {
         try {
             console.log(`🎨 Génération nouvelle image pour ${character.name} avec description personnalisée...`);
 
-            // Construire le prompt optimisé pour Freepik
+            // Construire le prompt optimisé pour Freepik avec vue première personne FORCÉE
             const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
             const kingdomDesc = this.getKingdomDescription(character.kingdom);
 
             // Nettoyer et optimiser la description utilisateur
             const cleanDescription = description.trim();
 
-            // Construire un prompt plus structuré et précis
+            // Construire un prompt plus structuré et précis avec vue première personne
             const basePrompt = `fantasy ${genderDesc} warrior`;
             const kingdomContext = `from ${character.kingdom} kingdom (${kingdomDesc})`;
             const userCustomization = cleanDescription;
-            const artStyle = 'detailed fantasy RPG character art, full body portrait, epic fantasy style';
+            const artStyle = 'detailed fantasy RPG character art, first person POV perspective, epic fantasy style';
 
             let fullPrompt = `${basePrompt} ${kingdomContext}, appearance: ${userCustomization}, ${artStyle}`;
 
@@ -1078,7 +1078,7 @@ class GameEngine {
                 fullPrompt = correctedPrompt;
             }
 
-            // Générer l'image avec Freepik
+            // Générer l'image avec Freepik FORCÉ en vue première personne
             const imagePath = `temp/character_modified_${character.id}_${Date.now()}.png`;
 
             console.log(`📝 Description originale: "${cleanDescription}"`);
@@ -1086,7 +1086,7 @@ class GameEngine {
 
             await imageGenerator.freepikClient.generateImage(fullPrompt, imagePath, {
                 style: '3d',
-                perspective: 'third_person',
+                perspective: 'first_person', // FORCÉ - vue première personne pour IA
                 nudity: false
             });
 
@@ -1098,14 +1098,14 @@ class GameEngine {
             await dbManager.clearTemporaryData(player.id, 'modification_started');
 
             if (imageBuffer) {
-                // Sauvegarder l'image modifiée (si Freepik a bien généré une image)
+                // Sauvegarder l'image modifiée comme image personnalisée
                 await imageGenerator.saveCustomCharacterImage(character.id, imageBuffer);
 
                 return {
                     text: `✨ **PERSONNAGE MODIFIÉ AVEC SUCCÈS !**\n\n` +
                           `👤 **${character.name}** - Nouvelle apparence générée\n\n` +
                           `📝 **Description appliquée :**\n"${cleanDescription}"\n\n` +
-                          `🎨 **Image générée par Freepik avec IA**\n\n` +
+                          `🎨 **Image générée par Freepik avec IA (vue première personne)**\n\n` +
                           `✅ Ton personnage a maintenant une apparence unique basée sur ta description !`,
                     image: imageBuffer
                 };
