@@ -50,7 +50,14 @@ class GameEngine {
             // Mise à jour de l'activité du joueur
             await dbManager.updatePlayerActivity(player.id);
 
-            // Traitement des commandes
+            // Traitement des commandes - gérer les cas où message est null (ex: images)
+            if (!message) {
+                return { 
+                    text: "🖼️ J'ai reçu votre image ! Cependant, je ne peux traiter que les commandes textuelles.\n\n" +
+                          "💬 Utilisez `/menu` pour voir les commandes disponibles." 
+                };
+            }
+            
             const command = message.toLowerCase().trim();
 
             if (this.commandHandlers[command]) {
