@@ -193,6 +193,14 @@ class DatabaseManager {
                 created_at TIMESTAMP DEFAULT NOW() NOT NULL
             );
 
+            -- Table de sauvegarde des parties
+            CREATE TABLE IF NOT EXISTS game_backups (
+                id SERIAL PRIMARY KEY,
+                player_id INTEGER NOT NULL REFERENCES players(id),
+                backup_data JSONB NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+
             -- Index pour améliorer les performances
             CREATE INDEX IF NOT EXISTS idx_players_whatsapp ON players(whatsapp_number);
             CREATE INDEX IF NOT EXISTS idx_characters_player ON characters(player_id);
@@ -202,6 +210,8 @@ class DatabaseManager {
             CREATE INDEX IF NOT EXISTS idx_conversation_memory_importance ON conversation_memory(importance DESC);
             CREATE INDEX IF NOT EXISTS idx_character_memories_character ON character_memories(character_id);
             CREATE INDEX IF NOT EXISTS idx_character_memories_importance ON character_memories(importance DESC);
+            CREATE INDEX IF NOT EXISTS idx_game_backups_player ON game_backups(player_id);
+            CREATE INDEX IF NOT EXISTS idx_conversation_memory_content ON conversation_memory USING gin(to_tsvector('french', content));
         `;
 
         await this.pool.query(createTablesSQL);
@@ -518,19 +528,82 @@ class DatabaseManager {
         }
     }
 
-    async getConversationMemory(sessionId, limit = 20) {
+    async getConversationMemory(sessionId, limit = 1000) {
         try {
             const memories = await this.db
                 .select()
                 .from(schema.conversationMemory)
                 .where(eq(schema.conversationMemory.sessionId, sessionId))
-                .orderBy(schema.conversationMemory.timestamp)
+                .orderBy(desc(schema.conversationMemory.timestamp))
                 .limit(limit);
             
-            return memories;
+            return memories.reverse(); // Retourner dans l'ordre chronologique
         } catch (error) {
             console.error('❌ Erreur lors de la récupération mémoire:', error);
             return [];
+        }
+    }
+
+    async searchRelatedMemories(sessionId, searchText, limit = 10) {
+        try {
+            // Recherche simple par mots-clés dans le contenu
+            const keywords = searchText.toLowerCase().split(' ').filter(word => word.length > 3);
+            
+            if (keywords.length === 0) return [];
+            
+            const memories = await this.db
+                .select()
+                .from(schema.conversationMemory)
+                .where(eq(schema.conversationMemory.sessionId, sessionId))
+                .orderBy(desc(schema.conversationMemory.importance))
+                .limit(100); // Récupérer plus pour filtrer
+            
+            // Filtrer par pertinence
+            const relevantMemories = memories.filter(memory => {
+                const content = memory.content.toLowerCase();
+                return keywords.some(keyword => content.includes(keyword));
+            });
+            
+            return relevantMemories.slice(0, limit);
+        } catch (error) {
+            console.error('❌ Erreur lors de la recherche mémoire:', error);
+            return [];
+        }
+    }
+
+    async createGameBackup(playerId) {
+        try {
+            const player = await this.getPlayerByWhatsApp(playerId);
+            if (!player) return null;
+            
+            const character = await this.getCharacterByPlayer(player.id);
+            const memories = await this.getConversationMemory(`player_${player.id}`, 1000);
+            
+            const backup = {
+                player: player,
+                character: character,
+                memories: memories,
+                timestamp: new Date(),
+                version: '1.0'
+            };
+            
+            // Sauvegarder dans une table de backup
+            const backupData = {
+                playerId: player.id,
+                backupData: JSON.stringify(backup),
+                createdAt: new Date()
+            };
+            
+            await this.pool.query(
+                'INSERT INTO game_backups (player_id, backup_data, created_at) VALUES ($1, $2, $3)',
+                [backupData.playerId, backupData.backupData, backupData.createdAt]
+            );
+            
+            console.log(`✅ Sauvegarde créée pour le joueur ${player.id}`);
+            return backup;
+        } catch (error) {
+            console.error('❌ Erreur lors de la création de sauvegarde:', error);
+            return null;
         }
     }
 

@@ -2,14 +2,51 @@ const OpenAI = require('openai');
 
 // Persistent database-backed AI memory system
 class AIMemory {
-    constructor(dbManager, maxHistory = 20) {
+    constructor(dbManager, maxHistory = 1000) {
         this.dbManager = dbManager;
         this.maxHistory = maxHistory;
+        this.recentMemory = new Map(); // Cache en mémoire pour les messages récents
     }
 
     async getHistory(sessionId) {
         if (!this.dbManager) return [];
-        return await this.dbManager.getConversationMemory(sessionId, this.maxHistory);
+        
+        // Vérifier le cache d'abord
+        const cacheKey = `history_${sessionId}`;
+        if (this.recentMemory.has(cacheKey)) {
+            const cached = this.recentMemory.get(cacheKey);
+            if (Date.now() - cached.timestamp < 60000) { // Cache de 1 minute
+                return cached.data;
+            }
+        }
+        
+        // Récupérer de la base de données avec pagination intelligente
+        const history = await this.dbManager.getConversationMemory(sessionId, this.maxHistory);
+        
+        // Mettre en cache
+        this.recentMemory.set(cacheKey, {
+            data: history,
+            timestamp: Date.now()
+        });
+        
+        return history;
+    }
+
+    async getContextualMemory(sessionId, currentAction) {
+        if (!this.dbManager) return [];
+        
+        // Récupérer les 50 derniers messages + messages importants
+        const recentMemories = await this.dbManager.getConversationMemory(sessionId, 50);
+        const importantMemories = await this.dbManager.getImportantMemories(sessionId, 8, 20);
+        
+        // Rechercher des souvenirs liés à l'action actuelle
+        const relatedMemories = await this.dbManager.searchRelatedMemories(sessionId, currentAction, 10);
+        
+        // Combiner et dédupliquer
+        const allMemories = [...recentMemories, ...importantMemories, ...relatedMemories];
+        const uniqueMemories = Array.from(new Map(allMemories.map(m => [m.id, m])).values());
+        
+        return uniqueMemories.slice(0, 100); // Limiter à 100 pour les performances
     }
 
     async addMessage(sessionId, role, content, contextData = {}) {

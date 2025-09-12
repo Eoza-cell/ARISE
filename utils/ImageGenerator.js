@@ -77,9 +77,34 @@ class ImageGenerator {
         try {
             await fs.mkdir(this.assetsPath, { recursive: true });
             await fs.mkdir(this.tempPath, { recursive: true });
+            await fs.mkdir(path.join(this.assetsPath, 'characters'), { recursive: true });
+            await fs.mkdir(path.join(this.assetsPath, 'custom_images'), { recursive: true });
             console.log('✅ Dossiers d\'images initialisés');
         } catch (error) {
             console.error('❌ Erreur création dossiers:', error);
+        }
+    }
+
+    async saveCustomCharacterImage(characterId, imageBuffer) {
+        try {
+            const imagePath = path.join(this.assetsPath, 'custom_images', `character_${characterId}.png`);
+            await fs.writeFile(imagePath, imageBuffer);
+            console.log(`✅ Image personnalisée sauvegardée: ${imagePath}`);
+            return imagePath;
+        } catch (error) {
+            console.error('❌ Erreur sauvegarde image personnalisée:', error);
+            throw error;
+        }
+    }
+
+    async getCustomCharacterImage(characterId) {
+        try {
+            const imagePath = path.join(this.assetsPath, 'custom_images', `character_${characterId}.png`);
+            const imageBuffer = await fs.readFile(imagePath);
+            return imageBuffer;
+        } catch (error) {
+            // Image personnalisée non trouvée, retourner null
+            return null;
         }
     }
 

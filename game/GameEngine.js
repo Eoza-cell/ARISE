@@ -57,7 +57,7 @@ class GameEngine {
                           "💬 Utilisez `/menu` pour voir les commandes disponibles." 
                 };
             }
-            
+
             const command = message.toLowerCase().trim();
 
             if (this.commandHandlers[command]) {
@@ -294,7 +294,7 @@ class GameEngine {
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
             const sessionId = `player_${player.id}`; // Session unique par joueur
-            
+
             // Analyser l'action du joueur avec OpenAI
             const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
                 character: character,
@@ -357,16 +357,16 @@ class GameEngine {
             const energyCost = Math.max(0, Math.min(character.currentEnergy, actionAnalysis.energyCost || 10));
             const staminaRecovery = Math.max(-15, Math.min(3, actionAnalysis.staminaRecovery || 0));
             const equipmentStress = Math.max(-3, Math.min(0, actionAnalysis.equipmentStress || 0));
-            
+
             // Valider combatAdvantage dans une liste sécurisée
             const validCombatAdvantages = ['critical_hit', 'normal_hit', 'glancing_blow', 'miss', 'counter_attacked'];
             actionAnalysis.combatAdvantage = validCombatAdvantages.includes(actionAnalysis.combatAdvantage) 
                 ? actionAnalysis.combatAdvantage 
                 : 'miss';
-            
+
             // Appliquer le système de combat Dark Souls strict
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
-            
+
             // Appliquer les dégâts potentiels (si action mal exécutée)
             let damageText = '';
             if (actionAnalysis.potentialDamage > 0) {
@@ -374,7 +374,7 @@ class GameEngine {
                 character.currentLife = Math.max(0, character.currentLife - damage);
                 damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV`;
             }
-            
+
             // Récupération de stamina (utiliser la valeur clampée)
             if (staminaRecovery !== 0) {
                 if (staminaRecovery > 0) {
@@ -395,17 +395,17 @@ class GameEngine {
             let isAlive = true;
             if (character.currentLife <= 0) {
                 isAlive = false;
-                
+
                 // Calculer les pertes AVANT modification
                 const coinsBefore = character.coins;
                 const coinsLost = Math.floor(coinsBefore * 0.1);
-                
+
                 // Appliquer les pénalités de mort
                 character.currentLife = Math.ceil(character.maxLife * 0.3); // Respawn avec 30% de vie
                 character.currentEnergy = Math.floor(character.maxEnergy * 0.5); // 50% d'énergie
                 character.coins = Math.max(0, coinsBefore - coinsLost); // Réduction correcte
                 character.currentLocation = 'Lieu de Respawn - Sanctuaire des Âmes Perdues';
-                
+
                 deathText = `\n💀 **MORT** - Vous avez succombé à vos blessures...\n` +
                            `🕊️ **RESPAWN** - Votre âme trouve refuge au Sanctuaire\n` +
                            `💰 **PERTE** - ${coinsLost} pièces perdues dans la mort\n` +
@@ -430,7 +430,7 @@ class GameEngine {
             // Générer les barres de vie et d'énergie comme dans Dark Souls
             const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
             const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
-            
+
             // Indicateur d'avantage de combat
             const combatEmoji = {
                 'critical_hit': '🎯',
@@ -445,7 +445,7 @@ class GameEngine {
             if (actionAnalysis.detectionRisk) {
                 detectionWarning = `\n👁️ **DÉTECTION** - Vos mouvements ont pu être repérés !`;
             }
-            
+
             let consequencesText = '';
             if (actionAnalysis.consequences && actionAnalysis.consequences.length > 0) {
                 const mainConsequence = actionAnalysis.consequences[0];
@@ -460,7 +460,7 @@ class GameEngine {
                 'medium': '⚪',
                 'low': '❌'
             }[actionAnalysis.precision] || '❓';
-            
+
             const staminaText = staminaRecovery !== 0 
                 ? `\n⚡ **RÉCUP. ENDURANCE :** ${staminaRecovery > 0 ? '+' : ''}${staminaRecovery}` 
                 : '';
@@ -775,11 +775,11 @@ class GameEngine {
             };
         }
 
-        // Valider le nom (lettres, chiffres, espaces, accents)
-        const nameRegex = /^[a-zA-Z0-9àâäéèêëïîôöùûüÿç\s]{2,20}$/;
+        // Valider le nom (lettres, chiffres, accents)
+        const nameRegex = /^[a-zA-Z0-9àâäéèêëïîôöùûüÿç\s-]{2,20}$/;
         if (!nameRegex.test(name)) {
             return {
-                text: `❌ Le nom doit contenir entre 2 et 20 caractères (lettres, chiffres, espaces uniquement) !`
+                text: `❌ Le nom doit contenir entre 2 et 20 caractères (lettres, chiffres, espaces, tirets uniquement) !`
             };
         }
 
@@ -804,60 +804,6 @@ class GameEngine {
                   `• Si tu n'as pas de photo, écris "SANS_PHOTO"\n\n` +
                   `📷 **Envoie ta photo maintenant...**`
         };
-
-        // Récupérer les détails du royaume
-        const kingdom = await dbManager.getKingdomById(kingdomId);
-        const kingdomName = kingdom ? kingdom.name : kingdomId;
-
-        // Créer le personnage
-        const characterData = {
-            playerId: player.id,
-            name: name,
-            gender: gender,
-            kingdom: kingdomId,
-            level: 1,
-            experience: 0,
-            powerLevel: 'G',
-            frictionLevel: 'G',
-            currentLife: 100,
-            maxLife: 100,
-            currentEnergy: 100,
-            maxEnergy: 100,
-            currentLocation: `Capitale de ${kingdomName}`,
-            position: { x: 0, y: 0, z: 0 },
-            coins: 100,
-            equipment: {},
-            inventory: [],
-            learnedTechniques: []
-        };
-
-        console.log(`✅ Création personnage: ${name}, Royaume: ${kingdomName} (${kingdomId}), Genre: ${gender}`);
-
-        try {
-            const newCharacter = await dbManager.createCharacter(characterData);
-
-            // Nettoyer TOUTES les données temporaires de création
-            await dbManager.clearTemporaryData(player.id, 'creation_started');
-            await dbManager.clearTemporaryData(player.id, 'creation_gender');
-            await dbManager.clearTemporaryData(player.id, 'creation_kingdom');
-
-            return {
-                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !**\n\n` +
-                      `👤 **Nom :** ${newCharacter.name}\n` +
-                      `👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}\n` +
-                      `🏰 **Royaume :** ${kingdomName}\n` +
-                      `⚔️ **Niveau :** ${newCharacter.level}\n` +
-                      `🌟 **Niveau de puissance :** ${newCharacter.powerLevel}\n\n` +
-                      `🎮 Utilise **/menu** pour découvrir tes options !`,
-                image: await imageGenerator.generateCharacterImage(newCharacter)
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur lors de la création du personnage:', error);
-            return {
-                text: `❌ Erreur lors de la création du personnage. Réessaie plus tard.`
-            };
-        }
     }
 
     async finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage = false, imageBuffer = null }) {
@@ -999,20 +945,20 @@ class GameEngine {
             // Construire le prompt optimisé pour Freepik
             const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
             const kingdomDesc = this.getKingdomDescription(character.kingdom);
-            
+
             // Nettoyer et optimiser la description utilisateur
             const cleanDescription = description.trim();
-            
+
             // Construire un prompt plus structuré et précis
             const basePrompt = `fantasy ${genderDesc} warrior`;
             const kingdomContext = `from ${character.kingdom} kingdom (${kingdomDesc})`;
             const userCustomization = cleanDescription;
             const artStyle = 'detailed fantasy RPG character art, full body portrait, epic fantasy style';
-            
-            const fullPrompt = `${basePrompt} ${kingdomContext}, appearance: ${userCustomization}, ${artStyle}`;
-            
+
+            let fullPrompt = `${basePrompt} ${kingdomContext}, appearance: ${userCustomization}, ${artStyle}`;
+
             console.log(`🎨 Prompt de modification généré: "${fullPrompt}"`);
-            
+
             // Vérifier que la description utilisateur est bien intégrée
             if (!fullPrompt.toLowerCase().includes(cleanDescription.toLowerCase().substring(0, 20))) {
                 console.log('⚠️ Description utilisateur mal intégrée, correction...');
@@ -1023,10 +969,10 @@ class GameEngine {
 
             // Générer l'image avec Freepik
             const imagePath = `temp/character_modified_${character.id}_${Date.now()}.png`;
-            
+
             console.log(`📝 Description originale: "${cleanDescription}"`);
             console.log(`🎯 Prompt final envoyé: "${fullPrompt}"`);
-            
+
             await imageGenerator.freepikClient.generateImage(fullPrompt, imagePath, {
                 style: '3d',
                 perspective: 'third_person',
@@ -1041,6 +987,9 @@ class GameEngine {
             await dbManager.clearTemporaryData(player.id, 'modification_started');
 
             if (imageBuffer) {
+                // Sauvegarder l'image modifiée (si Freepik a bien généré une image)
+                await imageGenerator.saveCustomCharacterImage(character.id, imageBuffer);
+
                 return {
                     text: `✨ **PERSONNAGE MODIFIÉ AVEC SUCCÈS !**\n\n` +
                           `👤 **${character.name}** - Nouvelle apparence générée\n\n` +
@@ -1058,7 +1007,7 @@ class GameEngine {
         } catch (error) {
             console.error('❌ Erreur lors de la modification:', error);
             await dbManager.clearTemporaryData(player.id, 'modification_started');
-            
+
             return {
                 text: `❌ Erreur lors de la génération de l'image personnalisée.\n\n` +
                       `Réessaie avec une description plus simple ou utilise /modifier à nouveau.`

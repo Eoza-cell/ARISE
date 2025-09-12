@@ -37,10 +37,10 @@ class FreepikClient {
             console.log(`✨ Prompt final optimisé: "${optimizedPrompt}"`);
             console.log(`📏 Longueur du prompt: ${optimizedPrompt.length} caractères`);
 
-            // Construire un negative prompt plus précis
-            let negativePrompt = 'blurry, low quality, distorted, deformed, bad anatomy, ugly';
+            // Utiliser le negative prompt amélioré
+            let negativePrompt = this.lastNegativePrompt || 'blurry, low quality, distorted, deformed, bad anatomy, ugly, dark, black screen, completely black, monochrome, poorly lit';
             if (style === '3d') {
-                negativePrompt += ', cartoon, anime, 2d, flat art, drawing';
+                negativePrompt += ', cartoon, anime, 2d, flat art, drawing, sketch';
             } else {
                 negativePrompt += ', photorealistic, 3d render, CGI, realistic photo';
             }
@@ -130,35 +130,38 @@ class FreepikClient {
         // Nettoyer le prompt de base
         optimized = optimized.trim();
 
-        // Ajouter le style en premier pour définir le rendu
+        // Styles améliorés pour de meilleures images
         if (style === '3d') {
-            optimized = `photorealistic 3D rendering, highly detailed CGI, ${optimized}`;
+            optimized = `cinematic 3D render, unreal engine 5, ray tracing, dramatic lighting, vibrant colors, fantasy game art style, ${optimized}`;
         } else {
-            optimized = `detailed anime illustration, manga art style, 2D digital art, ${optimized}`;
+            optimized = `high quality anime art, studio ghibli style, detailed illustration, vibrant colors, fantasy art, ${optimized}`;
         }
 
-        // Ajouter la perspective de manière plus précise
+        // Perspectives améliorées
         const perspectiveMap = {
-            'first_person': 'POV shot, first person perspective',
-            'second_person': 'front view, facing camera directly', 
-            'third_person': 'full body shot, third person view, complete character visible'
+            'first_person': 'dynamic POV shot, immersive perspective, action scene',
+            'second_person': 'heroic portrait, front facing, confident pose, detailed facial features', 
+            'third_person': 'epic full body shot, action pose, detailed environment, cinematic composition'
         };
         
         optimized = `${optimized}, ${perspectiveMap[perspective]}`;
 
-        // Gestion de la nudité (plus subtile)
+        // Gestion de la nudité améliorée
         if (nudity) {
-            optimized = `${optimized}, anatomically correct, detailed body, artistic nude`;
+            optimized = `${optimized}, detailed character design, anatomically correct`;
         } else {
-            optimized = `${optimized}, clothed, appropriate attire`;
+            optimized = `${optimized}, detailed fantasy armor, medieval clothing, warrior outfit`;
         }
 
-        // Mots-clés de qualité essentiels
-        optimized = `${optimized}, masterpiece quality, 8K resolution, professional artwork, detailed textures`;
+        // Mots-clés de qualité premium
+        optimized = `${optimized}, masterpiece, 8K ultra HD, professional game art, detailed textures, sharp focus, best quality, no blur, vibrant lighting`;
 
-        // Limiter la longueur pour éviter la confusion
-        if (optimized.length > 400) {
-            optimized = optimized.substring(0, 400);
+        // Negative prompt pour éviter les images sombres
+        this.lastNegativePrompt = 'blurry, low quality, distorted, deformed, bad anatomy, ugly, dark, black screen, completely black, monochrome, poorly lit, shadow only, silhouette only';
+
+        // Limiter la longueur
+        if (optimized.length > 450) {
+            optimized = optimized.substring(0, 450);
         }
 
         console.log(`🔧 Prompt optimisé final: "${optimized}"`);

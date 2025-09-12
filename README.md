@@ -25,3 +25,33 @@ cd ton-depot
 
 # Installer les dépendances
 pip install -r requirements.txt
+
+
+
+## 🎬 APIs Vidéo Gratuites Recommandées
+
+### 1. RunwayML API
+- **Avantages :** Génération vidéo à partir de texte et d'images
+- **Limitations :** Version gratuite limitée
+- **Usage :** Parfait pour des courtes séquences d'action RPG
+
+### 2. Pika Labs API
+- **Avantages :** Génération vidéo rapide, bonne qualité
+- **Limitations :** Queue d'attente en version gratuite
+- **Usage :** Idéal pour des cinématiques de personnages
+
+### 3. Stable Video Diffusion
+- **Avantages :** Open source, peut être auto-hébergé
+- **Limitations :** Nécessite des ressources GPU
+- **Usage :** Pour des animations de combat
+
+### 4. LeiaPix Converter
+- **Avantages :** Gratuit, conversion image vers vidéo 3D
+- **Limitations :** Limité aux effets de profondeur
+- **Usage :** Effet de parallaxe sur les portraits
+
+### 5. DaVinci Resolve API
+- **Avantages :** Montage vidéo professionnel gratuit
+- **Limitations :** Plus pour l'édition que la génération
+- **Usage :** Assemblage de séquences générées
+
