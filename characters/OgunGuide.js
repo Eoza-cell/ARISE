@@ -8,11 +8,11 @@ class OgunGuide {
         this.name = "Ogun Montgomery";
         this.personality = "Énergique, loyal, passionné par les armes à feu et la technologie. Toujours prêt à aider ses amis.";
         this.stickers = [
-            'https://i.pinimg.com/564x/8c/3d/2f/8c3d2f5e4a6b8c9d0e1f2a3b4c5d6e7f.jpg',
-            'https://i.pinimg.com/736x/1a/2b/3c/1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d.jpg',
-            'https://i.pinimg.com/564x/5f/8e/9d/5f8e9d7c6b5a4f3e2d1c0b9a8f7e6d5c.jpg',
-            'https://i.pinimg.com/736x/9e/8d/7c/9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4f.jpg',
-            'https://i.pinimg.com/564x/3b/4c/5d/3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e.jpg'
+            'https://via.placeholder.com/200x200/FF4500/FFFFFF?text=🔥+OGUN',
+            'https://via.placeholder.com/200x200/FF6347/FFFFFF?text=⚔️+FIRE',
+            'https://via.placeholder.com/200x200/DC143C/FFFFFF?text=💪+FORCE',
+            'https://via.placeholder.com/200x200/B22222/FFFFFF?text=🎯+READY',
+            'https://via.placeholder.com/200x200/8B0000/FFFFFF?text=⚡+ENERGY'
         ];
         this.responses = [
             "🔥 Yo ! Besoin d'aide avec ton équipement ?",

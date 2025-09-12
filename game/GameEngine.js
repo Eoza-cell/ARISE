@@ -23,6 +23,7 @@ class GameEngine {
             '/help': this.ogunGuide.getHelpMenu.bind(this),
             '/guide': this.ogunGuide.getHelpMenu.bind(this),
             '/ogun': this.ogunGuide.getHelpMenu.bind(this),
+            '/jouer': this.handlePlayCommand.bind(this),
             '/royaumes': this.handleKingdomsCommand.bind(this),
             '/ordres': this.handleOrdersCommand.bind(this),
             '/combat': this.handleCombatCommand.bind(this),
@@ -74,18 +75,20 @@ class GameEngine {
             const playerId = player.id;
             const normalizedMessage = message.toLowerCase().trim();
 
-            // Vérifier si c'est une question pour le guide ou si Ogun est mentionné
-            const guideKeywords = ['comment', 'pourquoi', 'que faire', 'aide', 'help', '?', 'conseil', 'guide', 'ogun'];
-            const isQuestion = guideKeywords.some(keyword => 
+            // Vérifier si c'est une question DIRECTE pour Ogun (plus restrictif)
+            const directOgunKeywords = ['aide', 'help', 'conseil', 'guide', 'ogun', 'comment commencer', 'comment jouer'];
+            const isDirectQuestion = directOgunKeywords.some(keyword => 
                 normalizedMessage.includes(keyword)
-            ) || normalizedMessage.endsWith('?');
+            ) || (normalizedMessage.endsWith('?') && normalizedMessage.length < 50); // Questions courtes seulement
 
             // Détecter si Ogun est mentionné directement
             const ogunMentioned = normalizedMessage.includes('ogun') || 
                                 normalizedMessage.includes('montgomery') ||
-                                normalizedMessage.includes('@ogun');
+                                normalizedMessage.includes('@ogun') ||
+                                normalizedMessage.startsWith('salut ogun') ||
+                                normalizedMessage.startsWith('hey ogun');
 
-            if ((isQuestion || ogunMentioned) && !response) {
+            if ((isDirectQuestion || ogunMentioned) && !response) {
                 response = await this.ogunGuide.getGuideResponse(message, playerId);
             }
 
@@ -105,6 +108,9 @@ class GameEngine {
     }
 
     async handleMenuCommand({ player, dbManager, imageGenerator }) {
+        // Désactiver le mode jeu quand on accède au menu
+        await dbManager.clearTemporaryData(player.id, 'game_mode');
+        
         const character = await dbManager.getCharacterByPlayer(player.id);
 
         let menuText = `🎮 **FRICTION ULTIMATE - Menu Principal**\n\n`;
@@ -117,6 +123,7 @@ class GameEngine {
         }
 
         menuText += `📱 **Commandes disponibles :**\n` +
+                   `• /jouer - 🎮 ENTRER DANS LE JEU\n` +
                    `• /créer - Créer ton personnage\n` +
                    `• /modifier - Modifier ton personnage\n` +
                    `• /fiche - Voir ta fiche de personnage\n` +
@@ -125,6 +132,7 @@ class GameEngine {
                    `• /combat - Système de combat\n` +
                    `• /inventaire - Gérer ton équipement\n` +
                    `• /carte - Carte du monde\n` +
+                   `• /ogun - 🔥 Parler avec Ogun (guide)\n` +
                    `• /aide - Aide complète\n\n` +
                    `💀 **Le monde bouge en permanence. Chaque seconde compte !**`;
 
@@ -307,12 +315,27 @@ class GameEngine {
             return await this.handleModificationDescription({ player, description: message, dbManager, imageGenerator });
         }
 
+        // Vérifier si le joueur est en mode jeu
+        const isInGameMode = await dbManager.getTemporaryData(player.id, 'game_mode');
+        
+        if (!isInGameMode) {
+            return {
+                text: `💬 **Message libre détecté**\n\n` +
+                      `Salut ! Pour jouer à Friction Ultimate, utilise :\n` +
+                      `🎮 **/jouer** - Entrer en mode jeu\n` +
+                      `🔥 **/ogun** - Parler avec Ogun (guide)\n` +
+                      `📋 **/menu** - Voir toutes les options\n\n` +
+                      `En mode libre, je ne traite pas les actions de jeu.`
+            };
+        }
+
         // Maintenant vérifier si le personnage existe pour les actions de jeu normales
         const character = await dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
             return {
-                text: `❌ Tu dois d'abord créer un personnage avec /créer !`
+                text: `❌ Tu dois d'abord créer un personnage avec /créer !\n\n` +
+                      `Utilise /menu pour sortir du mode jeu.`
             };
         }
 
@@ -727,6 +750,44 @@ class GameEngine {
                   `• Et d'autres lieux mystérieux...\n\n` +
                   `💀 **Chaque région est dangereuse !**`,
             image: await imageGenerator.generateWorldMap()
+        };
+    }
+
+    async handlePlayCommand({ player, dbManager, imageGenerator }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+
+        if (!character) {
+            return {
+                text: `🎮 **MODE JEU ACTIVÉ**\n\n` +
+                      `❌ Tu n'as pas encore de personnage !\n\n` +
+                      `✨ **Pour commencer à jouer :**\n` +
+                      `1️⃣ Utilise /créer pour créer ton personnage\n` +
+                      `2️⃣ Puis utilise /jouer pour entrer dans le monde\n\n` +
+                      `💬 **Note :** En mode jeu, tes messages seront interprétés comme des actions de jeu.\n` +
+                      `Pour parler avec Ogun, utilise /ogun ou commence par "Ogun, ..."`,
+                image: await imageGenerator.generateMenuImage()
+            };
+        }
+
+        // Marquer le joueur en mode jeu
+        await dbManager.setTemporaryData(player.id, 'game_mode', true);
+
+        return {
+            text: `🎮 **MODE JEU ACTIVÉ** 🎮\n\n` +
+                  `👤 **${character.name}** est maintenant en jeu !\n` +
+                  `📍 **Position :** ${character.currentLocation}\n` +
+                  `❤️ **Vie :** ${character.currentLife}/${character.maxLife}\n` +
+                  `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}\n\n` +
+                  `🎯 **Tes prochains messages seront interprétés comme des actions de jeu.**\n\n` +
+                  `📝 **Exemples d'actions :**\n` +
+                  `• "Je regarde autour de moi"\n` +
+                  `• "J'avance vers le nord"\n` +
+                  `• "Je cherche des ennemis"\n` +
+                  `• "J'attaque avec mon épée"\n\n` +
+                  `💬 **Pour parler avec Ogun :** commence par "Ogun, ..." ou utilise /ogun\n` +
+                  `⚙️ **Pour sortir du mode jeu :** utilise /menu\n\n` +
+                  `🔥 **L'aventure commence maintenant !**`,
+            image: await imageGenerator.generateCharacterImage(character)
         };
     }
     async handleGenderSelection({ player, message, dbManager, imageGenerator }) {

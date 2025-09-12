@@ -244,7 +244,7 @@ class FrictionUltimateBot {
             // Si c'est une réponse du guide avec sticker
             if (response.isGuide && response.sticker) {
                 try {
-                    // Envoyer le sticker d'abord
+                    // Essayer d'envoyer le sticker d'abord
                     await this.sock.sendMessage(chatId, {
                         image: { url: response.sticker },
                         caption: '🔥 Ogun Montgomery'
@@ -260,7 +260,13 @@ class FrictionUltimateBot {
                     }, 500);
                     return;
                 } catch (stickerError) {
-                    console.log('⚠️ Erreur sticker, envoi texte seul:', stickerError.message);
+                    console.log('⚠️ Erreur sticker, envoi texte avec emoji:', stickerError.message);
+                    // Fallback: envoyer le texte avec des emojis supplémentaires
+                    await this.sock.sendMessage(chatId, {
+                        text: `🔥⚔️💪 **OGUN MONTGOMERY** 🔥⚔️💪\n\n${response.text.replace('🔥 **OGUN MONTGOMERY** 🔥', '')}`
+                    });
+                    console.log('✅ Message guide Ogun envoyé (fallback)');
+                    return;
                 }
             }
 
