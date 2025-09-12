@@ -48,10 +48,6 @@ externalPort = 80
 localPort = 33195
 externalPort = 3000
 
-[[ports]]
-localPort = 40073
-externalPort = 3001
-
 [deployment]
 deploymentTarget = "vm"
 run = ["npm", "start"]
