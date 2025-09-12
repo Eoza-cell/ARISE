@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["libuuid"]
 
 [workflows]
-runButton = "Start Friction Bot"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Project"
@@ -23,12 +23,13 @@ args = "Friction Ultimate Bot"
 name = "Friction Ultimate Bot"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node index.js"
-
-[workflows.workflow.metadata]
-outputType = "console"
+args = "npm start"
+waitForPort = 5000
 
 [[workflows.workflow]]
 name = "Start Friction Bot"
