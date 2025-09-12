@@ -917,6 +917,14 @@ class GameEngine {
 
             const imageType = hasCustomImage ? "avec ta photo personnalisée" : "avec une image générée";
 
+            // Générer l'image du personnage de façon sécurisée
+            let characterImage = null;
+            try {
+                characterImage = await imageGenerator.generateCharacterImage(newCharacter);
+            } catch (imageError) {
+                console.log('⚠️ Impossible de générer l\'image du personnage, continuons sans image:', imageError.message);
+            }
+
             return {
                 text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !**\n\n` +
                       `👤 **Nom :** ${newCharacter.name}\n` +
@@ -926,7 +934,7 @@ class GameEngine {
                       `⚔️ **Niveau :** ${newCharacter.level}\n` +
                       `🌟 **Niveau de puissance :** ${newCharacter.powerLevel}\n\n` +
                       `🎮 Utilise **/menu** pour découvrir tes options !`,
-                image: await imageGenerator.generateCharacterImage(newCharacter)
+                image: characterImage
             };
 
         } catch (error) {
@@ -950,6 +958,14 @@ class GameEngine {
         // Marquer le début de la modification
         await dbManager.setTemporaryData(player.id, 'modification_started', true);
 
+        // Générer l'image du personnage de façon sécurisée
+        let characterImage = null;
+        try {
+            characterImage = await imageGenerator.generateCharacterImage(character);
+        } catch (imageError) {
+            console.log('⚠️ Impossible de générer l\'image du personnage pour modification, continuons sans image:', imageError.message);
+        }
+
         return {
             text: `✨ **MODIFICATION DE PERSONNAGE**\n\n` +
                   `👤 **Personnage actuel :** ${character.name}\n` +
@@ -963,7 +979,7 @@ class GameEngine {
                   `• Armes et accessoires\n` +
                   `• Cicatrices, tatouages, etc.\n\n` +
                   `✍️ **Écris ta description complète en un seul message :**`,
-            image: await imageGenerator.generateCharacterImage(character)
+            image: characterImage
         };
     }
 
