@@ -1,11 +1,11 @@
-modules = ["nodejs-20"]
+modules = ["nodejs-20", "python-3.11"]
 [agent]
 expertMode = true
 integrations = ["javascript_gemini:1.0.0", "javascript_database:1.0.0"]
 
 [nix]
 channel = "stable-25_05"
-packages = ["libuuid"]
+packages = ["blender", "freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libuuid", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [workflows]
 runButton = "Project"
@@ -47,6 +47,10 @@ externalPort = 80
 [[ports]]
 localPort = 33195
 externalPort = 3000
+
+[[ports]]
+localPort = 40073
+externalPort = 3001
 
 [deployment]
 deploymentTarget = "vm"

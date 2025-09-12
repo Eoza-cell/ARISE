@@ -3,6 +3,7 @@ const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs').promises;
 const path = require('path');
 const FreepikClient = require('../freepik/FreepikClient');
+const BlenderClient = require('../blender/BlenderClient');
 
 class ImageGenerator {
     constructor() {
@@ -21,6 +22,20 @@ class ImageGenerator {
             console.error('❌ Erreur initialisation FreepikClient:', error.message);
             this.freepikClient = null;
             this.hasFreepik = false;
+        }
+
+        // Initialisation de BlenderClient pour personnalisation 3D
+        try {
+            this.blenderClient = new BlenderClient();
+            this.hasBlender = false; // Sera vérifié lors de la première utilisation
+            console.log('🎨 BlenderClient initialisé - Vérification en cours...');
+            
+            // Vérification asynchrone de la disponibilité
+            this.initializeBlender();
+        } catch (error) {
+            console.error('❌ Erreur initialisation BlenderClient:', error.message);
+            this.blenderClient = null;
+            this.hasBlender = false;
         }
 
         // Configuration par défaut
@@ -401,6 +416,70 @@ class ImageGenerator {
     }
 
     
+
+    // Initialisation asynchrone de Blender
+    async initializeBlender() {
+        if (this.blenderClient) {
+            try {
+                this.hasBlender = await this.blenderClient.checkAvailability();
+                if (this.hasBlender) {
+                    console.log('✅ BlenderClient disponible - Personnalisation 3D prête');
+                } else {
+                    console.log('⚠️ Blender non disponible - Utilisation de Freepik uniquement');
+                }
+            } catch (error) {
+                console.error('❌ Erreur vérification Blender:', error.message);
+                this.hasBlender = false;
+            }
+        }
+    }
+
+    /**
+     * Générer un modèle 3D personnalisé avec Blender
+     */
+    async generateCustom3DCharacter(character, customization, outputPath) {
+        try {
+            if (!this.hasBlender || !this.blenderClient) {
+                throw new Error('Blender non disponible');
+            }
+
+            console.log(`🎨 Génération 3D personnalisée pour ${character.name}...`);
+            return await this.blenderClient.generateCustomCharacter(character, customization, outputPath);
+
+        } catch (error) {
+            console.error('❌ Erreur génération 3D personnalisée:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Générer des variations de vêtements pour auberges
+     */
+    async generateClothingVariation(character, clothingType) {
+        try {
+            const outputPath = path.join(this.tempPath, `${character.name}_${clothingType}_${Date.now()}.png`);
+
+            if (this.hasBlender && this.blenderClient) {
+                // Utiliser Blender pour un rendu 3D des vêtements
+                return await this.blenderClient.generateClothingVariation(character, clothingType, outputPath);
+            } else if (this.hasFreepik && this.freepikClient) {
+                // Fallback sur Freepik
+                const prompt = `${character.name} wearing ${clothingType} clothing, ${this.getKingdomDescription(character.kingdom)}, detailed fashion illustration`;
+                await this.freepikClient.generateImage(prompt, outputPath, {
+                    style: this.defaultStyle,
+                    perspective: 'third_person',
+                    nudity: false
+                });
+                return outputPath;
+            } else {
+                throw new Error('Aucun générateur d\'image disponible');
+            }
+
+        } catch (error) {
+            console.error(`❌ Erreur génération vêtements ${clothingType}:`, error);
+            throw error;
+        }
+    }
 
     clearCache() {
         this.imageCache.clear();
