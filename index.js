@@ -177,7 +177,9 @@ class FrictionUltimateBot {
             setTimeout(async () => {
                 await this.sendResponse(from, {
                     text: result.text,
-                    image: result.image
+                    image: result.image,
+                    sticker: result.sticker,
+                    isGuide: result.isGuide
                 });
 
                 // Envoyer la vidéo si générée (avec délai pour éviter les conflits)
@@ -239,6 +241,29 @@ class FrictionUltimateBot {
 
     async sendResponse(chatId, response) {
         try {
+            // Si c'est une réponse du guide avec sticker
+            if (response.isGuide && response.sticker) {
+                try {
+                    // Envoyer le sticker d'abord
+                    await this.sock.sendMessage(chatId, {
+                        image: { url: response.sticker },
+                        caption: '🔥 Ogun Montgomery'
+                    });
+                    console.log('✅ Sticker Ogun envoyé');
+                    
+                    // Petit délai avant le texte
+                    setTimeout(async () => {
+                        await this.sock.sendMessage(chatId, {
+                            text: response.text
+                        });
+                        console.log('✅ Message guide Ogun envoyé');
+                    }, 500);
+                    return;
+                } catch (stickerError) {
+                    console.log('⚠️ Erreur sticker, envoi texte seul:', stickerError.message);
+                }
+            }
+
             if (response.image && response.text) {
                 // Envoi d'image avec caption
                 await this.sock.sendMessage(chatId, {

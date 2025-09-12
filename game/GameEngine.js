@@ -74,13 +74,18 @@ class GameEngine {
             const playerId = player.id;
             const normalizedMessage = message.toLowerCase().trim();
 
-            // Vérifier si c'est une question pour le guide
+            // Vérifier si c'est une question pour le guide ou si Ogun est mentionné
             const guideKeywords = ['comment', 'pourquoi', 'que faire', 'aide', 'help', '?', 'conseil', 'guide', 'ogun'];
             const isQuestion = guideKeywords.some(keyword => 
                 normalizedMessage.includes(keyword)
             ) || normalizedMessage.endsWith('?');
 
-            if (isQuestion && !response) {
+            // Détecter si Ogun est mentionné directement
+            const ogunMentioned = normalizedMessage.includes('ogun') || 
+                                normalizedMessage.includes('montgomery') ||
+                                normalizedMessage.includes('@ogun');
+
+            if ((isQuestion || ogunMentioned) && !response) {
                 response = await this.ogunGuide.getGuideResponse(message, playerId);
             }
 

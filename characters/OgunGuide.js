@@ -34,10 +34,30 @@ class OgunGuide {
             const randomSticker = this.stickers[Math.floor(Math.random() * this.stickers.length)];
             const randomResponse = this.responses[Math.floor(Math.random() * this.responses.length)];
 
-            // Générer une réponse personnalisée avec Groq si disponible
+            // Détecter si c'est juste une mention du nom d'Ogun
+            const normalizedQuestion = question.toLowerCase().trim();
+            const isJustMention = normalizedQuestion === 'ogun' || 
+                                normalizedQuestion === 'montgomery' ||
+                                normalizedQuestion === '@ogun' ||
+                                normalizedQuestion.includes('salut ogun') ||
+                                normalizedQuestion.includes('hey ogun');
+
             let response = randomResponse;
             
-            if (this.groqClient && this.groqClient.hasValidClient()) {
+            if (isJustMention) {
+                // Réponses spéciales quand on l'appelle juste par son nom
+                const greetingResponses = [
+                    "🔥 Yo ! Tu m'as appelé ? Je suis là pour t'aider !",
+                    "💪 Salut ! Ogun Montgomery à ton service !",
+                    "⚔️ Fire Force style ! Qu'est-ce que tu veux savoir ?",
+                    "🎯 Tu as besoin de conseils ? Je suis ton homme !",
+                    "🔥 Présent ! Prêt à faire chauffer la friction !",
+                    "💥 Ogun Montgomery ici ! Comment je peux t'aider ?",
+                    "🛠️ Hey ! Besoin d'aide avec ton équipement ?",
+                    "⚡ Yo ! L'expert en armes est là !"
+                ];
+                response = greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
+            } else if (this.groqClient && this.groqClient.hasValidClient()) {
                 try {
                     const groqPrompt = `Tu es Ogun Montgomery de Fire Force, maintenant guide dans Friction Ultimate. 
                     Réponds à cette question de manière énergique et utile en 1-2 phrases maximum:
@@ -57,7 +77,7 @@ class OgunGuide {
             }
 
             return {
-                text: `🔥 **OGUN MONTGOMERY - GUIDE FRICTION ULTIMATE** 🔥\n\n${response}`,
+                text: `🔥 **OGUN MONTGOMERY** 🔥\n\n${response}`,
                 sticker: randomSticker,
                 isGuide: true
             };
