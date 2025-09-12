@@ -163,7 +163,7 @@ class FrictionUltimateBot {
             }
 
             // Traitement du message par le moteur de jeu
-            const response = await this.gameEngine.processPlayerMessage({
+            const result = await this.gameEngine.processPlayerMessage({
                 playerNumber,
                 chatId: from,
                 message: messageText ? messageText.trim() : null,
@@ -173,9 +173,38 @@ class FrictionUltimateBot {
                 imageGenerator: this.imageGenerator
             });
 
-            // Envoi de la réponse (avec petit délai pour éviter les doublons)
+            // Envoi de la réponse texte d'abord
             setTimeout(async () => {
-                await this.sendResponse(from, response);
+                await this.sendResponse(from, {
+                    text: result.text,
+                    image: result.image
+                });
+
+                // Envoyer la vidéo si générée (avec délai pour éviter les conflits)
+                if (result.video) {
+                    setTimeout(async () => {
+                        try {
+                            const fs = require('fs');
+                            const videoBuffer = await fs.promises.readFile(result.video);
+                            await this.sock.sendMessage(from, {
+                                video: videoBuffer,
+                                caption: `🎬 Vidéo de l'action de ${result.character ? result.character.name : 'votre personnage'}`,
+                                gifPlayback: false
+                            });
+                            console.log(`✅ Vidéo envoyée: ${result.video}`);
+                            
+                            // Nettoyer le fichier vidéo après envoi
+                            setTimeout(() => {
+                                fs.unlink(result.video, (err) => {
+                                    if (err) console.log('⚠️ Impossible de supprimer la vidéo:', err.message);
+                                    else console.log(`🗑️ Vidéo supprimée: ${result.video}`);
+                                });
+                            }, 5000);
+                        } catch (videoError) {
+                            console.error('❌ Erreur envoi vidéo:', videoError);
+                        }
+                    }, 2000);
+                }
             }, 100);
 
         } catch (error) {
@@ -210,20 +239,41 @@ class FrictionUltimateBot {
 
     async sendResponse(chatId, response) {
         try {
-            if (response.image) {
-                // Envoi d'image avec texte
+            if (response.image && response.text) {
+                // Envoi d'image avec caption
                 await this.sock.sendMessage(chatId, {
                     image: response.image,
                     caption: response.text
                 });
+                console.log('✅ Image avec texte envoyée');
+            } else if (response.image) {
+                // Envoi d'image seule
+                await this.sock.sendMessage(chatId, {
+                    image: response.image,
+                    caption: '🎨 Image générée'
+                });
+                console.log('✅ Image seule envoyée');
             } else if (response.text) {
                 // Envoi de texte simple
                 await this.sock.sendMessage(chatId, {
                     text: response.text
                 });
+                console.log('✅ Texte seul envoyé');
             }
         } catch (error) {
             console.error('❌ Erreur lors de l\'envoi de la réponse:', error);
+            
+            // Fallback en cas d'erreur avec l'image
+            if (response.image && response.text) {
+                try {
+                    console.log('🔄 Tentative d\'envoi de texte seul...');
+                    await this.sock.sendMessage(chatId, {
+                        text: response.text
+                    });
+                } catch (fallbackError) {
+                    console.error('❌ Erreur fallback:', fallbackError);
+                }
+            }
         }
     }
 }

@@ -551,7 +551,15 @@ class ImageGenerator {
             
             console.log(`🎬 Génération vidéo d'action pour ${character.name}: ${action}`);
             
-            return await this.runwayClient.generateCharacterActionVideo(character, action, imagePath, videoPath);
+            const result = await this.runwayClient.generateCharacterActionVideo(character, action, imagePath, videoPath);
+            
+            if (result) {
+                console.log(`✅ Vidéo d'action générée: ${result}`);
+                return result;
+            } else {
+                console.log('⚠️ Aucune vidéo générée par RunwayML');
+                return null;
+            }
 
         } catch (error) {
             console.error('❌ Erreur génération vidéo d\'action:', error);

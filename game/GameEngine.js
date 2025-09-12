@@ -2,6 +2,7 @@ const GeminiClient = require('../gemini/GeminiClient');
 const OpenAIClient = require('../ai/OpenAIClient');
 const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
+const path = require('path'); // Importer le module path pour gérer les chemins de fichiers
 
 class GameEngine {
     constructor(dbManager = null) {
@@ -478,19 +479,39 @@ class GameEngine {
                                `${equipmentWarning}${detectionWarning}${consequencesText}\n\n` +
                                `💭 ${isAlive ? '*Que fais-tu ensuite ?*' : '*Vous renaissez au Sanctuaire... Que faites-vous ?*'}`;
 
-            // Essayer de générer l'image, mais ne pas bloquer l'envoi si ça échoue
+            // Essayer de générer l'image et la vidéo, mais ne pas bloquer l'envoi si ça échoue
+            let actionImage = null;
+            let actionVideo = null;
             try {
-                const image = await imageGenerator.generateCharacterActionImage(character, message, narration);
-                return {
-                    text: responseText,
-                    image: image
-                };
-            } catch (imageError) {
-                console.log('⚠️ Image échouée, envoi narration seule:', imageError.message);
-                return {
-                    text: responseText
-                };
+                actionImage = await imageGenerator.generateCharacterActionImage(character, message, narration);
+                
+                // Générer une vidéo pour cette action
+                const imagePath = actionImage ? path.join(__dirname, '../temp', `action_temp_${Date.now()}.png`) : null;
+                if (actionImage && imagePath) {
+                    // Sauvegarder l'image temporairement pour la vidéo
+                    const fs = require('fs').promises;
+                    await fs.writeFile(imagePath, actionImage);
+                }
+
+                actionVideo = await imageGenerator.generateActionVideo(character, message, narration, imagePath);
+
+                // Nettoyer l'image temporaire
+                if (imagePath) {
+                    try {
+                        await fs.unlink(imagePath);
+                    } catch (err) {
+                        console.log('⚠️ Impossible de supprimer le fichier temporaire:', err.message);
+                    }
+                }
+            } catch (mediaError) {
+                console.error('❌ Erreur génération image/vidéo:', mediaError.message);
             }
+
+            return {
+                text: responseText,
+                image: actionImage,
+                video: actionVideo
+            };
 
         } catch (error) {
             console.error('❌ Erreur lors du traitement IA:', error);
