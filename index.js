@@ -192,7 +192,7 @@ class FrictionUltimateBot {
                                 gifPlayback: false
                             });
                             console.log(`✅ Vidéo envoyée: ${result.video}`);
-                            
+
                             // Nettoyer le fichier vidéo après envoi
                             setTimeout(() => {
                                 fs.unlink(result.video, (err) => {
@@ -262,7 +262,7 @@ class FrictionUltimateBot {
             }
         } catch (error) {
             console.error('❌ Erreur lors de l\'envoi de la réponse:', error);
-            
+
             // Fallback en cas d'erreur avec l'image
             if (response.image && response.text) {
                 try {

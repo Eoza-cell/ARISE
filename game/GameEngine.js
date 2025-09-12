@@ -2,22 +2,27 @@ const GeminiClient = require('../gemini/GeminiClient');
 const OpenAIClient = require('../ai/OpenAIClient');
 const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
+const OgunGuide = require('../characters/OgunGuide');
 const path = require('path'); // Importer le module path pour gérer les chemins de fichiers
 
 class GameEngine {
     constructor(dbManager = null) {
         this.dbManager = dbManager;
-        this.openAIClient = new OpenAIClient(dbManager);
+        this.openAIClient = new OpenAIClient(this.dbManager);
         this.ollamaClient = new OllamaClient();
-        this.geminiClient = new GeminiClient();
         this.groqClient = new GroqClient();
+        this.geminiClient = new GeminiClient();
+        this.ogunGuide = new OgunGuide(this.groqClient);
         this.commandHandlers = {
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
             '/créer_personnage': this.handleCreateCharacterCommand.bind(this),
             '/modifier': this.handleModifyCharacterCommand.bind(this),
             '/fiche': this.handleCharacterSheetCommand.bind(this),
-            '/aide': this.handleHelpCommand.bind(this),
+            '/aide': this.ogunGuide.getHelpMenu.bind(this),
+            '/help': this.ogunGuide.getHelpMenu.bind(this),
+            '/guide': this.ogunGuide.getHelpMenu.bind(this),
+            '/ogun': this.ogunGuide.getHelpMenu.bind(this),
             '/royaumes': this.handleKingdomsCommand.bind(this),
             '/ordres': this.handleOrdersCommand.bind(this),
             '/combat': this.handleCombatCommand.bind(this),
@@ -60,13 +65,31 @@ class GameEngine {
             }
 
             const command = message.toLowerCase().trim();
+            let response = null;
 
             if (this.commandHandlers[command]) {
-                return await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator });
+                response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator });
             }
 
-            // Si ce n'est pas une commande, traiter comme action de jeu
-            return await this.handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator });
+            const playerId = player.id;
+            const normalizedMessage = message.toLowerCase().trim();
+
+            // Vérifier si c'est une question pour le guide
+            const guideKeywords = ['comment', 'pourquoi', 'que faire', 'aide', 'help', '?', 'conseil', 'guide', 'ogun'];
+            const isQuestion = guideKeywords.some(keyword => 
+                normalizedMessage.includes(keyword)
+            ) || normalizedMessage.endsWith('?');
+
+            if (isQuestion && !response) {
+                response = await this.ogunGuide.getGuideResponse(message, playerId);
+            }
+
+            // Si aucune commande reconnue, traiter comme action de jeu
+            if (!response) {
+                response = await this.handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator });
+            }
+            
+            return response;
 
         } catch (error) {
             console.error('❌ Erreur dans le moteur de jeu:', error);
@@ -484,7 +507,7 @@ class GameEngine {
             let actionVideo = null;
             try {
                 actionImage = await imageGenerator.generateCharacterActionImage(character, message, narration);
-                
+
                 // Générer une vidéo pour cette action
                 const imagePath = actionImage ? path.join(__dirname, '../temp', `action_temp_${Date.now()}.png`) : null;
                 if (actionImage && imagePath) {
