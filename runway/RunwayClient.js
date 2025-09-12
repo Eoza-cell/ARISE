@@ -19,10 +19,9 @@ class RunwayClient {
                 return;
             }
 
-            // Test de l'API
-            await this.testConnection();
+            // Marquer comme disponible directement avec la clé API
             this.isAvailable = true;
-            console.log('✅ Client RunwayML initialisé avec succès');
+            console.log('✅ Client RunwayML initialisé avec succès avec clé API');
 
         } catch (error) {
             console.error('❌ Erreur lors de l\'initialisation du client RunwayML:', error.message);
@@ -57,35 +56,28 @@ class RunwayClient {
             console.log(`🎬 Génération vidéo RunwayML avec prompt: "${prompt.substring(0, 100)}..."`);
 
             const requestData = {
-                taskType: 'gen2',
-                internal: false,
-                options: {
-                    name: `Friction Ultimate - ${Date.now()}`,
-                    seconds: options.duration || 4,
-                    gen2Options: {
-                        mode: 'gen2',
-                        seed: Math.floor(Math.random() * 1000000),
-                        interpolate: true,
-                        watermark: false,
-                        motion_score: options.motionScore || 15,
-                        use_motion_score: true,
-                        text_prompt: this.optimizePromptForRunway(prompt),
-                        width: options.width || 1280,
-                        height: options.height || 768
-                    }
-                }
+                model: 'gen3a_turbo',
+                prompt_text: this.optimizePromptForRunway(prompt),
+                duration: options.duration || 5,
+                seed: Math.floor(Math.random() * 1000000),
+                resolution: '1280x768',
+                watermark: false
             };
 
+            console.log('📤 Envoi requête RunwayML:', JSON.stringify(requestData, null, 2));
+
             // Créer la tâche de génération
-            const createResponse = await axios.post(`${this.baseURL}/tasks`, requestData, {
+            const createResponse = await axios.post(`${this.baseURL}/image_to_video`, requestData, {
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json'
                 },
-                timeout: 30000
+                timeout: 60000
             });
 
-            const taskId = createResponse.data.task.id;
+            console.log('📥 Réponse RunwayML:', createResponse.data);
+
+            const taskId = createResponse.data.id;
             console.log(`🎬 Tâche RunwayML créée: ${taskId}`);
 
             // Attendre la completion
@@ -99,6 +91,9 @@ class RunwayClient {
 
         } catch (error) {
             console.error('❌ Erreur génération vidéo RunwayML:', error.message);
+            if (error.response) {
+                console.error('❌ Détails erreur API:', error.response.data);
+            }
             throw error;
         }
     }
@@ -159,7 +154,7 @@ class RunwayClient {
         }
     }
 
-    async waitForCompletion(taskId, maxWaitTime = 180000) { // 3 minutes max
+    async waitForCompletion(taskId, maxWaitTime = 300000) { // 5 minutes max
         const startTime = Date.now();
         
         while (Date.now() - startTime < maxWaitTime) {
@@ -170,20 +165,30 @@ class RunwayClient {
                     }
                 });
 
-                const task = response.data.task;
+                const task = response.data;
                 console.log(`🎬 Statut RunwayML: ${task.status} (${task.progress || 0}%)`);
 
-                if (task.status === 'SUCCEEDED') {
-                    return task.artifacts[0].url;
-                } else if (task.status === 'FAILED') {
-                    throw new Error(`Génération échouée: ${task.failure_reason || 'Raison inconnue'}`);
+                if (task.status === 'SUCCEEDED' || task.status === 'success') {
+                    // Essayer différents formats de réponse
+                    const videoUrl = task.output?.[0] || task.artifacts?.[0]?.url || task.output_video;
+                    if (videoUrl) {
+                        return videoUrl;
+                    } else {
+                        console.error('❌ URL vidéo non trouvée dans la réponse:', task);
+                        throw new Error('URL de vidéo non trouvée dans la réponse');
+                    }
+                } else if (task.status === 'FAILED' || task.status === 'failed') {
+                    throw new Error(`Génération échouée: ${task.failure_reason || task.error || 'Raison inconnue'}`);
                 }
 
-                // Attendre 5 secondes avant de vérifier à nouveau
-                await new Promise(resolve => setTimeout(resolve, 5000));
+                // Attendre 10 secondes avant de vérifier à nouveau
+                await new Promise(resolve => setTimeout(resolve, 10000));
 
             } catch (error) {
                 console.error('❌ Erreur lors de la vérification du statut:', error.message);
+                if (error.response) {
+                    console.error('❌ Détails erreur status:', error.response.data);
+                }
                 throw error;
             }
         }

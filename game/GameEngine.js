@@ -498,6 +498,7 @@ class GameEngine {
                 // Nettoyer l'image temporaire
                 if (imagePath) {
                     try {
+                        const fs = require('fs').promises;
                         await fs.unlink(imagePath);
                     } catch (err) {
                         console.log('⚠️ Impossible de supprimer le fichier temporaire:', err.message);
