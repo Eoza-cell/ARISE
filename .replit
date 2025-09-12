@@ -44,6 +44,10 @@ args = "node index.js"
 localPort = 5000
 externalPort = 80
 
+[[ports]]
+localPort = 42403
+externalPort = 3000
+
 [deployment]
 deploymentTarget = "vm"
 run = ["npm", "start"]

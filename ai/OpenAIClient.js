@@ -162,8 +162,8 @@ ${recentHistory.slice(-5).map(h => `${h.role}: ${h.content.substring(0, 100)}`).
                 role: "system",
                 content: "Tu es le narrateur de combat de FRICTION ULTIMATE. Décris les combats de manière épique et dramatique en français."
             };
-            const memoryHistory = this.memory.getHistory(sessionId);
-            const messages = [systemMsg, ...memoryHistory, { role: "user", content: prompt }];
+            // Simplifier - pas de mémoire pour combat, réaction immédiate
+            const messages = [systemMsg, { role: "user", content: prompt }];
 
             const completion = await this.openai.chat.completions.create({
                 model: "gpt-4o-mini",
@@ -195,8 +195,8 @@ ${recentHistory.slice(-5).map(h => `${h.role}: ${h.content.substring(0, 100)}`).
                 role: "system",
                 content: "Tu incarnes un PNJ du monde de FRICTION ULTIMATE. Réponds de manière cohérente avec le lore du personnage en français."
             };
-            const memoryHistory = this.memory.getHistory(sessionId);
-            const messages = [systemMsg, ...memoryHistory, { role: "user", content: prompt }];
+            // Simplifier - pas de mémoire pour PNJ, réaction immédiate
+            const messages = [systemMsg, { role: "user", content: prompt }];
 
             const completion = await this.openai.chat.completions.create({
                 model: "gpt-4o-mini",
@@ -218,55 +218,84 @@ ${recentHistory.slice(-5).map(h => `${h.role}: ${h.content.substring(0, 100)}`).
 
     async analyzePlayerAction(action, gameContext, sessionId = "default") {
         if (!this.isAvailable) {
+            // Fallback Dark Souls - même avec API indisponible, punir l'imprécision
+            const isActionPrecise = action && action.length > 20 && (
+                action.includes('mètre') || action.includes('angle') || 
+                action.includes('avec') || action.includes('vers') ||
+                action.includes('précis') || action.includes('exact')
+            );
+            
             return {
                 actionType: "unknown",
-                precision: "medium",
-                consequences: ["Action analysée de manière basique"],
-                affectedEntities: [],
-                energyCost: 10,
-                riskLevel: "medium"
+                precision: isActionPrecise ? "medium" : "low",
+                energyCost: isActionPrecise ? 20 : 35,
+                riskLevel: isActionPrecise ? "high" : "extreme",
+                consequences: isActionPrecise ? ["Action basique mais détaillée"] : ["Action trop vague - vulnérabilité totale"],
+                affectedEntities: ["Analyse basique"],
+                potentialDamage: isActionPrecise ? 5 : 15,
+                detectionRisk: !isActionPrecise,
+                staminaRecovery: isActionPrecise ? -5 : -12,
+                combatAdvantage: isActionPrecise ? "glancing_blow" : "miss",
+                equipmentStress: isActionPrecise ? -1 : -2
             };
         }
 
         try {
-            const prompt = `Analyse cette action de joueur dans FRICTION ULTIMATE:
+            const prompt = `Analyse cette action dans FRICTION ULTIMATE - RPG dark fantasy IMPITOYABLE comme Dark Souls:
 
 Action: "${action}"
 Contexte: ${JSON.stringify(gameContext, null, 2)}
 
-Détermine:
-1. Type d'action (combat, exploration, social, etc.)
-2. Niveau de précision (manque de détails = vulnérabilité)
-3. Conséquences probables
-4. NPCs/environnement affectés
+RÈGLES STRICTES D'ANALYSE DARK SOULS :
+🔥 DIFFICULTÉ MAXIMALE - Punir SÉVÈREMENT toute imprécision
+🗡️ COMBAT TECHNIQUE - Exiger distance exacte, angle d'attaque, partie du corps visée  
+⚡ GESTION STAMINA - Actions coûteuses en énergie, récupération lente
+💀 MORT PERMANENTE - Une erreur = dégâts critiques potentiels
+🎯 PRÉCISION TOTALE - "J'attaque" = ÉCHEC automatique (manque détails)
+🔍 VIGILANCE ENNEMIE - Bruits, mouvements détectés facilement
+⚔️ ÉQUIPEMENT CRUCIAL - Sans bonne arme/armure = vulnérabilité extrême
 
-Réponds en JSON strict:
+EXEMPLES D'ACTIONS PRÉCISES VALIDES :
+✅ "J'avance de 2 mètres en silence vers l'ombre, épée dans la main droite"
+✅ "J'attaque la jambe gauche du gobelin avec mon épée en diagonal descendant"
+✅ "Je bloque avec mon bouclier et contre-attaque immédiatement à la gorge"
+
+EXEMPLES D'ACTIONS IMPRÉCISES = ECHEC :
+❌ "J'attaque" (aucun détail)
+❌ "Je me déplace" (pas de distance/direction)
+❌ "Je me cache" (pas de méthode/position)
+
+Analyse strictement et réponds en JSON:
 {
-  "actionType": "string",
+  "actionType": "combat|exploration|stealth|magic|social|craft",
   "precision": "high|medium|low",
-  "consequences": ["string"],
+  "energyCost": number (15-45),
+  "riskLevel": "low|medium|high|extreme", 
+  "consequences": ["dégâts/effets spécifiques"],
   "affectedEntities": ["string"],
-  "energyCost": number,
-  "riskLevel": "low|medium|high|extreme"
+  "potentialDamage": number (0-25),
+  "detectionRisk": boolean,
+  "staminaRecovery": number (-15 à +3),
+  "combatAdvantage": "critical_hit|normal_hit|glancing_blow|miss|counter_attacked",
+  "equipmentStress": number (-3 à 0)
 }`;
 
             const systemMsg = {
                 role: "system",
-                content: "Tu es un analyseur d'actions pour FRICTION ULTIMATE. Réponds uniquement en JSON valide."
+                content: "Tu es l'analyseur implacable de FRICTION ULTIMATE. SOIS STRICT - Punit l'imprécision comme Dark Souls. Réponds en JSON valide uniquement."
             };
-            const memoryHistory = this.memory.getHistory(sessionId);
-            const messages = [systemMsg, ...memoryHistory, { role: "user", content: prompt }];
+            // Simplifier - pas de mémoire pour l'analyse d'action, plus direct et fiable
+            const messages = [systemMsg, { role: "user", content: prompt }];
 
             const completion = await this.openai.chat.completions.create({
                 model: "gpt-4o-mini",
                 messages,
-                max_tokens: 200,
-                temperature: 0.3
+                max_tokens: 350,
+                temperature: 0.2
             });
 
             const aiReply = completion.choices[0].message.content;
-            this.memory.addMessage(sessionId, "user", prompt);
-            this.memory.addMessage(sessionId, "assistant", aiReply);
+            // Pas de mémoire pour l'analyse - réaction directe au contexte
 
             try {
                 return JSON.parse(aiReply);
@@ -275,21 +304,31 @@ Réponds en JSON strict:
                 return {
                     actionType: "unknown",
                     precision: "low",
-                    consequences: ["Action imprécise"],
-                    affectedEntities: [],
-                    energyCost: 10,
-                    riskLevel: "medium"
+                    energyCost: 30, // Coût punitif élevé
+                    riskLevel: "extreme", // Risque maximal par défaut
+                    consequences: ["Action mal analysée - vulnérabilité totale"],
+                    affectedEntities: ["Erreur système"],
+                    potentialDamage: 20,
+                    detectionRisk: true,
+                    staminaRecovery: -15,
+                    combatAdvantage: "counter_attacked",
+                    equipmentStress: -3
                 };
             }
         } catch (error) {
             console.error('❌ Erreur lors de l\'analyse d\'action:', error);
             return {
-                actionType: "unknown",
+                actionType: "unknown", 
                 precision: "low",
-                consequences: ["Erreur d'analyse"],
-                affectedEntities: [],
-                energyCost: 10,
-                riskLevel: "medium"
+                energyCost: 35, // Coût maximum en cas d'erreur
+                riskLevel: "extreme",
+                consequences: ["Erreur critique d'analyse - conséquences fatales"],
+                affectedEntities: ["Système défaillant"],
+                potentialDamage: 25,
+                detectionRisk: true,
+                staminaRecovery: -15, // Corrigé - dans les limites (-15 à +3)
+                combatAdvantage: "counter_attacked",
+                equipmentStress: -3
             };
         }
     }

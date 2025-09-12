@@ -346,13 +346,71 @@ class GameEngine {
                 }
             }
 
-            // Appliquer les coûts énergétiques
-            const energyCost = Math.min(actionAnalysis.energyCost, character.currentEnergy);
+            // CLAMPING SERVER-SIDE STRICT - Sécuriser toutes les valeurs de l'IA
+            const energyCost = Math.max(0, Math.min(character.currentEnergy, actionAnalysis.energyCost || 10));
+            const staminaRecovery = Math.max(-15, Math.min(3, actionAnalysis.staminaRecovery || 0));
+            const equipmentStress = Math.max(-3, Math.min(0, actionAnalysis.equipmentStress || 0));
+            
+            // Valider combatAdvantage dans une liste sécurisée
+            const validCombatAdvantages = ['critical_hit', 'normal_hit', 'glancing_blow', 'miss', 'counter_attacked'];
+            actionAnalysis.combatAdvantage = validCombatAdvantages.includes(actionAnalysis.combatAdvantage) 
+                ? actionAnalysis.combatAdvantage 
+                : 'miss';
+            
+            // Appliquer le système de combat Dark Souls strict
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
+            
+            // Appliquer les dégâts potentiels (si action mal exécutée)
+            let damageText = '';
+            if (actionAnalysis.potentialDamage > 0) {
+                const damage = Math.min(actionAnalysis.potentialDamage, character.currentLife);
+                character.currentLife = Math.max(0, character.currentLife - damage);
+                damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV`;
+            }
+            
+            // Récupération de stamina (utiliser la valeur clampée)
+            if (staminaRecovery !== 0) {
+                if (staminaRecovery > 0) {
+                    character.currentEnergy = Math.min(character.maxEnergy, character.currentEnergy + staminaRecovery);
+                } else {
+                    character.currentEnergy = Math.max(0, character.currentEnergy + staminaRecovery); // Soustraction supplémentaire
+                }
+            }
 
-            // Sauvegarder les changements
+            // Usure d'équipement (utiliser la valeur clampée)
+            let equipmentWarning = '';
+            if (equipmentStress < 0) {
+                equipmentWarning = `\n⚔️ **USURE ÉQUIPEMENT :** Votre équipement s'abîme (${Math.abs(equipmentStress)})`;
+            }
+
+            // Vérifier si le personnage est mort (gestion Dark Souls)
+            let deathText = '';
+            let isAlive = true;
+            if (character.currentLife <= 0) {
+                isAlive = false;
+                
+                // Calculer les pertes AVANT modification
+                const coinsBefore = character.coins;
+                const coinsLost = Math.floor(coinsBefore * 0.1);
+                
+                // Appliquer les pénalités de mort
+                character.currentLife = Math.ceil(character.maxLife * 0.3); // Respawn avec 30% de vie
+                character.currentEnergy = Math.floor(character.maxEnergy * 0.5); // 50% d'énergie
+                character.coins = Math.max(0, coinsBefore - coinsLost); // Réduction correcte
+                character.currentLocation = 'Lieu de Respawn - Sanctuaire des Âmes Perdues';
+                
+                deathText = `\n💀 **MORT** - Vous avez succombé à vos blessures...\n` +
+                           `🕊️ **RESPAWN** - Votre âme trouve refuge au Sanctuaire\n` +
+                           `💰 **PERTE** - ${coinsLost} pièces perdues dans la mort\n` +
+                           `❤️ **RÉSURRECTION** - Vous renaissez avec ${character.currentLife} PV`;
+            }
+
+            // Sauvegarder les changements (avec position de respawn si mort)
             await dbManager.updateCharacter(character.id, {
-                currentEnergy: character.currentEnergy
+                currentEnergy: character.currentEnergy,
+                currentLife: character.currentLife,
+                coins: character.coins,
+                currentLocation: character.currentLocation
             });
 
             const riskEmoji = {
@@ -366,15 +424,52 @@ class GameEngine {
             const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
             const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
             
-            // Préparer la réponse avec narration Groq prioritaire
+            // Indicateur d'avantage de combat
+            const combatEmoji = {
+                'critical_hit': '🎯',
+                'normal_hit': '⚔️', 
+                'glancing_blow': '🛡️',
+                'miss': '❌',
+                'counter_attacked': '💀'
+            }[actionAnalysis.combatAdvantage] || '⚪';
+
+            // Messages d'alerte pour détection et conséquences
+            let detectionWarning = '';
+            if (actionAnalysis.detectionRisk) {
+                detectionWarning = `\n👁️ **DÉTECTION** - Vos mouvements ont pu être repérés !`;
+            }
+            
+            let consequencesText = '';
+            if (actionAnalysis.consequences && actionAnalysis.consequences.length > 0) {
+                const mainConsequence = actionAnalysis.consequences[0];
+                if (mainConsequence && !mainConsequence.includes('Erreur')) {
+                    consequencesText = `\n⚠️ **CONSÉQUENCES :** ${mainConsequence}`;
+                }
+            }
+
+            // Feedback complet des métriques Dark Souls
+            const precisionEmoji = {
+                'high': '🎯',
+                'medium': '⚪',
+                'low': '❌'
+            }[actionAnalysis.precision] || '❓';
+            
+            const staminaText = staminaRecovery !== 0 
+                ? `\n⚡ **RÉCUP. ENDURANCE :** ${staminaRecovery > 0 ? '+' : ''}${staminaRecovery}` 
+                : '';
+
+            // Préparer la réponse avec toutes les métriques Dark Souls
             const responseText = `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
                                `📖 **Narration :** ${narration}\n\n` +
-                               `❤️ **Vie :** ${lifeBar}\n` +
-                               `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
-                               `💰 **Argent :** ${character.coins} pièces d'or\n` +
+                               `❤️ **Vie :** ${lifeBar}${damageText}${deathText}\n` +
+                               `⚡ **Énergie :** ${energyBar} (-${energyCost})${staminaText}\n` +
+                               `💰 **Argent :** ${character.coins} pièces d'or\n\n` +
+                               `${precisionEmoji} **Précision :** ${actionAnalysis.precision.toUpperCase()}\n` +
                                `${riskEmoji} **Niveau de risque :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
-                               `🎯 **Type d'action :** ${actionAnalysis.actionType}\n\n` +
-                               `💭 *Que fais-tu ensuite ?*`;
+                               `🎯 **Type d'action :** ${actionAnalysis.actionType}\n` +
+                               `${combatEmoji} **Résultat combat :** ${actionAnalysis.combatAdvantage?.replace('_', ' ') || 'N/A'}` +
+                               `${equipmentWarning}${detectionWarning}${consequencesText}\n\n` +
+                               `💭 ${isAlive ? '*Que fais-tu ensuite ?*' : '*Vous renaissez au Sanctuaire... Que faites-vous ?*'}`;
 
             // Essayer de générer l'image, mais ne pas bloquer l'envoi si ça échoue
             try {
