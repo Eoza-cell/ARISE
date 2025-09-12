@@ -563,9 +563,20 @@ class GameEngine {
                            `✨ **Particularités :** ${kingdom.particularities}\n\n`;
         });
 
+        // Générer une image des royaumes avec les fonctions disponibles
+        let kingdomImage = null;
+        try {
+            kingdomImage = await imageGenerator.generateWorldMap({
+                style: '3d',
+                description: 'Fantasy kingdoms overview with multiple magical realms and territories'
+            });
+        } catch (error) {
+            console.log('⚠️ Impossible de générer l\'image des royaumes, continuons sans image');
+        }
+
         return { 
             text: kingdomsText,
-            image: await imageGenerator.generateKingdomsOverview()
+            image: kingdomImage
         };
     }
 
@@ -692,9 +703,20 @@ class GameEngine {
 
         kingdomText += `\n⚡ **Tape le numéro du royaume (1 à 12)**`;
 
+        // Générer une image de royaumes fantasy avec les fonctions disponibles
+        let kingdomImage = null;
+        try {
+            kingdomImage = await imageGenerator.generateWorldMap({
+                style: '3d',
+                description: 'Fantasy kingdoms overview with multiple realms, castles, and magical lands'
+            });
+        } catch (error) {
+            console.log('⚠️ Impossible de générer l\'image des royaumes, continuons sans image');
+        }
+
         return {
             text: kingdomText,
-            image: await imageGenerator.generateKingdomsOverview()
+            image: kingdomImage
         };
     }
 
