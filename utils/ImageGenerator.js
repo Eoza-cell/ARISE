@@ -4,6 +4,7 @@ const fs = require('fs').promises;
 const path = require('path');
 const FreepikClient = require('../freepik/FreepikClient');
 const BlenderClient = require('../blender/BlenderClient');
+const RunwayClient = require('../runway/RunwayClient');
 
 class ImageGenerator {
     constructor() {
@@ -36,6 +37,20 @@ class ImageGenerator {
             console.error('❌ Erreur initialisation BlenderClient:', error.message);
             this.blenderClient = null;
             this.hasBlender = false;
+        }
+
+        // Initialisation de RunwayClient pour génération de vidéos
+        try {
+            this.runwayClient = new RunwayClient();
+            this.hasRunway = false; // Sera vérifié lors de l'initialisation
+            console.log('🎬 RunwayClient initialisé - Génération de vidéos activée');
+            
+            // Vérifier la disponibilité
+            this.initializeRunway();
+        } catch (error) {
+            console.error('❌ Erreur initialisation RunwayClient:', error.message);
+            this.runwayClient = null;
+            this.hasRunway = false;
         }
 
         // Configuration par défaut
@@ -459,6 +474,23 @@ class ImageGenerator {
         }
     }
 
+    // Initialisation asynchrone de RunwayML
+    async initializeRunway() {
+        if (this.runwayClient) {
+            try {
+                this.hasRunway = this.runwayClient.hasValidClient();
+                if (this.hasRunway) {
+                    console.log('✅ RunwayClient disponible - Génération de vidéos prête');
+                } else {
+                    console.log('⚠️ RunwayML non disponible - Génération de vidéos désactivée');
+                }
+            } catch (error) {
+                console.error('❌ Erreur vérification RunwayML:', error.message);
+                this.hasRunway = false;
+            }
+        }
+    }
+
     /**
      * Générer un modèle 3D personnalisé avec Blender
      */
@@ -502,6 +534,81 @@ class ImageGenerator {
 
         } catch (error) {
             console.error(`❌ Erreur génération vêtements ${clothingType}:`, error);
+            throw error;
+        }
+    }
+
+    // ===== MÉTHODES DE GÉNÉRATION DE VIDÉOS =====
+
+    async generateActionVideo(character, action, narration, imagePath = null) {
+        try {
+            if (!this.hasRunway || !this.runwayClient) {
+                console.log('⚠️ RunwayML non disponible - pas de vidéo générée');
+                return null;
+            }
+
+            const videoPath = path.join(this.tempPath, `action_video_${character.id}_${Date.now()}.mp4`);
+            
+            console.log(`🎬 Génération vidéo d'action pour ${character.name}: ${action}`);
+            
+            return await this.runwayClient.generateCharacterActionVideo(character, action, imagePath, videoPath);
+
+        } catch (error) {
+            console.error('❌ Erreur génération vidéo d\'action:', error);
+            return null;
+        }
+    }
+
+    async generateCombatVideo(combatContext) {
+        try {
+            if (!this.hasRunway || !this.runwayClient) {
+                console.log('⚠️ RunwayML non disponible - pas de vidéo de combat générée');
+                return null;
+            }
+
+            const videoPath = path.join(this.tempPath, `combat_video_${Date.now()}.mp4`);
+            
+            console.log(`🎬 Génération vidéo de combat: ${combatContext.attacker.name} vs ${combatContext.defender.name}`);
+            
+            return await this.runwayClient.generateCombatVideo(combatContext, videoPath);
+
+        } catch (error) {
+            console.error('❌ Erreur génération vidéo de combat:', error);
+            return null;
+        }
+    }
+
+    async generateLocationVideo(location, character) {
+        try {
+            if (!this.hasRunway || !this.runwayClient) {
+                console.log('⚠️ RunwayML non disponible - pas de vidéo de lieu générée');
+                return null;
+            }
+
+            const videoPath = path.join(this.tempPath, `location_video_${location.replace(/\s+/g, '_')}_${Date.now()}.mp4`);
+            
+            console.log(`🎬 Génération vidéo de lieu: ${location}`);
+            
+            return await this.runwayClient.generateLocationVideo(location, character, videoPath);
+
+        } catch (error) {
+            console.error('❌ Erreur génération vidéo de lieu:', error);
+            return null;
+        }
+    }
+
+    async generateCustomVideo(prompt, outputPath, options = {}) {
+        try {
+            if (!this.hasRunway || !this.runwayClient) {
+                throw new Error('RunwayML non disponible');
+            }
+
+            console.log(`🎬 Génération vidéo personnalisée: ${prompt.substring(0, 100)}...`);
+            
+            return await this.runwayClient.generateVideoFromText(prompt, outputPath, options);
+
+        } catch (error) {
+            console.error('❌ Erreur génération vidéo personnalisée:', error);
             throw error;
         }
     }

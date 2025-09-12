@@ -1,6 +1,4 @@
-// Friction Ultimate - Bot WhatsApp RPG
-// Bot WhatsApp autonome en Node.js avec système RPG complet
-
+// The following code integrates RunwayML video generation into the bot's action response system.
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
 const qrcode = require('qrcode-terminal');
@@ -178,6 +176,107 @@ class FrictionUltimateBot {
             // Envoi de la réponse (avec petit délai pour éviter les doublons)
             setTimeout(async () => {
                 await this.sendResponse(from, response);
+            }, 100);
+
+        } catch (error) {
+            console.error('❌ Erreur lors du traitement du message:', error);
+            await this.sendResponse(message.key.remoteJid, {
+                text: "❌ Une erreur s'est produite. Veuillez réessayer."
+            });
+        }
+    }
+
+    extractMessageText(message) {
+        if (message.message?.conversation) {
+            return message.message.conversation;
+        }
+        if (message.message?.extendedTextMessage?.text) {
+            return message.message.extendedTextMessage.text;
+        }
+        return null;
+    }
+
+    extractMessageImage(message) {
+        if (message.message?.imageMessage) {
+            console.log('📸 Image détectée dans le message');
+            return message.message.imageMessage;
+        }
+        if (message.message?.viewOnceMessage?.message?.imageMessage) {
+            console.log('📸 Image view-once détectée');
+            return message.message.viewOnceMessage.message.imageMessage;
+        }
+        return null;
+    }
+
+    async sendResponse(chatId, response) {
+        try {
+            if (response.image) {
+                // Envoi d'image avec texte
+                await this.sock.sendMessage(chatId, {
+                    image: response.image,
+                    caption: response.text
+                });
+            } else if (response.text) {
+                // Envoi de texte simple
+                await this.sock.sendMessage(chatId, {
+                    text: response.text
+                });
+            }
+        } catch (error) {
+            console.error('❌ Erreur lors de l\'envoi de la réponse:', error);
+        }
+    }
+}
+
+// Démarrage du bot
+const bot = new FrictionUltimateBot();
+
+// Démarrer le serveur keep-alive pour UptimeRobot
+require('./server/keepalive');
+
+// Gestion propre de l'arrêt du processus
+process.on('SIGINT', () => {
+    console.log('🛑 Arrêt du bot...');
+    process.exit(0);
+});
+
+process.on('uncaughtException', (error) => {
+    console.error('❌ Erreur non gérée:', error);
+    process.exit(1);
+});
+
+// Lancement du bot
+bot.initialize().catch(console.error);
+
+console.log('🎮 FRICTION ULTIMATE - Bot WhatsApp RPG');
+console.log('🚀 Démarrage en cours...');
+<replit_final_file>// Envoyer l'image si générée
+                if (result.image) {
+                    try {
+                        await sock.sendMessage(from, {
+                            image: result.image,
+                            caption: `🎨 Illustration de l'action de ${result.character.name}`
+                        });
+                    } catch (imageError) {
+                        console.error('❌ Erreur envoi image:', imageError);
+                    }
+                }
+
+                // Envoyer la vidéo si générée
+                if (result.video) {
+                    try {
+                        const fs = require('fs');
+                        const videoBuffer = await fs.promises.readFile(result.video);
+                        await sock.sendMessage(from, {
+                            video: videoBuffer,
+                            caption: `🎬 Vidéo de l'action de ${result.character.name}`,
+                            gifPlayback: false
+                        });
+                        console.log(`✅ Vidéo envoyée: ${result.video}`);
+                    } catch (videoError) {
+                        console.error('❌ Erreur envoi vidéo:', videoError);
+                    }
+                }
             }, 100);
 
         } catch (error) {
