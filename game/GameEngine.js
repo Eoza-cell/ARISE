@@ -120,34 +120,22 @@ class GameEngine {
         // Marquer le début de la création pour sécuriser le processus
         await dbManager.setTemporaryData(player.id, 'creation_started', true);
 
-        // Processus simplifié en 3 étapes courtes
-        let creationText = `⚔️ **CRÉATION RAPIDE DE PERSONNAGE**\n\n` +
-                          `🎯 **Étape 1/3 - Sexe**\n` +
-                          `👤 Choisis ton sexe :\n` +
-                          `• Tape **1** pour HOMME\n` +
-                          `• Tape **2** pour FEMME\n\n` +
-                          `🏰 **Aperçu des royaumes (étape 2) :**\n` +
-                          `1️⃣ AEGYRIA - Chevaliers honorables\n` +
-                          `2️⃣ SOMBRENUIT - Maîtres des ombres\n` +
-                          `3️⃣ KHELOS - Nomades du désert\n` +
-                          `4️⃣ ABRANTIS - Marins intrépides\n` +
-                          `5️⃣ VARHA - Chasseurs montagnards\n` +
-                          `6️⃣ SYLVARIA - Gardiens de la forêt\n` +
-                          `7️⃣ ECLYPSIA - Seigneurs des éclipses\n` +
-                          `8️⃣ TERRE_DESOLE - Survivants post-apocalyptiques\n` +
-                          `9️⃣ DRAK_TARR - Forgeurs draconiques\n` +
-                          `🔟 URVALA - Alchimistes nécromants\n` +
-                          `1️⃣1️⃣ OMBREFIEL - Mercenaires exilés\n` +
-                          `1️⃣2️⃣ KHALDAR - Pirates des jungles\n\n` +
-                          `⚡ **Processus ultra-rapide :**\n` +
-                          `1. Sexe → tape 1 ou 2\n` +
-                          `2. Royaume → tape 1 à 12\n` +
-                          `3. Nom → écris ton nom\n\n` +
-                          `🚀 Création terminée en 3 messages !`;
+        // Processus simplifié en 3 étapes courtes - ÉTAPE 1 seulement
+        let creationText = `⚔️ **CRÉATION DE PERSONNAGE**\n\n` +
+                          `🎯 **Étape 1/3 - Choix du sexe**\n\n` +
+                          `👤 Choisis le sexe de ton personnage :\n\n` +
+                          `• Tape **HOMME** ou **H** pour masculin\n` +
+                          `• Tape **FEMME** ou **F** pour féminin\n\n` +
+                          `💀 **Attention :** Dans ce monde impitoyable, chaque choix compte !\n\n` +
+                          `⚡ **Processus rapide en 3 étapes :**\n` +
+                          `1. 👤 Sexe (maintenant)\n` +
+                          `2. 🏰 Royaume (prochaine étape)\n` +
+                          `3. 📝 Nom de personnage\n\n` +
+                          `🚀 **Tape HOMME, H, FEMME ou F pour continuer !**`;
 
         return {
             text: creationText,
-            image: await imageGenerator.generateMenuImage() // Menu plus simple et rapide
+            image: await imageGenerator.generateMenuImage()
         };
     }
 
@@ -244,7 +232,8 @@ class GameEngine {
         const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
 
         // Traitement des actions de création de personnage en cours (seulement si création initiée)
-        if (creationStarted && (message.toUpperCase() === 'HOMME' || message.toUpperCase() === 'FEMME' || message === '1' || message === '2')) {
+        const input = message.toUpperCase().trim();
+        if (creationStarted && (input === 'HOMME' || input === 'H' || input === 'FEMME' || input === 'F' || input === '1' || input === '2')) {
             return await this.handleGenderSelection({ player, message, dbManager, imageGenerator });
         }
 
@@ -312,7 +301,7 @@ class GameEngine {
                 // Priorité absolue à Groq pour la vitesse et qualité
                 if (this.groqClient && this.groqClient.hasValidClient()) {
                     console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
-                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId);
+                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId, character);
                     console.log('✅ Narration générée avec Groq');
                 } else {
                     throw new Error('Groq non disponible, essai Ollama');
@@ -373,10 +362,16 @@ class GameEngine {
                 'extreme': '🔴'
             }[actionAnalysis.riskLevel] || '⚪';
 
+            // Générer les barres de vie et d'énergie comme dans Dark Souls
+            const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
+            const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
+            
             // Préparer la réponse avec narration Groq prioritaire
             const responseText = `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
                                `📖 **Narration :** ${narration}\n\n` +
-                               `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy} (-${energyCost})\n` +
+                               `❤️ **Vie :** ${lifeBar}\n` +
+                               `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
+                               `💰 **Argent :** ${character.coins} pièces d'or\n` +
                                `${riskEmoji} **Niveau de risque :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
                                `🎯 **Type d'action :** ${actionAnalysis.actionType}\n\n` +
                                `💭 *Que fais-tu ensuite ?*`;
@@ -577,14 +572,15 @@ class GameEngine {
 
         // Convertir l'entrée du joueur en genre
         let gender;
-        if (message === '1' || message.toUpperCase() === 'HOMME') {
+        const input = message.toUpperCase().trim();
+        if (input === 'HOMME' || input === 'H' || input === '1') {
             gender = 'male';
-        } else if (message === '2' || message.toUpperCase() === 'FEMME') {
+        } else if (input === 'FEMME' || input === 'F' || input === '2') {
             gender = 'female';
         } else {
             return {
                 text: `❌ Choix invalide ! \n\n` +
-                      `Tape **1** pour HOMME ou **2** pour FEMME`
+                      `Tape **HOMME**, **H**, **FEMME** ou **F**`
             };
         }
 

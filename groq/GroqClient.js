@@ -72,7 +72,7 @@ class GroqClient {
         return this.isAvailable && this.client;
     }
 
-    async generateNarration(prompt, maxTokens = 300) {
+    async generateNarration(prompt, maxTokens = 800) {
         if (!this.hasValidClient()) {
             throw new Error('Client Groq non disponible');
         }
@@ -113,7 +113,7 @@ class GroqClient {
         }
     }
 
-    async generateCombatNarration(combatData, maxTokens = 250) {
+    async generateCombatNarration(combatData, maxTokens = 600) {
         const prompt = `Décris cette action de combat RPG:
         Attaquant: ${combatData.attacker} (Niveau ${combatData.attackerLevel})
         Défenseur: ${combatData.defender} (Niveau ${combatData.defenderLevel})
@@ -126,19 +126,48 @@ class GroqClient {
         return await this.generateNarration(prompt, maxTokens);
     }
 
-    async generateExplorationNarration(location, action, sessionId = "default", maxTokens = 300) {
+    async generateExplorationNarration(location, action, sessionId = "default", character = null, maxTokens = 1000) {
         const locationContinuity = this.getLocationContinuity(sessionId, location);
         
-        const prompt = `Décris cette exploration dans un monde RPG:
+        // Construire des informations détaillées sur le personnage
+        let characterContext = '';
+        if (character) {
+            const equipmentList = character.equipment && Object.keys(character.equipment).length > 0 ? 
+                Object.entries(character.equipment).map(([slot, item]) => `${slot}: ${item}`).join(', ') : 
+                'aucun équipement';
+            
+            const inventoryList = character.inventory && character.inventory.length > 0 ? 
+                character.inventory.slice(0, 5).join(', ') + (character.inventory.length > 5 ? '...' : '') : 
+                'inventaire vide';
+
+            characterContext = `
+État du personnage ${character.name}:
+- Niveau: ${character.level} | Puissance: ${character.powerLevel} | Friction: ${character.frictionLevel}
+- Vie: ${character.currentLife}/${character.maxLife} | Énergie: ${character.currentEnergy}/${character.maxEnergy}
+- Argent: ${character.coins} pièces d'or
+- Équipement: ${equipmentList}
+- Inventaire: ${inventoryList}
+- Royaume: ${character.kingdom} | Ordre: ${character.order || 'Aucun'}`;
+        }
+        
+        const prompt = `Décris cette exploration dans un monde RPG Dark Souls médiéval-steampunk:
         Lieu: ${location}
         Action du joueur: ${action}
         
-        ${locationContinuity}
+        ${locationContinuity}${characterContext}
         
-        RÈGLE IMPORTANTE: Le personnage est DÉJÀ dans ce lieu. Ne dis pas qu'il "arrive", "entre" ou "découvre" le lieu sauf si l'action le précise explicitement.
+        RÈGLES DE NARRATION:
+        1. Le personnage est DÉJÀ dans ce lieu. Ne dis pas qu'il "arrive" sauf si l'action le précise
+        2. Décris 4-6 phrases immersives et détaillées
+        3. Référence l'équipement et l'inventaire quand pertinent à l'action
+        4. Mentionne des conséquences sur l'inventaire/équipement si applicable  
+        5. Style sombre et dangereux comme Dark Souls
+        6. Intègre technologie steampunk (engrenages, vapeur, mécanismes)
+        7. Le monde réagit de manière hostile et impitoyable
+        8. IMPORTANT: Fais interagir les objets portés avec l'environnement
         
-        Contexte: Monde médiéval-steampunk avec 12 royaumes, magie, technologie à vapeur, 
-        créatures fantastiques et aventures épiques.`;
+        Contexte: Friction Ultimate - Monde où chaque action peut être fatale, fusion magie/technologie, 
+        12 royaumes hostiles, survie difficile, système de friction implacable.`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);
