@@ -49,11 +49,17 @@ class FrictionUltimateBot {
     async startWhatsApp() {
         console.log('📱 Démarrage de la connexion WhatsApp...');
 
-        const { state, saveCreds } = await useMultiFileAuthState('auth_info');
+        // Use environment variable for auth state path for security
+        const authInfoPath = process.env.WHATSAPP_AUTH_PATH || 'auth_info';
+        const { state, saveCreds } = await useMultiFileAuthState(authInfoPath);
 
         this.sock = makeWASocket({
             auth: state,
-            browser: ['Friction Ultimate', 'Desktop', '1.0.0']
+            browser: [
+                process.env.WHATSAPP_BROWSER_NAME || 'Friction Ultimate',
+                process.env.WHATSAPP_BROWSER_TYPE || 'Desktop', 
+                process.env.WHATSAPP_BROWSER_VERSION || '1.0.0'
+            ]
         });
 
         // Gestion des événements de connexion

@@ -1,6 +1,7 @@
 const { spawn } = require('child_process');
 const fs = require('fs').promises;
 const path = require('path');
+const Asset3DManager = require('../utils/Asset3DManager');
 
 class BlenderClient {
     constructor() {
@@ -8,8 +9,16 @@ class BlenderClient {
         this.scriptsPath = path.join(__dirname, 'scripts');
         this.outputPath = path.join(__dirname, '..', 'temp');
         this.isAvailable = true;
-
+        
+        // Initialiser le gestionnaire d'assets 3D
+        this.assetManager = new Asset3DManager();
+        this.assetsReady = false;
+        
         console.log('🎨 BlenderClient initialisé pour personnalisation 3D');
+        console.log('🎨 BlenderClient initialisé - Vérification en cours...');
+        
+        // Initialiser les assets de façon asynchrone
+        this.initializeAssets();
     }
 
     /**
@@ -61,10 +70,16 @@ from mathutils import Vector
 bpy.ops.object.select_all(action='SELECT')
 bpy.ops.object.delete(use_global=False)
 
-# Créer un personnage de base (cube modifié)
-bpy.ops.mesh.primitive_monkey_add(location=(0, 0, 0))
+# Importer le modèle humain de base réaliste
+${this.generateHumanModelImport(customization)}
 character_obj = bpy.context.active_object
-character_obj.name = "${character.name}_model"
+if character_obj:
+    character_obj.name = "${character.name}_model"
+else:
+    # Fallback si pas de modèle 3D disponible
+    bpy.ops.mesh.primitive_monkey_add(location=(0, 0, 0))
+    character_obj = bpy.context.active_object
+    character_obj.name = "${character.name}_fallback"
 
 # Entrer en mode édition
 bpy.context.view_layer.objects.active = character_obj
@@ -87,6 +102,9 @@ character_obj.data.materials.append(material)
 
 # Configuration de la couleur basée sur le royaume
 ${this.generateKingdomMaterial(character.kingdom)}
+
+# Ajouter équipements 3D réalistes
+${this.generateEquipmentCode(customization.equipment || {})}
 
 # Configuration de l'éclairage
 bpy.ops.object.light_add(type='SUN', location=(5, 5, 10))
@@ -225,6 +243,201 @@ if bsdf:
         };
 
         return await this.generateCustomCharacter(character, customization, outputPath);
+    }
+
+    /**
+     * Initialiser les assets 3D
+     */
+    async initializeAssets() {
+        try {
+            console.log('🎨 BlenderClient - Initialisation des assets 3D...');
+            
+            const initSuccess = await this.assetManager.initialize();
+            if (initSuccess) {
+                // Vérifier si on a des modèles
+                const stats = await this.assetManager.checkExistingAssets();
+                const totalModels = stats.humanModels.male + stats.humanModels.female + 
+                                  stats.equipment.weapons + stats.equipment.armor;
+                
+                if (totalModels === 0) {
+                    console.log('📥 Aucun asset 3D trouvé - Téléchargement automatique...');
+                    await this.downloadRealistic3DAssets();
+                } else {
+                    console.log(`✅ ${totalModels} assets 3D disponibles`);
+                }
+                
+                this.assetsReady = true;
+                console.log('✅ BlenderClient disponible - Personnalisation 3D prête');
+            } else {
+                console.log('⚠️ Échec initialisation assets - Mode fallback activé');
+                this.assetsReady = false;
+            }
+            
+        } catch (error) {
+            console.error('❌ Erreur initialisation assets 3D:', error);
+            this.assetsReady = false;
+        }
+    }
+    
+    /**
+     * Télécharge les assets 3D réalistes
+     */
+    async downloadRealistic3DAssets() {
+        console.log('🚀 Téléchargement des modèles 3D réalistes...');
+        
+        try {
+            const results = await this.assetManager.downloadAllAssets();
+            
+            if (results.humans || results.equipment) {
+                console.log('✅ Assets 3D téléchargés avec succès');
+            } else {
+                console.log('⚠️ Téléchargement partiel - Génération d\'assets par défaut');
+            }
+            
+        } catch (error) {
+            console.error('❌ Erreur téléchargement assets:', error);
+        }
+    }
+    
+    /**
+     * Génère le code d'import de modèle humain réaliste
+     */
+    generateHumanModelImport(customization) {
+        const gender = customization.gender || 'male';
+        
+        // Utilise un modèle 3D réaliste si disponible
+        return `
+# Importer modèle humain réaliste (${gender})
+import_path = None
+
+# Essayer de charger un modèle FBX/GLB réaliste
+try:
+    import_path = "${this.getHumanModelPath(gender)}"
+    if import_path and os.path.exists(import_path):
+        if import_path.endswith('.fbx'):
+            bpy.ops.import_scene.fbx(filepath=import_path)
+        elif import_path.endswith('.glb') or import_path.endswith('.gltf'):
+            bpy.ops.import_scene.gltf(filepath=import_path)
+        
+        # Sélectionner le modèle importé
+        imported_objects = [obj for obj in bpy.context.scene.objects if obj.type == 'MESH']
+        if imported_objects:
+            character_obj = imported_objects[0]  # Premier mesh trouvé
+            bpy.context.view_layer.objects.active = character_obj
+        else:
+            character_obj = None
+    else:
+        character_obj = None
+        
+except Exception as e:
+    print(f"⚠️ Erreur import modèle 3D: {e}")
+    character_obj = None
+`;
+    }
+    
+    /**
+     * Récupère le chemin d'un modèle humain
+     */
+    getHumanModelPath(gender) {
+        // En production, ceci récupérera le vrai chemin depuis l'AssetManager
+        const basePath = path.join(__dirname, '..', 'assets', '3d', 'humans', gender);
+        
+        // Modèles préférés par ordre de priorité
+        const preferredModels = [
+            'Realistic_Male_Base.fbx',
+            'Realistic_Female_Base.fbx', 
+            'Casual_Male_Rigged.fbx',
+            'Casual_Female_Rigged.fbx',
+            'RPM_Male_Base.glb',
+            'RPM_Female_Base.glb'
+        ];
+        
+        // Retourner le premier modèle qui correspond au genre
+        for (const model of preferredModels) {
+            if ((gender === 'male' && model.includes('Male')) || 
+                (gender === 'female' && model.includes('Female'))) {
+                return path.join(basePath, model);
+            }
+        }
+        
+        // Fallback
+        return null;
+    }
+    
+    /**
+     * Génère le code d'équipement 3D
+     */
+    generateEquipmentCode(equipment) {
+        if (!equipment || !this.assetsReady) {
+            return '# Pas d\'équipement spécifique';
+        }
+        
+        let equipCode = '';
+        
+        // Ajouter armes
+        if (equipment.weapon) {
+            equipCode += `
+# Ajouter arme: ${equipment.weapon}
+try:
+    weapon_path = "${this.getEquipmentPath('weapons', equipment.weapon)}"
+    if weapon_path and os.path.exists(weapon_path):
+        if weapon_path.endswith('.fbx'):
+            bpy.ops.import_scene.fbx(filepath=weapon_path)
+        elif weapon_path.endswith('.glb'):
+            bpy.ops.import_scene.gltf(filepath=weapon_path)
+        
+        # Positionner l'arme
+        weapon_objects = [obj for obj in bpy.context.selected_objects if obj.type == 'MESH']
+        if weapon_objects:
+            weapon = weapon_objects[0]
+            weapon.location = (1.2, 0, 0.8)  # À droite du personnage
+            weapon.name = "weapon_${equipment.weapon}"
+except Exception as e:
+    print(f"⚠️ Erreur import arme: {e}")
+`;
+        }
+        
+        // Ajouter armure
+        if (equipment.armor) {
+            equipCode += `
+# Ajouter armure: ${equipment.armor}
+try:
+    armor_path = "${this.getEquipmentPath('armor', equipment.armor)}"
+    if armor_path and os.path.exists(armor_path):
+        if armor_path.endswith('.fbx'):
+            bpy.ops.import_scene.fbx(filepath=armor_path)
+        elif armor_path.endswith('.glb'):
+            bpy.ops.import_scene.gltf(filepath=armor_path)
+        
+        # Adapter l'armure au personnage
+        armor_objects = [obj for obj in bpy.context.selected_objects if obj.type == 'MESH']
+        if armor_objects:
+            armor = armor_objects[0]
+            armor.parent = character_obj
+            armor.name = "armor_${equipment.armor}"
+except Exception as e:
+    print(f"⚠️ Erreur import armure: {e}")
+`;
+        }
+        
+        return equipCode;
+    }
+    
+    /**
+     * Récupère le chemin d'un équipement
+     */
+    getEquipmentPath(category, itemName) {
+        const basePath = path.join(__dirname, '..', 'assets', '3d', 'equipment', category);
+        
+        // Formats supportés par priorité
+        const extensions = ['.fbx', '.glb', '.gltf'];
+        
+        for (const ext of extensions) {
+            const fullPath = path.join(basePath, itemName + ext);
+            return fullPath; // Retourne le chemin (sera vérifié par Blender)
+        }
+        
+        return null;
     }
 
     /**
