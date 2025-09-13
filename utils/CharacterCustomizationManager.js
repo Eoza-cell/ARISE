@@ -263,6 +263,20 @@ class CharacterCustomizationManager {
         const stepName = this.customizationSteps[currentStep];
         const options = this.customizationOptions[stepName];
         
+        // Vérifications de sécurité
+        if (!stepName) {
+            console.error(`❌ Étape ${currentStep} invalide dans customizationSteps`);
+            return false;
+        }
+        
+        if (!options) {
+            console.error(`❌ Options non trouvées pour l'étape: ${stepName}`);
+            await this.sock.sendMessage(chatId, {
+                text: `❌ Erreur dans le système de personnalisation. Redémarrez avec /create`
+            });
+            return false;
+        }
+        
         // Convertir la réponse en index
         const choiceNumber = parseInt(response.trim()) - 1;
         const optionKeys = Object.keys(options);
@@ -276,6 +290,15 @@ class CharacterCustomizationManager {
 
         const selectedKey = optionKeys[choiceNumber];
         const selectedOption = options[selectedKey];
+        
+        // Vérification de sécurité supplémentaire
+        if (!selectedOption) {
+            console.error(`❌ Option non trouvée: ${selectedKey} dans ${stepName}`);
+            await this.sock.sendMessage(chatId, {
+                text: `❌ Erreur de sélection. Réessayez.`
+            });
+            return true;
+        }
         
         // Enregistrer la sélection
         customizationState.selections[stepName] = {
@@ -559,11 +582,46 @@ class CharacterCustomizationManager {
     async updateCharacterInDatabase(playerNumber, selections, imagePath) {
         // Mise à jour en base de données
         try {
-            // Cette méthode sera implémentée quand on intégrera avec GameEngine
-            console.log(`💾 Sauvegarde personnage ${playerNumber}:`, selections);
+            console.log(`💾 Création personnage ${playerNumber}:`, selections);
             console.log(`🖼️ Image sauvée: ${imagePath}`);
+            
+            // Récupérer le joueur
+            const player = await this.dbManager.getPlayerByNumber(playerNumber);
+            if (!player) {
+                throw new Error('Joueur introuvable');
+            }
+            
+            // Construire les données du personnage depuis les sélections
+            const characterData = {
+                playerId: player.id,
+                name: `${selections.gender?.key === 'male' ? 'Guerrier' : 'Guerrière'}_${playerNumber.slice(-4)}`,
+                gender: selections.gender?.key || 'male',
+                kingdom: 'ASTORIA', // Royaume par défaut
+                order: null,
+                level: 1,
+                experience: 0,
+                powerLevel: 'G',
+                frictionLevel: 'G',
+                currentLife: 100,
+                maxLife: 100,
+                currentEnergy: 100,
+                maxEnergy: 100,
+                currentLocation: 'Capitale d\'Astoria',
+                position: { x: 0, y: 0, z: 0 },
+                equipment: {},
+                learnedTechniques: [],
+                coins: 100,
+                inventory: []
+            };
+            
+            // Créer le personnage dans la base de données
+            const newCharacter = await this.dbManager.createCharacter(characterData);
+            console.log(`✅ Personnage créé avec ID: ${newCharacter.id}`);
+            
+            return newCharacter;
         } catch (error) {
             console.error('❌ Erreur sauvegarde BDD:', error);
+            throw error;
         }
     }
 
