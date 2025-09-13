@@ -3,6 +3,7 @@ const OpenAIClient = require('../ai/OpenAIClient');
 const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
 const OgunGuide = require('../characters/OgunGuide');
+const CharacterCustomizationManager = require('../utils/CharacterCustomizationManager');
 const path = require('path'); // Importer le module path pour gérer les chemins de fichiers
 
 class GameEngine {
@@ -13,6 +14,10 @@ class GameEngine {
         this.groqClient = new GroqClient();
         this.geminiClient = new GeminiClient();
         this.ogunGuide = new OgunGuide(this.groqClient);
+        
+        // Sera initialisé dans setWhatsAppSocket une fois que sock est disponible
+        this.characterCustomization = null;
+        
         this.commandHandlers = {
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
@@ -34,6 +39,11 @@ class GameEngine {
 
     async processPlayerMessage({ playerNumber, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
         try {
+            // Initialiser le système de personnalisation si pas déjà fait
+            if (!this.characterCustomization && sock) {
+                this.characterCustomization = new CharacterCustomizationManager(dbManager, imageGenerator, sock);
+            }
+
             // Récupération ou création du joueur
             let player = await dbManager.getPlayerByWhatsApp(playerNumber);
             if (!player) {
@@ -68,8 +78,16 @@ class GameEngine {
             const command = message.toLowerCase().trim();
             let response = null;
 
+            // Vérifier d'abord si le joueur est en cours de personnalisation
+            if (this.characterCustomization && this.characterCustomization.activeCustomizations.has(playerNumber)) {
+                const handled = await this.characterCustomization.handleCustomizationResponse(playerNumber, chatId, message);
+                if (handled) {
+                    return { text: '' }; // Le système de personnalisation gère déjà l'envoi des messages
+                }
+            }
+
             if (this.commandHandlers[command]) {
-                response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator });
+                response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock });
             }
 
             const playerId = player.id;
@@ -142,7 +160,7 @@ class GameEngine {
         };
     }
 
-    async handleCreateCharacterCommand({ player, dbManager, imageGenerator }) {
+    async handleCreateCharacterCommand({ player, dbManager, imageGenerator, sock, chatId }) {
         const existingCharacter = await dbManager.getCharacterByPlayer(player.id);
 
         if (existingCharacter) {
@@ -150,14 +168,38 @@ class GameEngine {
                 text: `👤 Tu as déjà un personnage : **${existingCharacter.name}**\n\n` +
                       `🏰 Royaume : ${existingCharacter.kingdom}\n` +
                       `⚔️ Ordre : ${existingCharacter.order || 'Aucun'}\n\n` +
-                      `Pour créer un nouveau personnage, tu dois d'abord supprimer l'actuel.\n` +
-                      `Écris "SUPPRIMER_PERSONNAGE" pour confirmer.`,
+                      `🎨 Pour créer un nouveau personnage avec notre système 3D avancé,\n` +
+                      `tu dois d'abord supprimer l'actuel.\n\n` +
+                      `✨ **Nouveau système de création :**\n` +
+                      `• Personnalisation 3D réaliste comme Skyrim\n` +
+                      `• 9 étapes de customisation détaillée\n` +
+                      `• Aperçus en temps réel\n` +
+                      `• Rendu haute qualité final\n\n` +
+                      `Écris "SUPPRIMER_PERSONNAGE" pour confirmer la suppression et accéder au nouveau système.`,
                 image: await imageGenerator.generateCharacterImage(existingCharacter)
             };
         }
 
-        // Processus de création de personnage
-        return await this.startCharacterCreation({ player, dbManager, imageGenerator });
+        // Utiliser le nouveau système de personnalisation sophistiqué
+        if (this.characterCustomization) {
+            const success = await this.characterCustomization.startCharacterCustomization(
+                player.whatsappNumber, 
+                chatId, 
+                false // isModification = false
+            );
+            
+            if (success) {
+                return { text: '' }; // Le système de personnalisation gère l'envoi des messages
+            } else {
+                return {
+                    text: '❌ Impossible de démarrer le système de personnalisation. Une personnalisation est peut-être déjà en cours.\n\n' +
+                          'Tapez "annuler" si vous avez un processus en cours, puis réessayez /créer.'
+                };
+            }
+        } else {
+            // Fallback vers l'ancien système si le nouveau n'est pas disponible
+            return await this.startCharacterCreation({ player, dbManager, imageGenerator });
+        }
     }
 
     async startCharacterCreation({ player, dbManager, imageGenerator }) {
@@ -1002,7 +1044,7 @@ class GameEngine {
         }
     }
 
-    async handleModifyCharacterCommand({ player, dbManager, imageGenerator }) {
+    async handleModifyCharacterCommand({ player, dbManager, imageGenerator, sock, chatId }) {
         const character = await dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
@@ -1011,6 +1053,31 @@ class GameEngine {
                       `Utilise la commande /créer pour en créer un.`
             };
         }
+
+        // Utiliser le nouveau système de personnalisation sophistiqué pour modification
+        if (this.characterCustomization) {
+            const success = await this.characterCustomization.startCharacterCustomization(
+                player.whatsappNumber, 
+                chatId, 
+                true // isModification = true
+            );
+            
+            if (success) {
+                return { text: '' }; // Le système de personnalisation gère l'envoi des messages
+            } else {
+                return {
+                    text: '❌ Impossible de démarrer le système de modification. Une personnalisation est peut-être déjà en cours.\n\n' +
+                          'Tapez "annuler" si vous avez un processus en cours, puis réessayez /modifier.'
+                };
+            }
+        } else {
+            // Fallback vers l'ancien système si le nouveau n'est pas disponible
+            return await this.handleOldModifyCharacterCommand({ player, dbManager, imageGenerator });
+        }
+    }
+
+    async handleOldModifyCharacterCommand({ player, dbManager, imageGenerator }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
 
         // Marquer le début de la modification
         await dbManager.setTemporaryData(player.id, 'modification_started', true);
@@ -1024,10 +1091,11 @@ class GameEngine {
         }
 
         return {
-            text: `✨ **MODIFICATION DE PERSONNAGE**\n\n` +
+            text: `✨ **MODIFICATION DE PERSONNAGE (Mode Simple)**\n\n` +
                   `👤 **Personnage actuel :** ${character.name}\n` +
                   `🏰 **Royaume :** ${character.kingdom}\n` +
                   `👤 **Sexe :** ${character.gender === 'male' ? 'Homme' : 'Femme'}\n\n` +
+                  `⚠️ Le système 3D avancé n'est pas disponible.\n\n` +
                   `🎨 **Nouvelle apparence personnalisée :**\n\n` +
                   `📝 Décris en détail l'apparence que tu veux pour ton personnage :\n` +
                   `• Couleur des cheveux, des yeux\n` +
