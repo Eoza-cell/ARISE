@@ -37,8 +37,11 @@ class AimlApiClient {
             console.log(`✨ Prompt final optimisé: "${optimizedPrompt}"`);
 
             const requestData = {
-                model: 'google/gemini-2.5-flash-image-edit',
-                prompt: optimizedPrompt
+                model: 'stabilityai/stable-diffusion-xl-base-1.0',
+                prompt: optimizedPrompt,
+                n: 1,
+                size: "1024x1024",
+                response_format: "b64_json"
             };
 
             const response = await axios.post(`${this.baseURL}/images/generations`, requestData, {

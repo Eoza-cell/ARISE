@@ -609,10 +609,25 @@ class GameEngine {
 
         } catch (error) {
             console.error('❌ Erreur lors du traitement IA:', error);
+            
+            // Appliquer au moins une réduction d'énergie de base
+            const energyCost = 10;
+            character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
+            
+            await dbManager.updateCharacter(character.id, {
+                currentEnergy: character.currentEnergy
+            });
+
+            const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
+            const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
+
             return {
                 text: `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
                       `📖 **Action :** "${message}"\n\n` +
-                      `⚠️ Le narrateur analyse ton action...\n\n` +
+                      `❤️ **Vie :** ${lifeBar}\n` +
+                      `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
+                      `💰 **Argent :** ${character.coins} pièces d'or\n\n` +
+                      `⚠️ Le narrateur analyse ton action... Les systèmes IA sont temporairement instables.\n\n` +
                       `💭 *Continue ton aventure...*`
             };
         }

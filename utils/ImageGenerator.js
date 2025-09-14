@@ -148,7 +148,8 @@ class ImageGenerator {
 
         } catch (error) {
             console.error('❌ Erreur génération image menu:', error);
-            throw error;
+            // Fallback sur une image générée avec Canvas
+            return await this.generateFallbackMenuImage();
         }
     }
 
@@ -176,7 +177,8 @@ class ImageGenerator {
                 }
             }
 
-            throw new Error('Impossible de générer l\'image action avec AimlApi');
+            // Fallback sur Canvas
+            return await this.generateFallbackActionImage(character, action);
         } catch (error) {
             console.error('❌ Erreur génération image action:', error);
             throw error;
@@ -276,6 +278,113 @@ class ImageGenerator {
     }
 
     async generateInventoryImage(character) {
+
+    async generateFallbackMenuImage() {
+        try {
+            const canvas = createCanvas(800, 600);
+            const ctx = canvas.getContext('2d');
+
+            // Background dégradé
+            const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+            gradient.addColorStop(0, '#1a1a2e');
+            gradient.addColorStop(1, '#16213e');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 800, 600);
+
+            // Titre principal
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 48px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('FRICTION ULTIMATE', 400, 150);
+
+            // Sous-titre
+            ctx.fillStyle = '#ffffff';
+            ctx.font = '24px serif';
+            ctx.fillText('RPG Médiéval-Technologique', 400, 200);
+
+            // Emoji central
+            ctx.font = '120px serif';
+            ctx.fillText('⚔️', 400, 350);
+
+            // Message d'action
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 20px serif';
+            ctx.fillText('Prêt pour l\'aventure ?', 400, 450);
+
+            const buffer = canvas.toBuffer('image/png');
+            console.log('✅ Image menu fallback générée avec Canvas');
+            return buffer;
+
+        } catch (error) {
+            console.error('❌ Erreur génération fallback menu:', error);
+
+    async generateFallbackActionImage(character, action) {
+        try {
+            const canvas = createCanvas(800, 600);
+            const ctx = canvas.getContext('2d');
+
+            // Background selon le royaume
+            const colors = this.getKingdomColors(character.kingdom);
+            const gradient = ctx.createLinearGradient(0, 0, 800, 600);
+            gradient.addColorStop(0, colors.primary);
+            gradient.addColorStop(1, colors.secondary);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 800, 600);
+
+            // Nom du personnage
+            ctx.fillStyle = '#ffffff';
+            ctx.font = 'bold 32px serif';
+            ctx.textAlign = 'center';
+            ctx.fillText(character.name, 400, 80);
+
+            // Royaume
+            ctx.font = '20px serif';
+            ctx.fillText(`Royaume de ${character.kingdom}`, 400, 120);
+
+            // Action (première personne)
+            ctx.fillStyle = '#ffd700';
+            ctx.font = 'bold 24px serif';
+            
+            // Diviser l'action en lignes
+            const maxWidth = 700;
+            const words = action.split(' ');
+            let line = '';
+            let y = 300;
+
+            words.forEach(word => {
+                const testLine = line + word + ' ';
+                const metrics = ctx.measureText(testLine);
+                
+                if (metrics.width > maxWidth && line !== '') {
+                    ctx.fillText(line, 400, y);
+                    line = word + ' ';
+                    y += 30;
+                } else {
+                    line = testLine;
+                }
+            });
+            ctx.fillText(line, 400, y);
+
+            // Emoji d'action
+            ctx.font = '60px serif';
+            ctx.fillText('🎮', 400, 500);
+
+            const buffer = canvas.toBuffer('image/png');
+            console.log('✅ Image action fallback générée avec Canvas');
+            return buffer;
+
+        } catch (error) {
+            console.error('❌ Erreur génération fallback action:', error);
+            return null;
+        }
+    }
+
+
+            return null;
+        }
+    }
+
+
         try {
             const canvas = createCanvas(1200, 300); // Format horizontal
             const ctx = canvas.getContext('2d');
