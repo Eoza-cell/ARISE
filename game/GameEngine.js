@@ -154,10 +154,18 @@ class GameEngine {
                    `• /aide - Aide complète\n\n` +
                    `💀 **Le monde bouge en permanence. Chaque seconde compte !**`;
 
-        return {
-            text: menuText,
-            image: await imageGenerator.generateMenuImage()
-        };
+        try {
+            const menuImage = await imageGenerator.generateMenuImage();
+            return {
+                text: menuText,
+                image: menuImage
+            };
+        } catch (error) {
+            console.error('⚠️ Erreur génération image menu, affichage sans image:', error);
+            return {
+                text: menuText + '\n\n⚠️ Image temporairement indisponible'
+            };
+        }
     }
 
     async handleCreateCharacterCommand({ player, dbManager, imageGenerator, sock, chatId }) {

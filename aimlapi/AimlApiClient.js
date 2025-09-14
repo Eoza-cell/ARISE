@@ -136,9 +136,11 @@ class AimlApiClient {
         // Mots-clés de qualité premium
         optimized = `${optimized}, masterpiece, 8K ultra HD, professional game art, detailed textures, sharp focus, best quality, no blur, vibrant lighting`;
 
-        // Limiter la longueur
-        if (optimized.length > 450) {
-            optimized = optimized.substring(0, 450);
+        // Limiter la longueur mais s'assurer que le prompt reste cohérent
+        if (optimized.length > 400) {
+            // Couper au dernier mot complet
+            const lastSpace = optimized.lastIndexOf(' ', 400);
+            optimized = optimized.substring(0, lastSpace > 200 ? lastSpace : 400);
         }
 
         console.log(`🔧 Prompt optimisé final: "${optimized}"`);
@@ -200,7 +202,7 @@ class AimlApiClient {
     }
 
     async generateMenuImage(outputPath) {
-        const prompt = `Young man with black hair throwing a powerful right hook punch directly into demon's face at maximum speed, impact moment, steampunk medieval fantasy setting, dramatic lighting, action scene, motion blur, epic composition`;
+        const prompt = `Medieval fantasy game menu background, epic fantasy landscape with kingdoms, steampunk elements, dramatic lighting, game interface design`;
         
         return await this.generateImage(prompt, outputPath, {
             style: '3d',

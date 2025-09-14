@@ -147,7 +147,8 @@ class ImageGenerator {
 
         } catch (error) {
             console.error('❌ Erreur génération image menu:', error);
-            throw error;
+            // Retourner null au lieu de throw pour permettre l'affichage du menu sans image
+            return null;
         }
     }
 
