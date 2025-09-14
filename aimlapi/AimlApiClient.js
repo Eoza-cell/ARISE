@@ -37,12 +37,14 @@ class AimlApiClient {
             console.log(`✨ Prompt final optimisé: "${optimizedPrompt}"`);
 
             const requestData = {
-                model: 'stabilityai/stable-diffusion-xl-base-1.0',
+                model: 'flux/schnell',
                 prompt: optimizedPrompt,
                 n: 1,
                 size: "1024x1024",
-                response_format: "b64_json"
+                response_format: "url"
             };
+
+            console.log('📤 Données envoyées à AIMLAPI:', JSON.stringify(requestData, null, 2));
 
             const response = await axios.post(`${this.baseURL}/images/generations`, requestData, {
                 headers: {
@@ -51,6 +53,9 @@ class AimlApiClient {
                 },
                 timeout: 60000
             });
+
+            console.log('🔍 Statut réponse AIMLAPI:', response.status);
+            console.log('🔍 Données reçues:', response.data ? 'Oui' : 'Non');
 
             if (response.data && response.data.data && response.data.data.length > 0) {
                 const imageData = response.data.data[0];
@@ -133,17 +138,17 @@ class AimlApiClient {
             optimized = `${optimized}, detailed fantasy armor, medieval clothing, warrior outfit`;
         }
 
-        // Mots-clés de qualité premium
-        optimized = `${optimized}, masterpiece, 8K ultra HD, professional game art, detailed textures, sharp focus, best quality, no blur, vibrant lighting`;
+        // Mots-clés de qualité premium (plus courts)
+        optimized = `${optimized}, masterpiece, detailed art, fantasy style`;
 
-        // Limiter la longueur mais s'assurer que le prompt reste cohérent
-        if (optimized.length > 400) {
-            // Couper au dernier mot complet
-            const lastSpace = optimized.lastIndexOf(' ', 400);
-            optimized = optimized.substring(0, lastSpace > 200 ? lastSpace : 400);
+        // Limiter strictement la longueur pour éviter l'erreur 400
+        if (optimized.length > 250) {
+            // Couper au dernier mot complet mais plus agressivement
+            const lastSpace = optimized.lastIndexOf(' ', 250);
+            optimized = optimized.substring(0, lastSpace > 100 ? lastSpace : 250);
         }
 
-        console.log(`🔧 Prompt optimisé final: "${optimized}"`);
+        console.log(`🔧 Prompt optimisé final (${optimized.length} chars): "${optimized}"`);
         return optimized;
     }
 
@@ -202,7 +207,7 @@ class AimlApiClient {
     }
 
     async generateMenuImage(outputPath) {
-        const prompt = `Medieval fantasy game menu background, epic fantasy landscape with kingdoms, steampunk elements, dramatic lighting, game interface design`;
+        const prompt = `Fantasy game menu, medieval castle, epic landscape`;
         
         return await this.generateImage(prompt, outputPath, {
             style: '3d',
