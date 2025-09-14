@@ -2,7 +2,7 @@ const sharp = require('sharp');
 const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs').promises;
 const path = require('path');
-const FreepikClient = require('../freepik/FreepikClient');
+const AimlApiClient = require('../aimlapi/AimlApiClient');
 const BlenderClient = require('../blender/BlenderClient');
 const RunwayClient = require('../runway/RunwayClient');
 
@@ -12,17 +12,17 @@ class ImageGenerator {
         this.assetsPath = path.join(__dirname, '../assets');
         this.tempPath = path.join(__dirname, '../temp');
 
-        // Initialisation de FreepikClient (seul générateur)
+        // Initialisation de AimlApiClient (seul générateur)
         try {
-            this.freepikClient = new FreepikClient();
-            this.hasFreepik = this.freepikClient.hasValidClient();
-            if (this.hasFreepik) {
-                console.log('✅ FreepikClient initialisé - Générateur principal');
+            this.aimlApiClient = new AimlApiClient();
+            this.hasAimlApi = this.aimlApiClient.hasValidClient();
+            if (this.hasAimlApi) {
+                console.log('✅ AimlApiClient initialisé - Générateur principal');
             }
         } catch (error) {
-            console.error('❌ Erreur initialisation FreepikClient:', error.message);
-            this.freepikClient = null;
-            this.hasFreepik = false;
+            console.error('❌ Erreur initialisation AimlApiClient:', error.message);
+            this.aimlApiClient = null;
+            this.hasAimlApi = false;
         }
 
         // Initialisation de BlenderClient pour personnalisation 3D
@@ -61,7 +61,7 @@ class ImageGenerator {
         // Groq pour optimisation des prompts (injecté plus tard)
         this.groqClient = null;
 
-        console.log('🎨 Mode: Groq (narration) + Freepik (images seul) + Canvas (fallback)');
+        console.log('🎨 Mode: Groq (narration) + AimlApi (images seul) + Canvas (fallback)');
 
         // Créer les dossiers nécessaires
         this.initializeFolders();
@@ -125,26 +125,26 @@ class ImageGenerator {
 
     async generateMenuImage() {
         try {
-            const cacheKey = 'menu_main_freepik';
+            const cacheKey = 'menu_main_aimlapi';
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            const imagePath = path.join(this.tempPath, 'menu_main_freepik.png');
+            const imagePath = path.join(this.tempPath, 'menu_main_aimlapi.png');
 
-            if (this.hasFreepik && this.freepikClient) {
-                console.log('🎨 Génération image menu avec Freepik...');
-                await this.freepikClient.generateMenuImage(imagePath);
+            if (this.hasAimlApi && this.aimlApiClient) {
+                console.log('🎨 Génération image menu avec AimlApi...');
+                await this.aimlApiClient.generateMenuImage(imagePath);
 
                 const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                 if (imageBuffer) {
-                    console.log('✅ Image menu générée par Freepik');
+                    console.log('✅ Image menu générée par AimlApi');
                     this.imageCache.set(cacheKey, imageBuffer);
                     return imageBuffer;
                 }
             }
 
-            throw new Error('Impossible de générer l\'image menu - Freepik requis');
+            throw new Error('Impossible de générer l\'image menu - AimlApi requis');
 
         } catch (error) {
             console.error('❌ Erreur génération image menu:', error);
@@ -163,20 +163,20 @@ class ImageGenerator {
 
             const imagePath = path.join(this.tempPath, `character_action_${character.id}_${Date.now()}.png`);
 
-            if (this.hasFreepik && this.freepikClient) {
+            if (this.hasAimlApi && this.aimlApiClient) {
                 try {
-                    await this.freepikClient.generateActionImage(character, action, narration, imagePath, imageOptions);
+                    await this.aimlApiClient.generateActionImage(character, action, narration, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                     if (imageBuffer) {
-                        console.log('✅ Image action générée par Freepik (vue première personne)');
+                        console.log('✅ Image action générée par AimlApi (vue première personne)');
                         return imageBuffer;
                     }
-                } catch (freepikError) {
-                    console.log('⚠️ Erreur Freepik action:', freepikError.message);
+                } catch (aimlApiError) {
+                    console.log('⚠️ Erreur AimlApi action:', aimlApiError.message);
                 }
             }
 
-            throw new Error('Impossible de générer l\'image action avec Freepik');
+            throw new Error('Impossible de générer l\'image action avec AimlApi');
         } catch (error) {
             console.error('❌ Erreur génération image action:', error);
             throw error;
@@ -192,14 +192,14 @@ class ImageGenerator {
                 return customImage;
             }
 
-            const cacheKey = `character_${character.id}_freepik_${options.style || this.defaultStyle}`;
+            const cacheKey = `character_${character.id}_aimlapi_${options.style || this.defaultStyle}`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            console.log(`🎨 Génération image personnage ${character.name} avec Freepik (vue première personne)...`);
+            console.log(`🎨 Génération image personnage ${character.name} avec AimlApi (vue première personne)...`);
 
-            const imagePath = path.join(this.tempPath, `character_${character.id}_freepik.png`);
+            const imagePath = path.join(this.tempPath, `character_${character.id}_aimlapi.png`);
 
             // FORCER la vue première personne pour toutes les images IA
             const imageOptions = {
@@ -208,22 +208,22 @@ class ImageGenerator {
                 nudity: options.nudity !== undefined ? options.nudity : this.allowNudity
             };
 
-            if (this.hasFreepik && this.freepikClient) {
+            if (this.hasAimlApi && this.aimlApiClient) {
                 try {
-                    await this.freepikClient.generateCharacterImage(character, imagePath, imageOptions);
+                    await this.aimlApiClient.generateCharacterImage(character, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
                     if (imageBuffer) {
-                        console.log(`✅ Image personnage ${character.name} générée par Freepik (vue première personne)`);
+                        console.log(`✅ Image personnage ${character.name} générée par AimlApi (vue première personne)`);
                         this.imageCache.set(cacheKey, imageBuffer);
                         return imageBuffer;
                     }
-                } catch (freepikError) {
-                    console.log(`⚠️ Erreur Freepik personnage:`, freepikError.message);
+                } catch (aimlApiError) {
+                    console.log(`⚠️ Erreur AimlApi personnage:`, aimlApiError.message);
                 }
             }
 
-            throw new Error('Impossible de générer l\'image personnage avec Freepik');
+            throw new Error('Impossible de générer l\'image personnage avec AimlApi');
 
         } catch (error) {
             console.error('❌ Erreur génération image personnage:', error);
@@ -247,13 +247,13 @@ class ImageGenerator {
 
             const imagePath = path.join(this.tempPath, `character_sheet_${character.id}.png`);
 
-            if (this.hasFreepik && this.freepikClient) {
+            if (this.hasAimlApi && this.aimlApiClient) {
                 console.log(`🎨 Génération fiche personnage pour ${character.name} (vue première personne)...`);
                 
                 const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
                 const prompt = `Character sheet portrait of ${character.name}, detailed ${genderDesc} from ${character.kingdom} kingdom, level ${character.level}, power level ${character.powerLevel}, fantasy RPG character portrait, detailed armor and equipment, first person POV perspective`;
 
-                await this.freepikClient.generateImage(prompt, imagePath, {
+                await this.aimlApiClient.generateImage(prompt, imagePath, {
                     style: this.defaultStyle,
                     perspective: 'first_person', // FORCÉ - vue première personne
                     nudity: this.allowNudity
@@ -261,13 +261,13 @@ class ImageGenerator {
 
                 const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                 if (imageBuffer) {
-                    console.log(`✅ Fiche personnage générée par Freepik (vue première personne)`);
+                    console.log(`✅ Fiche personnage générée par AimlApi (vue première personne)`);
                     this.imageCache.set(cacheKey, imageBuffer);
                     return imageBuffer;
                 }
             }
 
-            throw new Error('Impossible de générer la fiche personnage avec Freepik');
+            throw new Error('Impossible de générer la fiche personnage avec AimlApi');
 
         } catch (error) {
             console.error('❌ Erreur génération fiche personnage:', error);
@@ -359,12 +359,12 @@ class ImageGenerator {
 
     async generateKingdomImage(kingdomId, options = {}) {
         try {
-            const cacheKey = `kingdom_${kingdomId}_freepik_${options.style || this.defaultStyle}`;
+            const cacheKey = `kingdom_${kingdomId}_aimlapi_${options.style || this.defaultStyle}`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            console.log(`🎨 Génération image royaume ${kingdomId} avec Freepik...`);
+            console.log(`🎨 Génération image royaume ${kingdomId} avec AimlApi...`);
 
             const kingdomDesc = this.getKingdomDescription(kingdomId);
             const imagePath = path.join(this.tempPath, `kingdom_${kingdomId}_freepik.png`);
@@ -375,21 +375,21 @@ class ImageGenerator {
                 nudity: false
             };
 
-            if (this.hasFreepik && this.freepikClient) {
+            if (this.hasAimlApi && this.aimlApiClient) {
                 try {
-                    await this.freepikClient.generateKingdomImage(kingdomId, { description: kingdomDesc }, imagePath, imageOptions);
+                    await this.aimlApiClient.generateKingdomImage(kingdomId, { description: kingdomDesc }, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                     if (imageBuffer) {
-                        console.log(`✅ Image royaume ${kingdomId} générée par Freepik`);
+                        console.log(`✅ Image royaume ${kingdomId} générée par AimlApi`);
                         this.imageCache.set(cacheKey, imageBuffer);
                         return imageBuffer;
                     }
-                } catch (freepikError) {
-                    console.log('⚠️ Erreur Freepik royaume:', freepikError.message);
+                } catch (aimlApiError) {
+                    console.log('⚠️ Erreur AimlApi royaume:', aimlApiError.message);
                 }
             }
 
-            throw new Error('Impossible de générer l\'image royaume avec Freepik');
+            throw new Error('Impossible de générer l\'image royaume avec AimlApi');
 
         } catch (error) {
             console.error(`❌ Erreur génération image royaume ${kingdomId}:`, error);
@@ -399,14 +399,14 @@ class ImageGenerator {
 
     async generateWorldMap(options = {}) {
         try {
-            const cacheKey = `world_map_freepik_${options.style || this.defaultStyle}`;
+            const cacheKey = `world_map_aimlapi_${options.style || this.defaultStyle}`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            console.log('🗺️ Génération carte du monde détaillée avec Freepik...');
+            console.log('🗺️ Génération carte du monde détaillée avec AimlApi...');
 
-            const imagePath = path.join(this.tempPath, 'world_map_freepik.png');
+            const imagePath = path.join(this.tempPath, 'world_map_aimlapi.png');
 
             const imageOptions = {
                 style: options.style || this.defaultStyle,
@@ -414,17 +414,17 @@ class ImageGenerator {
                 nudity: false
             };
 
-            if (this.hasFreepik && this.freepikClient) {
-                await this.freepikClient.generateDetailedWorldMap(imagePath, imageOptions);
+            if (this.hasAimlApi && this.aimlApiClient) {
+                await this.aimlApiClient.generateDetailedWorldMap(imagePath, imageOptions);
                 const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                 if (imageBuffer) {
-                    console.log('✅ Carte du monde détaillée générée par Freepik');
+                    console.log('✅ Carte du monde détaillée générée par AimlApi');
                     this.imageCache.set(cacheKey, imageBuffer);
                     return imageBuffer;
                 }
             }
 
-            throw new Error('Impossible de générer la carte du monde - Freepik requis');
+            throw new Error('Impossible de générer la carte du monde - AimlApi requis');
 
         } catch (error) {
             console.error('❌ Erreur génération carte du monde:', error);
@@ -535,10 +535,10 @@ class ImageGenerator {
             if (this.hasBlender && this.blenderClient) {
                 // Utiliser Blender pour un rendu 3D des vêtements
                 return await this.blenderClient.generateClothingVariation(character, clothingType, outputPath);
-            } else if (this.hasFreepik && this.freepikClient) {
-                // Fallback sur Freepik
+            } else if (this.hasAimlApi && this.aimlApiClient) {
+                // Fallback sur AimlApi
                 const prompt = `${character.name} wearing ${clothingType} clothing, ${this.getKingdomDescription(character.kingdom)}, detailed fashion illustration`;
-                await this.freepikClient.generateImage(prompt, outputPath, {
+                await this.aimlApiClient.generateImage(prompt, outputPath, {
                     style: this.defaultStyle,
                     perspective: 'third_person',
                     nudity: false
