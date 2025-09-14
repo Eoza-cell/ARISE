@@ -1,5 +1,4 @@
 const sharp = require('sharp');
-const { createCanvas, loadImage } = require('canvas');
 const fs = require('fs').promises;
 const path = require('path');
 const AimlApiClient = require('../aimlapi/AimlApiClient');
@@ -61,7 +60,7 @@ class ImageGenerator {
         // Groq pour optimisation des prompts (injecté plus tard)
         this.groqClient = null;
 
-        console.log('🎨 Mode: Groq (narration) + AimlApi (images seul) + Canvas (fallback)');
+        console.log('🎨 Mode: Groq (narration) + AimlApi (images uniquement) - AUCUN FALLBACK');
 
         // Créer les dossiers nécessaires
         this.initializeFolders();
@@ -148,8 +147,7 @@ class ImageGenerator {
 
         } catch (error) {
             console.error('❌ Erreur génération image menu:', error);
-            // Fallback sur une image générée avec Canvas
-            return await this.generateFallbackMenuImage();
+            throw error;
         }
     }
 
@@ -177,8 +175,7 @@ class ImageGenerator {
                 }
             }
 
-            // Fallback sur Canvas
-            return await this.generateFallbackActionImage(character, action);
+            throw new Error('Impossible de générer l\'image d\'action avec AimlApi');
         } catch (error) {
             console.error('❌ Erreur génération image action:', error);
             throw error;
@@ -278,192 +275,45 @@ class ImageGenerator {
     }
 
     async generateInventoryImage(character) {
-
-    async generateFallbackMenuImage() {
         try {
-            const canvas = createCanvas(800, 600);
-            const ctx = canvas.getContext('2d');
+            const cacheKey = `inventory_${character.id}`;
+            if (this.imageCache.has(cacheKey)) {
+                return this.imageCache.get(cacheKey);
+            }
 
-            // Background dégradé
-            const gradient = ctx.createLinearGradient(0, 0, 800, 600);
-            gradient.addColorStop(0, '#1a1a2e');
-            gradient.addColorStop(1, '#16213e');
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 800, 600);
+            const imagePath = path.join(this.tempPath, `inventory_${character.id}_aimlapi.png`);
 
-            // Titre principal
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 48px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText('FRICTION ULTIMATE', 400, 150);
-
-            // Sous-titre
-            ctx.fillStyle = '#ffffff';
-            ctx.font = '24px serif';
-            ctx.fillText('RPG Médiéval-Technologique', 400, 200);
-
-            // Emoji central
-            ctx.font = '120px serif';
-            ctx.fillText('⚔️', 400, 350);
-
-            // Message d'action
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 20px serif';
-            ctx.fillText('Prêt pour l\'aventure ?', 400, 450);
-
-            const buffer = canvas.toBuffer('image/png');
-            console.log('✅ Image menu fallback générée avec Canvas');
-            return buffer;
-
-        } catch (error) {
-            console.error('❌ Erreur génération fallback menu:', error);
-
-    async generateFallbackActionImage(character, action) {
-        try {
-            const canvas = createCanvas(800, 600);
-            const ctx = canvas.getContext('2d');
-
-            // Background selon le royaume
-            const colors = this.getKingdomColors(character.kingdom);
-            const gradient = ctx.createLinearGradient(0, 0, 800, 600);
-            gradient.addColorStop(0, colors.primary);
-            gradient.addColorStop(1, colors.secondary);
-            ctx.fillStyle = gradient;
-            ctx.fillRect(0, 0, 800, 600);
-
-            // Nom du personnage
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 32px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(character.name, 400, 80);
-
-            // Royaume
-            ctx.font = '20px serif';
-            ctx.fillText(`Royaume de ${character.kingdom}`, 400, 120);
-
-            // Action (première personne)
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 24px serif';
-            
-            // Diviser l'action en lignes
-            const maxWidth = 700;
-            const words = action.split(' ');
-            let line = '';
-            let y = 300;
-
-            words.forEach(word => {
-                const testLine = line + word + ' ';
-                const metrics = ctx.measureText(testLine);
+            if (this.hasAimlApi && this.aimlApiClient) {
+                console.log(`🎨 Génération inventaire pour ${character.name} avec AimlApi...`);
                 
-                if (metrics.width > maxWidth && line !== '') {
-                    ctx.fillText(line, 400, y);
-                    line = word + ' ';
-                    y += 30;
-                } else {
-                    line = testLine;
+                const prompt = `RPG inventory interface for ${character.name}, fantasy game UI, detailed equipment slots, medieval style inventory screen, character equipment display`;
+
+                await this.aimlApiClient.generateImage(prompt, imagePath, {
+                    style: this.defaultStyle,
+                    perspective: 'third_person',
+                    nudity: false
+                });
+
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    console.log(`✅ Inventaire généré par AimlApi`);
+                    this.imageCache.set(cacheKey, imageBuffer);
+                    return imageBuffer;
                 }
-            });
-            ctx.fillText(line, 400, y);
-
-            // Emoji d'action
-            ctx.font = '60px serif';
-            ctx.fillText('🎮', 400, 500);
-
-            const buffer = canvas.toBuffer('image/png');
-            console.log('✅ Image action fallback générée avec Canvas');
-            return buffer;
-
-        } catch (error) {
-            console.error('❌ Erreur génération fallback action:', error);
-            return null;
-        }
-    }
-
-
-            return null;
-        }
-    }
-
-
-        try {
-            const canvas = createCanvas(1200, 300); // Format horizontal
-            const ctx = canvas.getContext('2d');
-
-            // Background inventaire horizontal
-            ctx.fillStyle = '#2c2c2c';
-            ctx.fillRect(0, 0, 1200, 300);
-
-            // Grille d'inventaire horizontale - carrés parfaits
-            const slotSize = 80;
-            const slotsPerRow = 12; // Plus de slots en horizontal
-            const startX = 50;
-            const startY = 50;
-
-            // Dessiner les emplacements carrés
-            for (let i = 0; i < 24; i++) { // 2 rangées de 12
-                const x = startX + (i % slotsPerRow) * (slotSize + 10);
-                const y = startY + Math.floor(i / slotsPerRow) * (slotSize + 10);
-
-                // Emplacement carré
-                ctx.fillStyle = '#404040';
-                ctx.fillRect(x, y, slotSize, slotSize);
-                ctx.strokeStyle = '#606060';
-                ctx.strokeRect(x, y, slotSize, slotSize);
-
-                // Numéro de slot
-                ctx.fillStyle = '#888888';
-                ctx.font = '12px serif';
-                ctx.textAlign = 'center';
-                ctx.fillText((i + 1).toString(), x + slotSize/2, y + slotSize/2 + 4);
             }
 
-            // Titre
-            ctx.fillStyle = '#ffffff';
-            ctx.font = 'bold 20px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(`INVENTAIRE DE ${character.name.toUpperCase()}`, 600, 30);
-
-            // Équipement actuel dans les premiers slots
-            const equipment = character.equipment || {};
-            let slotIndex = 0;
-
-            if (equipment.weapon) {
-                const x = startX + (slotIndex % slotsPerRow) * (slotSize + 10);
-                const y = startY + Math.floor(slotIndex / slotsPerRow) * (slotSize + 10);
-                ctx.fillStyle = '#ff6b6b';
-                ctx.fillRect(x + 5, y + 5, slotSize - 10, slotSize - 10);
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 12px serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('⚔️', x + slotSize/2, y + slotSize/2 + 4);
-                slotIndex++;
-            }
-
-            if (equipment.armor) {
-                const x = startX + (slotIndex % slotsPerRow) * (slotSize + 10);
-                const y = startY + Math.floor(slotIndex / slotsPerRow) * (slotSize + 10);
-                ctx.fillStyle = '#4ecdc4';
-                ctx.fillRect(x + 5, y + 5, slotSize - 10, slotSize - 10);
-                ctx.fillStyle = '#ffffff';
-                ctx.font = 'bold 12px serif';
-                ctx.textAlign = 'center';
-                ctx.fillText('🛡️', x + slotSize/2, y + slotSize/2 + 4);
-                slotIndex++;
-            }
-
-            // Pièces en bas
-            ctx.fillStyle = '#ffd700';
-            ctx.font = 'bold 16px serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(`💰 Pièces: ${character.coins}`, 50, 280);
-
-            const buffer = canvas.toBuffer('image/png');
-            return buffer;
+            throw new Error('Impossible de générer l\'inventaire - AimlApi requis');
 
         } catch (error) {
             console.error('❌ Erreur génération inventaire:', error);
-            return null;
+            throw error;
         }
+    }
+
+    
+
+
+        
     }
 
     async generateKingdomImage(kingdomId, options = {}) {
@@ -742,6 +592,81 @@ class ImageGenerator {
 
         } catch (error) {
             console.error('❌ Erreur génération vidéo personnalisée:', error);
+            throw error;
+        }
+    }
+
+    async generateHelpImage() {
+        try {
+            const cacheKey = 'help_image_aimlapi';
+            if (this.imageCache.has(cacheKey)) {
+                return this.imageCache.get(cacheKey);
+            }
+
+            const imagePath = path.join(this.tempPath, 'help_image_aimlapi.png');
+
+            if (this.hasAimlApi && this.aimlApiClient) {
+                await this.aimlApiClient.generateHelpImage(imagePath);
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    this.imageCache.set(cacheKey, imageBuffer);
+                    return imageBuffer;
+                }
+            }
+
+            throw new Error('Impossible de générer l\'image d\'aide - AimlApi requis');
+        } catch (error) {
+            console.error('❌ Erreur génération image aide:', error);
+            throw error;
+        }
+    }
+
+    async generateOrdersOverview() {
+        try {
+            const cacheKey = 'orders_overview_aimlapi';
+            if (this.imageCache.has(cacheKey)) {
+                return this.imageCache.get(cacheKey);
+            }
+
+            const imagePath = path.join(this.tempPath, 'orders_overview_aimlapi.png');
+
+            if (this.hasAimlApi && this.aimlApiClient) {
+                await this.aimlApiClient.generateOrdersOverview(imagePath);
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    this.imageCache.set(cacheKey, imageBuffer);
+                    return imageBuffer;
+                }
+            }
+
+            throw new Error('Impossible de générer l\'image des ordres - AimlApi requis');
+        } catch (error) {
+            console.error('❌ Erreur génération image ordres:', error);
+            throw error;
+        }
+    }
+
+    async generateCombatGuideImage() {
+        try {
+            const cacheKey = 'combat_guide_aimlapi';
+            if (this.imageCache.has(cacheKey)) {
+                return this.imageCache.get(cacheKey);
+            }
+
+            const imagePath = path.join(this.tempPath, 'combat_guide_aimlapi.png');
+
+            if (this.hasAimlApi && this.aimlApiClient) {
+                await this.aimlApiClient.generateCombatGuideImage(imagePath);
+                const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                if (imageBuffer) {
+                    this.imageCache.set(cacheKey, imageBuffer);
+                    return imageBuffer;
+                }
+            }
+
+            throw new Error('Impossible de générer l\'image de combat - AimlApi requis');
+        } catch (error) {
+            console.error('❌ Erreur génération image combat:', error);
             throw error;
         }
     }

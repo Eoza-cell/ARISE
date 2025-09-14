@@ -275,6 +275,36 @@ class AimlApiClient {
             nudity: false
         });
     }
+
+    async generateHelpImage(outputPath) {
+        const prompt = `Fantasy RPG help guide interface, medieval scroll with game commands, detailed UI design, magical parchment with glowing text, fantasy game manual page`;
+        
+        return await this.generateImage(prompt, outputPath, {
+            style: '3d',
+            perspective: 'third_person',
+            nudity: false
+        });
+    }
+
+    async generateOrdersOverview(outputPath) {
+        const prompt = `Seven fantasy military orders overview, detailed guild emblems and banners, medieval warrior organizations, fantasy order symbols and crests`;
+        
+        return await this.generateImage(prompt, outputPath, {
+            style: '3d',
+            perspective: 'third_person',
+            nudity: false
+        });
+    }
+
+    async generateCombatGuideImage(outputPath) {
+        const prompt = `Fantasy RPG combat system guide, detailed combat interface, medieval weapons and armor, power level progression chart, epic combat scene`;
+        
+        return await this.generateImage(prompt, outputPath, {
+            style: '3d',
+            perspective: 'third_person',
+            nudity: false
+        });
+    }
 }
 
 module.exports = AimlApiClient;
