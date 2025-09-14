@@ -310,12 +310,6 @@ class ImageGenerator {
         }
     }
 
-    
-
-
-        
-    }
-
     async generateKingdomImage(kingdomId, options = {}) {
         try {
             const cacheKey = `kingdom_${kingdomId}_aimlapi_${options.style || this.defaultStyle}`;
