@@ -5,11 +5,11 @@ const path = require('path');
 
 class AimlApiClient {
     constructor() {
-        this.apiKey = 'f096718811994413a3fcc5819a3b7984';
-        this.baseURL = 'https://api.aimlapi.com/v1';
+        this.apiKey = '3876607b0590221cf01e40c0966c383c82c50b78aa148753e9526285b198dc5d';
+        this.baseURL = 'https://api.piapi.ai/v1';
         this.isAvailable = true;
         
-        console.log('✅ AimlApiClient initialisé avec succès');
+        console.log('✅ Pi API Client initialisé avec succès');
     }
 
     hasValidClient() {
@@ -19,10 +19,10 @@ class AimlApiClient {
     async generateImage(prompt, outputPath, options = {}) {
         try {
             if (!this.hasValidClient()) {
-                throw new Error('Client AIMLAPI non disponible - vérifiez la clé API');
+                throw new Error('Client Pi API non disponible - vérifiez la clé API');
             }
 
-            console.log(`🎨 Génération d'image AIMLAPI avec prompt: "${prompt}"`);
+            console.log(`🎨 Génération d'image Pi API avec prompt: "${prompt}"`);
 
             // Configuration par défaut
             const style = options.style || '3d';
@@ -37,16 +37,17 @@ class AimlApiClient {
             console.log(`✨ Prompt final optimisé: "${optimizedPrompt}"`);
 
             const requestData = {
-                model: 'stabilityai/stable-diffusion-xl-base-1.0',
+                model: 'flux-pro',
                 prompt: optimizedPrompt,
-                n: 1,
-                size: "1024x1024",
-                response_format: "b64_json"
+                width: 1024,
+                height: 1024,
+                num_inference_steps: 20,
+                guidance_scale: 7.5
             };
 
-            console.log('📤 Données envoyées à AIMLAPI:', JSON.stringify(requestData, null, 2));
+            console.log('📤 Données envoyées à Pi API:', JSON.stringify(requestData, null, 2));
 
-            const response = await axios.post(`${this.baseURL}/images/generations`, requestData, {
+            const response = await axios.post(`${this.baseURL}/generate/image`, requestData, {
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json'
@@ -54,52 +55,35 @@ class AimlApiClient {
                 timeout: 60000
             });
 
-            console.log('🔍 Statut réponse AIMLAPI:', response.status);
+            console.log('🔍 Statut réponse Pi API:', response.status);
             console.log('🔍 Données reçues:', response.data ? 'Oui' : 'Non');
 
-            if (response.data && response.data.data && response.data.data.length > 0) {
-                const imageData = response.data.data[0];
+            if (response.data && response.data.image_url) {
+                const imageUrl = response.data.image_url;
+                console.log('🔍 URL reçue de Pi API:', imageUrl ? imageUrl.substring(0, 100) + '...' : 'null');
                 
-                let imageUrl = null;
-                if (imageData.url) {
-                    imageUrl = imageData.url;
-                } else if (imageData.b64_json) {
-                    // Image en base64
-                    const base64Image = `data:image/png;base64,${imageData.b64_json}`;
-                    await this.saveBase64Image(base64Image, outputPath);
-                    console.log(`✅ Image AIMLAPI générée: ${outputPath}`);
-                    return outputPath;
-                } else if (typeof imageData === 'string') {
-                    imageUrl = imageData;
-                }
-                
-                console.log('🔍 Type de réponse AIMLAPI:', typeof imageData);
-                console.log('🔍 URL reçue:', imageUrl ? imageUrl.substring(0, 100) + '...' : 'null');
-                
-                if (imageUrl) {
-                    try {
-                        if (imageUrl.startsWith('data:image')) {
-                            await this.saveBase64Image(imageUrl, outputPath);
-                        } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-                            await this.downloadAndSaveImage(imageUrl, outputPath);
-                        } else {
-                            const base64Image = `data:image/png;base64,${imageUrl}`;
-                            await this.saveBase64Image(base64Image, outputPath);
-                        }
-                        
-                        console.log(`✅ Image AIMLAPI générée: ${outputPath}`);
-                        return outputPath;
-                    } catch (urlError) {
-                        console.error('❌ Erreur traitement URL:', urlError.message);
-                        console.log('🔍 Données complètes:', JSON.stringify(response.data, null, 2));
+                try {
+                    if (imageUrl.startsWith('data:image')) {
+                        await this.saveBase64Image(imageUrl, outputPath);
+                    } else if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
+                        await this.downloadAndSaveImage(imageUrl, outputPath);
+                    } else {
+                        const base64Image = `data:image/png;base64,${imageUrl}`;
+                        await this.saveBase64Image(base64Image, outputPath);
                     }
+                    
+                    console.log(`✅ Image Pi API générée: ${outputPath}`);
+                    return outputPath;
+                } catch (urlError) {
+                    console.error('❌ Erreur traitement URL:', urlError.message);
+                    console.log('🔍 Données complètes:', JSON.stringify(response.data, null, 2));
                 }
             }
 
-            throw new Error('Aucune image générée par AIMLAPI - réponse vide');
+            throw new Error('Aucune image générée par Pi API - réponse vide');
 
         } catch (error) {
-            console.error('❌ Erreur génération AIMLAPI:', error.message);
+            console.error('❌ Erreur génération Pi API:', error.message);
             if (error.response) {
                 console.error('Response status:', error.response.status);
                 console.error('Response headers:', error.response.headers);
