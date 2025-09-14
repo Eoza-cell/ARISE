@@ -37,11 +37,11 @@ class AimlApiClient {
             console.log(`✨ Prompt final optimisé: "${optimizedPrompt}"`);
 
             const requestData = {
-                model: 'flux/schnell',
+                model: 'stabilityai/stable-diffusion-xl-base-1.0',
                 prompt: optimizedPrompt,
                 n: 1,
                 size: "1024x1024",
-                response_format: "url"
+                response_format: "b64_json"
             };
 
             console.log('📤 Données envoyées à AIMLAPI:', JSON.stringify(requestData, null, 2));
