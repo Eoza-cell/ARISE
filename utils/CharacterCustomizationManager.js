@@ -87,6 +87,21 @@ class CharacterCustomizationManager {
                 warrior: { label: 'Guerrier', description: 'Armure légère' },
                 mage: { label: 'Mage', description: 'Robes mystiques' },
                 rogue: { label: 'Voleur', description: 'Cuir sombre discret' }
+            },
+
+            kingdom: {
+                AEGYRIA: { label: '🏰 Aegyria', description: 'Royaume doré de l\'honneur et de la chevalerie' },
+                SOMBRENUIT: { label: '🌙 Sombrenuit', description: 'Terres mystérieuses de la magie lunaire' },
+                KHELOS: { label: '🏜️ Khelos', description: 'Empire du désert aux ruines antiques' },
+                ABRANTIS: { label: '🌊 Abrantis', description: 'Cités côtières aux flottes puissantes' },
+                VARHA: { label: '🏔️ Varha', description: 'Montagnes glacées des chasseurs de bêtes' },
+                SYLVARIA: { label: '🌲 Sylvaria', description: 'Forêts enchantées des druides elfiques' },
+                ECLYPSIA: { label: '🌑 Eclypsia', description: 'Terres sombres sous l\'éclipse éternelle' },
+                TERRE_DESOLE: { label: '💀 Terre Désolée', description: 'Terres post-apocalyptiques des survivants' },
+                DRAK_TARR: { label: '🔥 Drak\'Tarr', description: 'Pics volcaniques des forgerons-dragons' },
+                URVALA: { label: '🔮 Urvala', description: 'Royaume mystique des alchimistes' },
+                OMBREFIEL: { label: '👤 Ombrefiel', description: 'Domaine des assassins et espions' },
+                KHALDAR: { label: '⚡ Khaldar', description: 'Terres électrifiées de la technologie magique' }
             }
         };
         
@@ -100,11 +115,12 @@ class CharacterCustomizationManager {
             'eyeColor',
             'bodyType',
             'height',
-            'clothing'
+            'clothing',
+            'kingdom'
         ];
         
         // Étapes où générer un preview
-        this.previewSteps = ['skinTone', 'hairColor', 'eyeColor', 'clothing'];
+        this.previewSteps = ['skinTone', 'hairColor', 'eyeColor', 'clothing', 'kingdom'];
     }
 
     /**
@@ -605,7 +621,7 @@ class CharacterCustomizationManager {
                 playerId: playerId,
                 name: `${selections.gender?.key === 'male' ? 'Guerrier' : 'Guerrière'}_${playerNumber.slice(-4)}`,
                 gender: selections.gender?.key || 'male',
-                kingdom: 'ASTORIA', // Royaume par défaut
+                kingdom: selections.kingdom?.key || 'AEGYRIA', // Royaume choisi ou par défaut
                 order: null,
                 level: 1,
                 experience: 0,

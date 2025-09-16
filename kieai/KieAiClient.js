@@ -135,14 +135,21 @@ class KieAiClient {
 
     // Méthodes spécialisées pour le RPG
     async generateCharacterPortrait(character, outputPath, options = {}) {
-        const prompt = `portrait of ${character.gender} character named ${character.name} from ${character.kingdom} kingdom, 
-                       RPG character, fantasy medieval setting, detailed face, ${character.gender === 'female' ? 'beautiful woman' : 'handsome man'}`;
+        const gender = character.gender || 'male';
+        const name = character.name || 'character';
+        const kingdom = character.kingdom || 'fantasy';
+        
+        const prompt = `portrait of ${gender} character named ${name} from ${kingdom} kingdom, 
+                       RPG character, fantasy medieval setting, detailed face, ${gender === 'female' ? 'beautiful woman' : 'handsome man'}`;
         
         return this.generateImage(prompt, outputPath, { ...options, perspective: 'portrait' });
     }
 
     async generateKingdomLandscape(kingdom, outputPath, options = {}) {
-        const prompt = `fantasy landscape of ${kingdom.name} kingdom, ${kingdom.geography}, 
+        const name = kingdom?.name || kingdom || 'fantasy';
+        const geography = kingdom?.geography || 'mystical lands';
+        
+        const prompt = `fantasy landscape of ${name} kingdom, ${geography}, 
                        medieval fantasy setting, epic landscape, cinematic view`;
         
         return this.generateImage(prompt, outputPath, { ...options, perspective: 'landscape' });

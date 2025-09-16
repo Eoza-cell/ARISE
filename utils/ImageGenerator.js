@@ -207,7 +207,7 @@ class ImageGenerator {
             if (this.hasKieAI && this.kieaiClient) {
                 try {
                     console.log(`🎨 Génération image d'action avec KieAI (vue première personne forcée)...`);
-                    const prompt = `${character.gender} ${character.name} from ${character.kingdom} kingdom, ${action}, ${narration}, RPG character action, first person view, POV`;
+                    const prompt = `${character.gender || 'warrior'} ${character.name || 'character'} from ${character.kingdom || 'fantasy'} kingdom, ${action}, ${narration}, RPG character action, first person view, POV`;
                     await this.kieaiClient.generateCombatScene(prompt, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                     if (imageBuffer) {
