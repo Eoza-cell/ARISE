@@ -114,7 +114,7 @@ class GameEngine {
             if (!response) {
                 // Récupérer le personnage du joueur pour les actions de jeu
                 const character = await dbManager.getCharacterByPlayer(player.id);
-                
+
                 if (!character) {
                     return {
                         text: `❌ Tu n'as pas encore de personnage !\n\n` +
@@ -376,7 +376,7 @@ class GameEngine {
             // Si c'est un autre message texte, redemander l'image
             return {
                 text: `📸 **En attente de ta photo de visage...**\n\n` +
-                      `🖼️ Envoie une image de ton visage ou écris "SANS_PHOTO" pour continuer sans photo personnalisée.`
+                      `🖼️ Envoie une photo de ton visage ou écris "SANS_PHOTO" pour continuer sans photo personnalisée.`
             };
         }
 
@@ -1351,18 +1351,18 @@ class GameEngine {
             // Essayer de générer une image et audio spécifique pour le PNJ
             let npcImage = null;
             let dialogueAudio = null;
-            
+
             if (targetNPC === 'Ogun') {
                 try {
                     npcImage = await this.ogunGuide.getImage(); // Obtenir l'image d'Ogun
-                    
+
                     // Générer l'audio du dialogue avec Ogun
                     const dialogueResult = await imageGenerator.generateDialogueImage(character, targetNPC, narration.text || narration, {
                         style: '3d',
                         perspective: 'second_person'
                     });
                     dialogueAudio = dialogueResult.audio;
-                    
+
                 } catch (error) {
                     console.error('⚠️ Erreur lors de la génération du dialogue Ogun:', error);
                     npcImage = await imageGenerator.generateCharacterImage(character); // Fallback vers l'image du personnage

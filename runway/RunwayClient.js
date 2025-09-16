@@ -223,6 +223,17 @@ class RunwayClient {
         return `${cleanPrompt}, ${qualityKeywords}`;
     }
 
+    // Alias pour generateVideoFromText
+    async generateVideo(prompt, imagePath = null) {
+        const outputPath = path.join(__dirname, '../temp', `video_${Date.now()}.mp4`);
+        
+        if (imagePath) {
+            return await this.generateVideoFromImage(imagePath, prompt, outputPath);
+        } else {
+            return await this.generateVideoFromText(prompt, outputPath);
+        }
+    }
+
     // Méthodes spécialisées pour le jeu
     async generateCombatVideo(combatContext, outputPath) {
         const prompt = `Epic fantasy combat scene: ${combatContext.attacker.name} fighting ${combatContext.defender.name} with ${combatContext.weapon || 'sword'}, dynamic action, medieval setting, dramatic lighting, smooth camera movement`;

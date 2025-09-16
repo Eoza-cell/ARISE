@@ -911,9 +911,17 @@ class ImageGenerator {
             if (this.hasPollinations && this.pollinationsClient) {
                 try {
                     const audioPath = path.join(this.tempPath, `narration_audio_${character.id}_${Date.now()}.mp3`);
-                    await this.pollinationsClient.generateNarrationVoice(narration, audioPath);
-                    audioBuffer = await fs.readFile(audioPath).catch(() => null);
-                    console.log('✅ Audio narration généré par Pollinations GRATUIT');
+                    const audioResult = await this.pollinationsClient.generateNarrationVoice(narration, audioPath);
+                    
+                    // Seulement si un fichier audio a été créé
+                    if (audioResult) {
+                        audioBuffer = await fs.readFile(audioPath).catch(() => null);
+                        if (audioBuffer) {
+                            console.log('✅ Audio narration généré');
+                        }
+                    } else {
+                        console.log('⚠️ Génération vocale désactivée');
+                    }
                 } catch (voiceError) {
                     console.log('⚠️ Erreur génération vocale narration:', voiceError.message);
                 }

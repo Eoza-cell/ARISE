@@ -142,47 +142,16 @@ class PollinationsClient {
      */
     async generateVoice(text, outputPath, options = {}) {
         try {
-            console.log(`🎙️ Génération vocale Pollinations GRATUITE avec texte: "${text.substring(0, 50)}..."`);
+            console.log(`🎙️ Tentative génération vocale avec texte: "${text.substring(0, 50)}..."`);
 
-            // Configuration vocale
-            const voice = options.voice || 'alloy'; // Voix par défaut
-            const speed = options.speed || 1.0;
-            const language = options.language || 'fr'; // Français par défaut
-
-            // URL de l'API vocale Pollinations (hypothétique - ajuster selon leur vraie API)
-            const voiceUrl = `https://text2audio.pollinations.ai/prompt/${encodeURIComponent(text)}?voice=${voice}&speed=${speed}&language=${language}`;
-            
-            console.log(`🎙️ Génération vocale depuis: ${voiceUrl.substring(0, 100)}...`);
-            
-            // Télécharger l'audio directement
-            const response = await axios.get(voiceUrl, {
-                responseType: 'arraybuffer',
-                timeout: 60000,
-                headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-                }
-            });
-
-            // Créer le dossier si nécessaire
-            const dir = path.dirname(outputPath);
-            await fs.mkdir(dir, { recursive: true });
-            
-            // Sauvegarder l'audio
-            await fs.writeFile(outputPath, Buffer.from(response.data));
-            console.log(`✅ Audio Pollinations généré GRATUITEMENT: ${outputPath}`);
-            
-            return outputPath;
+            // Pour l'instant, Pollinations n'a pas d'API vocale publique
+            // On utilise directement le fallback
+            console.log('⚠️ API vocale Pollinations non disponible, utilisation du fallback');
+            return await this.generateFallbackVoice(text, outputPath);
 
         } catch (error) {
-            console.error('❌ Erreur génération vocale Pollinations:', error.message);
-            
-            // Fallback: générer un fichier audio basique avec synthèse vocale système
-            try {
-                return await this.generateFallbackVoice(text, outputPath);
-            } catch (fallbackError) {
-                console.error('❌ Erreur fallback vocal:', fallbackError.message);
-                throw error;
-            }
+            console.error('❌ Erreur génération vocale:', error.message);
+            throw error;
         }
     }
 
@@ -190,15 +159,16 @@ class PollinationsClient {
      * Fallback pour génération vocale si Pollinations ne fonctionne pas
      */
     async generateFallbackVoice(text, outputPath) {
-        console.log('🔄 Fallback: génération vocale système...');
+        console.log('🔄 Fallback: génération vocale désactivée temporairement');
         
-        // Utiliser une synthèse vocale basique (TTS système ou API alternative)
-        // Pour l'instant, créer un fichier placeholder
-        const placeholderAudio = Buffer.from('AUDIO_PLACEHOLDER_' + text.substring(0, 100));
-        await fs.writeFile(outputPath, placeholderAudio);
+        // Créer le dossier si nécessaire
+        const dir = path.dirname(outputPath);
+        await fs.mkdir(dir, { recursive: true });
         
-        console.log(`⚠️ Audio placeholder généré: ${outputPath}`);
-        return outputPath;
+        // Retourner null pour indiquer qu'aucun audio n'a été généré
+        // Cela évitera d'envoyer des fichiers audio vides
+        console.log(`⚠️ Génération vocale désactivée - aucun fichier audio créé`);
+        return null;
     }
 
     /**
