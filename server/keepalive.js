@@ -75,7 +75,8 @@ const server = http.createServer((req, res) => {
 // Démarrer le serveur keep-alive
 server.listen(port, '0.0.0.0', () => {
     console.log(`🌐 Serveur keep-alive démarré sur le port ${port}`);
-    console.log(`📡 URL pour UptimeRobot: https://votre-repl.replit.app/health`);
+    const replitUrl = process.env.REPLIT_DEPLOYMENT_DOMAIN || process.env.REPLIT_DEV_DOMAIN || 'your-repl.replit.dev';
+    console.log(`📡 URL pour UptimeRobot: https://${replitUrl}/health`);
 });
 
 // Gestion propre de l'arrêt

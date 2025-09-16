@@ -59,7 +59,8 @@ class FrictionUltimateBot {
                 process.env.WHATSAPP_BROWSER_NAME || 'Friction Ultimate',
                 process.env.WHATSAPP_BROWSER_TYPE || 'Desktop', 
                 process.env.WHATSAPP_BROWSER_VERSION || '1.0.0'
-            ]
+            ],
+            logger: require('pino')({ level: 'error' }) // Reduce sensitive logging
         });
 
         // Gestion des événements de connexion
