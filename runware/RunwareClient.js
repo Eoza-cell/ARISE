@@ -1,4 +1,3 @@
-
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
@@ -8,7 +7,7 @@ class RunwareClient {
         this.apiKey = process.env.RUNWARE_API_KEY || 'ju33zckXLix4hrn9sLopAexhz2x923wq';
         this.baseURL = 'https://api.runware.ai/v1';
         this.isAvailable = false;
-        
+
         this.initializeClient();
     }
 
@@ -58,7 +57,7 @@ class RunwareClient {
 
             console.log('📤 Envoi requête Runware...');
 
-            const response = await axios.post(`${this.baseURL}/image/inference`, requestData, {
+            const response = await axios.post(`${this.baseURL}/image/inference`, [requestData], {
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json'
@@ -68,14 +67,14 @@ class RunwareClient {
 
             console.log('📥 Réponse Runware reçue');
 
-            if (response.data && response.data.data && response.data.data.length > 0) {
-                const imageData = response.data.data[0];
-                
+            if (response.data && response.data.length > 0) {
+                const imageData = response.data[0];
+
                 if (imageData.imageBase64) {
                     // Décoder et sauvegarder l'image
                     const imageBuffer = Buffer.from(imageData.imageBase64, 'base64');
                     await fs.writeFile(outputPath, imageBuffer);
-                    
+
                     console.log(`✅ Image Runware générée: ${outputPath}`);
                     return outputPath;
                 } else {
@@ -97,26 +96,26 @@ class RunwareClient {
     optimizePromptForRunware(prompt, options = {}) {
         const style = options.style || '3d';
         const perspective = options.perspective || 'first_person';
-        
+
         let optimizedPrompt = prompt;
-        
+
         // Ajouter des mots-clés de qualité
         const qualityKeywords = "high quality, detailed, professional, masterpiece";
-        
+
         // Ajouter des mots-clés de style
         if (style === '3d') {
             optimizedPrompt += ", 3D rendered, realistic textures, volumetric lighting";
         } else {
             optimizedPrompt += ", 2D illustration, digital art";
         }
-        
+
         // Ajouter des mots-clés de perspective
         if (perspective === 'first_person') {
             optimizedPrompt += ", first person view, POV perspective";
         } else if (perspective === 'third_person') {
             optimizedPrompt += ", third person view, full scene";
         }
-        
+
         return `${optimizedPrompt}, ${qualityKeywords}`;
     }
 
@@ -124,9 +123,9 @@ class RunwareClient {
     async generateCharacterPortrait(character, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
         const kingdomDesc = this.getKingdomDescription(character.kingdom);
-        
+
         const prompt = `Portrait of ${character.name}, detailed ${genderDesc} from ${character.kingdom} kingdom, level ${character.level}, ${kingdomDesc}, fantasy RPG character, epic armor and weapons`;
-        
+
         return await this.generateImage(prompt, outputPath, {
             ...options,
             width: 768,
@@ -138,9 +137,9 @@ class RunwareClient {
     async generateActionImage(character, action, narration, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
         const kingdomDesc = this.getKingdomDescription(character.kingdom);
-        
+
         const prompt = `${genderDesc} ${character.name} from ${character.kingdom} kingdom, ${action}, ${narration}, ${kingdomDesc}, dynamic action scene, epic fantasy combat`;
-        
+
         return await this.generateImage(prompt, outputPath, {
             ...options,
             width: 1024,
@@ -151,7 +150,7 @@ class RunwareClient {
 
     async generateMenuImage(outputPath) {
         const prompt = "Epic fantasy RPG main menu background, medieval castle, magical atmosphere, cinematic lighting, game interface, fantasy landscape";
-        
+
         return await this.generateImage(prompt, outputPath, {
             style: '3d',
             perspective: 'third_person',
@@ -164,7 +163,7 @@ class RunwareClient {
     async generateKingdomImage(kingdomId, kingdomData, outputPath, options = {}) {
         const kingdomDesc = this.getKingdomDescription(kingdomId);
         const prompt = `Fantasy kingdom of ${kingdomId}, ${kingdomDesc}, epic landscape, medieval architecture, atmospheric lighting, detailed environment`;
-        
+
         return await this.generateImage(prompt, outputPath, {
             ...options,
             width: 1024,
