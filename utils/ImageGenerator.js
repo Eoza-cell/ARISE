@@ -853,7 +853,7 @@ class ImageGenerator {
 
             if (!this.hasPollinations || !this.pollinationsClient) {
                 console.log('⚠️ Pollinations non disponible pour dialogue');
-                return null;
+                return { image: null, audio: null };
             }
 
             const imageOptions = {
@@ -863,23 +863,68 @@ class ImageGenerator {
             };
 
             const imagePath = path.join(this.tempPath, `dialogue_${character.id}_${Date.now()}.png`);
+            const audioPath = path.join(this.tempPath, `dialogue_audio_${character.id}_${Date.now()}.mp3`);
 
-            // Créer le prompt pour dialogue
+            // Créer le prompt pour dialogue style Skyrim
             const genderDesc = character.gender === 'male' ? 'male' : 'female';
-            const prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom}, talking with ${npcName}, medieval fantasy conversation scene, detailed portrait style, dialogue interaction`;
+            const prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom}, talking with ${npcName}, Skyrim style medieval fantasy conversation scene, detailed portrait style, dialogue interaction, Elder Scrolls atmosphere`;
 
+            // Générer l'image
             await this.pollinationsClient.generateImage(prompt, imagePath, imageOptions);
             const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
-            if (imageBuffer) {
-                console.log('✅ Image dialogue générée par Pollinations GRATUIT');
-                return imageBuffer;
+            // Générer l'audio du dialogue
+            let audioBuffer = null;
+            try {
+                await this.pollinationsClient.generateDialogueVoice(character, npcName, dialogue, audioPath);
+                audioBuffer = await fs.readFile(audioPath).catch(() => null);
+                console.log('✅ Audio dialogue généré par Pollinations GRATUIT');
+            } catch (voiceError) {
+                console.log('⚠️ Erreur génération vocale dialogue:', voiceError.message);
             }
 
-            return null;
+            if (imageBuffer) {
+                console.log('✅ Image dialogue générée par Pollinations GRATUIT');
+                return { 
+                    image: imageBuffer, 
+                    audio: audioBuffer 
+                };
+            }
+
+            return { image: null, audio: audioBuffer };
         } catch (error) {
-            console.error('❌ Erreur génération image dialogue:', error.message);
-            return null;
+            console.error('❌ Erreur génération dialogue:', error.message);
+            return { image: null, audio: null };
+        }
+    }
+
+    /**
+     * Génère une image d'action avec narration vocale
+     */
+    async generateCharacterActionImageWithVoice(character, action, narration, options = {}) {
+        try {
+            const result = await this.generateCharacterActionImage(character, action, narration, options);
+            
+            // Générer aussi l'audio de narration
+            let audioBuffer = null;
+            if (this.hasPollinations && this.pollinationsClient) {
+                try {
+                    const audioPath = path.join(this.tempPath, `narration_audio_${character.id}_${Date.now()}.mp3`);
+                    await this.pollinationsClient.generateNarrationVoice(narration, audioPath);
+                    audioBuffer = await fs.readFile(audioPath).catch(() => null);
+                    console.log('✅ Audio narration généré par Pollinations GRATUIT');
+                } catch (voiceError) {
+                    console.log('⚠️ Erreur génération vocale narration:', voiceError.message);
+                }
+            }
+
+            return {
+                image: result,
+                audio: audioBuffer
+            };
+        } catch (error) {
+            console.error('❌ Erreur génération action avec voix:', error);
+            throw error;
         }
     }
 

@@ -622,11 +622,15 @@ class GameEngine {
                                `${equipmentWarning}${detectionWarning}${consequencesText}\n\n` +
                                `💭 ${isAlive ? '*Que fais-tu ensuite ?*' : '*Vous renaissez au Sanctuaire... Que faites-vous ?*'}`;
 
-            // Essayer de générer l'image et la vidéo, mais ne pas bloquer l'envoi si ça échoue
+            // Essayer de générer l'image, l'audio et la vidéo, mais ne pas bloquer l'envoi si ça échoue
             let actionImage = null;
+            let actionAudio = null;
             let actionVideo = null;
             try {
-                actionImage = await imageGenerator.generateCharacterActionImage(character, message, narration);
+                // Générer image avec audio (style Skyrim)
+                const mediaResult = await imageGenerator.generateCharacterActionImageWithVoice(character, message, narration);
+                actionImage = mediaResult.image;
+                actionAudio = mediaResult.audio;
 
                 // Générer une vidéo pour cette action
                 const imagePath = actionImage ? path.join(__dirname, '../temp', `action_temp_${Date.now()}.png`) : null;
@@ -648,12 +652,13 @@ class GameEngine {
                     }
                 }
             } catch (mediaError) {
-                console.error('❌ Erreur génération image/vidéo:', mediaError.message);
+                console.error('❌ Erreur génération média:', mediaError.message);
             }
 
             return {
                 text: responseText,
                 image: actionImage,
+                audio: actionAudio,
                 video: actionVideo
             };
 
@@ -1333,22 +1338,44 @@ class GameEngine {
                                `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
                                `💰 **Argent :** ${character.coins} pièces d'or`;
 
-            // Essayer de générer une image spécifique pour le PNJ, sinon utiliser l'image du personnage
+            // Essayer de générer une image et audio spécifique pour le PNJ
             let npcImage = null;
+            let dialogueAudio = null;
+            
             if (targetNPC === 'Ogun') {
                 try {
                     npcImage = await this.ogunGuide.getImage(); // Obtenir l'image d'Ogun
+                    
+                    // Générer l'audio du dialogue avec Ogun
+                    const dialogueResult = await imageGenerator.generateDialogueImage(character, targetNPC, narration.text || narration, {
+                        style: '3d',
+                        perspective: 'second_person'
+                    });
+                    dialogueAudio = dialogueResult.audio;
+                    
                 } catch (error) {
-                    console.error('⚠️ Erreur lors de la récupération de l\'image d\'Ogun:', error);
+                    console.error('⚠️ Erreur lors de la génération du dialogue Ogun:', error);
                     npcImage = await imageGenerator.generateCharacterImage(character); // Fallback vers l'image du personnage
                 }
             } else {
-                npcImage = await imageGenerator.generateCharacterImage(character); // Image du personnage par défaut
+                // Générer image et audio pour autres PNJ
+                try {
+                    const dialogueResult = await imageGenerator.generateDialogueImage(character, targetNPC, narration.text || narration, {
+                        style: '3d',
+                        perspective: 'second_person'
+                    });
+                    npcImage = dialogueResult.image || await imageGenerator.generateCharacterImage(character);
+                    dialogueAudio = dialogueResult.audio;
+                } catch (error) {
+                    console.error('⚠️ Erreur génération dialogue PNJ:', error);
+                    npcImage = await imageGenerator.generateCharacterImage(character);
+                }
             }
 
             return {
                 text: responseText,
-                image: npcImage
+                image: npcImage,
+                audio: dialogueAudio
             };
 
         } catch (error) {

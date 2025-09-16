@@ -186,7 +186,9 @@ class FrictionUltimateBot {
                     text: result.text,
                     image: result.image,
                     sticker: result.sticker,
-                    isGuide: result.isGuide
+                    isGuide: result.isGuide,
+                    audio: result.audio, // Assurez-vous que le résultat du jeu contient un champ 'audio'
+                    video: result.video
                 });
 
                 // Envoyer la vidéo si générée (avec délai pour éviter les conflits)
@@ -257,7 +259,7 @@ class FrictionUltimateBot {
                         caption: '🔥 Ogun Montgomery'
                     });
                     console.log('✅ Sticker Ogun envoyé');
-                    
+
                     // Petit délai avant le texte
                     setTimeout(async () => {
                         await this.sock.sendMessage(chatId, {
@@ -277,26 +279,73 @@ class FrictionUltimateBot {
                 }
             }
 
-            if (response.image && response.text) {
-                // Envoi d'image avec caption
-                await this.sock.sendMessage(chatId, {
+            // Envoyer la réponse avec support audio
+            if (response.image && response.video && response.audio) {
+                // Envoyer l'image avec le texte
+                await sock.sendMessage(chatId, {
                     image: response.image,
                     caption: response.text
                 });
-                console.log('✅ Image avec texte envoyée');
-            } else if (response.image) {
-                // Envoi d'image seule
-                await this.sock.sendMessage(chatId, {
+
+                // Puis l'audio
+                await sock.sendMessage(chatId, {
+                    audio: response.audio,
+                    mimetype: 'audio/mp3',
+                    caption: '🎙️ Narration vocale'
+                });
+
+                // Puis la vidéo
+                await sock.sendMessage(chatId, {
+                    video: response.video,
+                    caption: '🎬 Vidéo de l\'action'
+                });
+            } else if (response.image && response.audio) {
+                // Envoyer l'image avec le texte
+                await sock.sendMessage(chatId, {
                     image: response.image,
-                    caption: '🎨 Image générée'
+                    caption: response.text
                 });
-                console.log('✅ Image seule envoyée');
-            } else if (response.text) {
-                // Envoi de texte simple
-                await this.sock.sendMessage(chatId, {
-                    text: response.text
+
+                // Puis l'audio
+                await sock.sendMessage(chatId, {
+                    audio: response.audio,
+                    mimetype: 'audio/mp3',
+                    caption: '🎙️ Message vocal'
                 });
-                console.log('✅ Texte seul envoyé');
+            } else if (response.image && response.video) {
+                // Envoyer l'image d'abord
+                await sock.sendMessage(chatId, {
+                    image: response.image,
+                    caption: response.text
+                });
+
+                // Puis la vidéo
+                await sock.sendMessage(chatId, {
+                    video: response.video,
+                    caption: '🎬 Vidéo de l\'action'
+                });
+            } else if (response.image) {
+                await sock.sendMessage(chatId, {
+                    image: response.image,
+                    caption: response.text
+                });
+            } else if (response.audio) {
+                // Envoyer d'abord le texte
+                await sock.sendMessage(chatId, { text: response.text });
+
+                // Puis l'audio
+                await sock.sendMessage(chatId, {
+                    audio: response.audio,
+                    mimetype: 'audio/mp3',
+                    caption: '🎙️ Message vocal'
+                });
+            } else if (response.video) {
+                await sock.sendMessage(chatId, {
+                    video: response.video,
+                    caption: response.text
+                });
+            } else {
+                await sock.sendMessage(chatId, { text: response.text });
             }
         } catch (error) {
             console.error('❌ Erreur lors de l\'envoi de la réponse:', error);
