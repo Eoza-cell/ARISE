@@ -269,7 +269,22 @@ class ImageGenerator {
 
             const imagePath = path.join(this.tempPath, `character_action_${character.id}_${Date.now()}.png`);
 
-            // Essayer Runware d'abord
+            // Essayer Pollinations d'abord (GRATUIT)
+            if (this.hasPollinations && this.pollinationsClient) {
+                try {
+                    console.log(`🎨 Génération image d'action avec Pollinations GRATUIT (vue première personne forcée)...`);
+                    await this.pollinationsClient.generateActionImage(character, action, narration, imagePath, imageOptions);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log('✅ Image action générée par Pollinations GRATUIT (vue première personne)');
+                        return imageBuffer;
+                    }
+                } catch (pollinationsError) {
+                    console.log('⚠️ Erreur Pollinations action, fallback vers Runware:', pollinationsError.message);
+                }
+            }
+
+            // Fallback vers Runware (payant)
             if (this.hasRunware && this.runwareClient) {
                 try {
                     console.log(`🎨 Génération image d'action avec Runware (vue première personne forcée)...`);
