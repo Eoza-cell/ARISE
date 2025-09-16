@@ -6,6 +6,7 @@ const BlenderClient = require('../blender/BlenderClient');
 const RunwayClient = require('../runway/RunwayClient');
 const KieAiClient = require('../kieai/KieAiClient');
 const RunwareClient = require('../runware/RunwareClient');
+const PollinationsClient = require('../pollinations/PollinationsClient');
 
 class ImageGenerator {
     constructor() {
@@ -13,12 +14,25 @@ class ImageGenerator {
         this.assetsPath = path.join(__dirname, '../assets');
         this.tempPath = path.join(__dirname, '../temp');
 
-        // Initialisation de Runware Client (générateur principal)
+        // Initialisation de Pollinations Client (générateur principal GRATUIT)
+        try {
+            this.pollinationsClient = new PollinationsClient();
+            this.hasPollinations = this.pollinationsClient.hasValidClient();
+            if (this.hasPollinations) {
+                console.log('✅ PollinationsClient initialisé - Générateur principal GRATUIT');
+            }
+        } catch (error) {
+            console.error('❌ Erreur initialisation PollinationsClient:', error.message);
+            this.pollinationsClient = null;
+            this.hasPollinations = false;
+        }
+
+        // Initialisation de Runware Client (générateur payant)
         try {
             this.runwareClient = new RunwareClient();
             this.hasRunware = this.runwareClient.hasValidClient();
             if (this.hasRunware) {
-                console.log('✅ RunwareClient initialisé - Générateur principal');
+                console.log('✅ RunwareClient initialisé - Générateur payant (désactivé par défaut)');
             }
         } catch (error) {
             console.error('❌ Erreur initialisation RunwareClient:', error.message);
@@ -89,7 +103,9 @@ class ImageGenerator {
         this.groqClient = null;
 
         // Déterminer le générateur principal
-        if (this.hasRunware) {
+        if (this.hasPollinations) {
+            console.log('🎨 Mode: Groq (narration) + Pollinations GRATUIT (images principales) + Fallbacks');
+        } else if (this.hasRunware) {
             console.log('🎨 Mode: Groq (narration) + Runware (images principales) + KieAI/Freepik (fallback)');
         } else if (this.hasKieAI) {
             console.log('🎨 Mode: Groq (narration) + KieAI (images principales) + Freepik (fallback)');
@@ -168,7 +184,24 @@ class ImageGenerator {
 
             const imagePath = path.join(this.tempPath, 'menu_main_kieai.png');
 
-            // Essayer Runware d'abord
+            // Essayer Pollinations d'abord (GRATUIT)
+            if (this.hasPollinations && this.pollinationsClient) {
+                try {
+                    console.log('🎨 Génération image menu avec Pollinations GRATUIT...');
+                    await this.pollinationsClient.generateMenuImage(imagePath);
+
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log('✅ Image menu générée par Pollinations GRATUIT');
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (pollinationsError) {
+                    console.log('⚠️ Erreur Pollinations menu, fallback vers Runware:', pollinationsError.message);
+                }
+            }
+
+            // Fallback vers Runware (payant)
             if (this.hasRunware && this.runwareClient) {
                 try {
                     console.log('🎨 Génération image menu avec Runware...');
