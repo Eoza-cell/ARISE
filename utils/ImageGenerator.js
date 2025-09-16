@@ -5,6 +5,7 @@ const FreepikClient = require('../freepik/FreepikClient');
 const BlenderClient = require('../blender/BlenderClient');
 const RunwayClient = require('../runway/RunwayClient');
 const KieAiClient = require('../kieai/KieAiClient');
+const RunwareClient = require('../runware/RunwareClient');
 
 class ImageGenerator {
     constructor() {
@@ -12,12 +13,25 @@ class ImageGenerator {
         this.assetsPath = path.join(__dirname, '../assets');
         this.tempPath = path.join(__dirname, '../temp');
 
-        // Initialisation de KieAI Client (générateur principal)
+        // Initialisation de Runware Client (générateur principal)
+        try {
+            this.runwareClient = new RunwareClient();
+            this.hasRunware = this.runwareClient.hasValidClient();
+            if (this.hasRunware) {
+                console.log('✅ RunwareClient initialisé - Générateur principal');
+            }
+        } catch (error) {
+            console.error('❌ Erreur initialisation RunwareClient:', error.message);
+            this.runwareClient = null;
+            this.hasRunware = false;
+        }
+
+        // Initialisation de KieAI Client (fallback)
         try {
             this.kieaiClient = new KieAiClient();
             this.hasKieAI = this.kieaiClient.hasValidClient();
             if (this.hasKieAI) {
-                console.log('✅ KieAiClient initialisé - Générateur principal');
+                console.log('✅ KieAiClient initialisé - Générateur de fallback');
             }
         } catch (error) {
             console.error('❌ Erreur initialisation KieAiClient:', error.message);
@@ -75,7 +89,9 @@ class ImageGenerator {
         this.groqClient = null;
 
         // Déterminer le générateur principal
-        if (this.hasKieAI) {
+        if (this.hasRunware) {
+            console.log('🎨 Mode: Groq (narration) + Runware (images principales) + KieAI/Freepik (fallback)');
+        } else if (this.hasKieAI) {
             console.log('🎨 Mode: Groq (narration) + KieAI (images principales) + Freepik (fallback)');
         } else if (this.hasFreepik) {
             console.log('🎨 Mode: Groq (narration) + Freepik (images uniquement)');
@@ -152,10 +168,27 @@ class ImageGenerator {
 
             const imagePath = path.join(this.tempPath, 'menu_main_kieai.png');
 
-            // Essayer KieAI d'abord
+            // Essayer Runware d'abord
+            if (this.hasRunware && this.runwareClient) {
+                try {
+                    console.log('🎨 Génération image menu avec Runware...');
+                    await this.runwareClient.generateMenuImage(imagePath);
+
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log('✅ Image menu générée par Runware');
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (runwareError) {
+                    console.log('⚠️ Erreur Runware menu, fallback vers KieAI:', runwareError.message);
+                }
+            }
+
+            // Fallback vers KieAI
             if (this.hasKieAI && this.kieaiClient) {
                 try {
-                    console.log('🎨 Génération image menu avec KieAI...');
+                    console.log('🎨 Génération image menu avec KieAI (fallback)...');
                     const prompt = 'RPG main menu background, medieval fantasy game interface, epic fantasy landscape, game UI, medieval castle, magical atmosphere';
                     await this.kieaiClient.generateImage(prompt, imagePath, { style: '3d', perspective: 'landscape' });
 
@@ -203,10 +236,25 @@ class ImageGenerator {
 
             const imagePath = path.join(this.tempPath, `character_action_${character.id}_${Date.now()}.png`);
 
-            // Essayer KieAI d'abord
+            // Essayer Runware d'abord
+            if (this.hasRunware && this.runwareClient) {
+                try {
+                    console.log(`🎨 Génération image d'action avec Runware (vue première personne forcée)...`);
+                    await this.runwareClient.generateActionImage(character, action, narration, imagePath, imageOptions);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log('✅ Image action générée par Runware (vue première personne)');
+                        return imageBuffer;
+                    }
+                } catch (runwareError) {
+                    console.log('⚠️ Erreur Runware action, fallback vers KieAI:', runwareError.message);
+                }
+            }
+
+            // Fallback vers KieAI
             if (this.hasKieAI && this.kieaiClient) {
                 try {
-                    console.log(`🎨 Génération image d'action avec KieAI (vue première personne forcée)...`);
+                    console.log(`🎨 Génération image d'action avec KieAI (fallback, vue première personne forcée)...`);
                     const prompt = `${character.gender || 'warrior'} ${character.name || 'character'} from ${character.kingdom || 'fantasy'} kingdom, ${action}, ${narration}, RPG character action, first person view, POV`;
                     await this.kieaiClient.generateCombatScene(prompt, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
@@ -266,10 +314,27 @@ class ImageGenerator {
                 nudity: options.nudity !== undefined ? options.nudity : this.allowNudity
             };
 
-            // Essayer KieAI d'abord
+            // Essayer Runware d'abord
+            if (this.hasRunware && this.runwareClient) {
+                try {
+                    console.log(`🎨 Génération image personnage ${character.name} avec Runware (vue première personne)...`);
+                    await this.runwareClient.generateCharacterPortrait(character, imagePath, imageOptions);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+
+                    if (imageBuffer) {
+                        console.log(`✅ Image personnage ${character.name} générée par Runware (vue première personne)`);
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (runwareError) {
+                    console.log(`⚠️ Erreur Runware personnage, fallback vers KieAI:`, runwareError.message);
+                }
+            }
+
+            // Fallback vers KieAI
             if (this.hasKieAI && this.kieaiClient) {
                 try {
-                    console.log(`🎨 Génération image personnage ${character.name} avec KieAI (vue première personne)...`);
+                    console.log(`🎨 Génération image personnage ${character.name} avec KieAI (fallback, vue première personne)...`);
                     await this.kieaiClient.generateCharacterPortrait(character, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
