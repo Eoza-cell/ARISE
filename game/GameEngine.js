@@ -469,12 +469,33 @@ class GameEngine {
             // Appliquer le système de combat Dark Souls strict
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
 
-            // Appliquer les dégâts potentiels (si action mal exécutée)
+            // Système de dégâts CONTRÔLÉ - seulement dans certaines situations
             let damageText = '';
-            if (actionAnalysis.potentialDamage > 0) {
-                const damage = Math.min(actionAnalysis.potentialDamage, character.currentLife);
+            let shouldTakeDamage = false;
+            
+            // Dégâts seulement si :
+            // 1. Action explicitement dangereuse (combat, escalade, etc.)
+            // 2. OU contre-attaque
+            // 3. OU énergie à zéro (épuisement)
+            const dangerousKeywords = ['attaque', 'combat', 'frappe', 'escalade', 'saute', 'courir', 'fonce'];
+            const isDangerousAction = dangerousKeywords.some(keyword => 
+                message.toLowerCase().includes(keyword)
+            );
+            
+            if (isDangerousAction && actionAnalysis.combatAdvantage === 'counter_attacked') {
+                shouldTakeDamage = true;
+            } else if (character.currentEnergy <= 0) {
+                shouldTakeDamage = true; // Épuisement = vulnérabilité
+            }
+            
+            if (shouldTakeDamage && actionAnalysis.potentialDamage > 0) {
+                // Dégâts réduits et plafonnés
+                const baseDamage = Math.max(1, Math.min(15, actionAnalysis.potentialDamage || 5));
+                const damage = Math.min(baseDamage, character.currentLife);
                 character.currentLife = Math.max(0, character.currentLife - damage);
-                damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV`;
+                damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV (action risquée)`;
+                
+                console.log(`⚔️ Dégâts appliqués: ${damage} PV (action: ${message}, situation: ${actionAnalysis.combatAdvantage})`);
             }
 
             // Récupération de stamina (utiliser la valeur clampée)
