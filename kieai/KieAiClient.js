@@ -5,7 +5,7 @@ const path = require('path');
 class KieAiClient {
     constructor() {
         this.apiKey = process.env.KIE_AI_API_KEY;
-        this.baseURL = 'https://api.kie.ai/v1'; // URL d'API Kie AI
+        this.baseURL = 'https://api.kie.ai/api/v1'; // URL d'API Kie AI
         this.isAvailable = true;
         
         if (!this.apiKey) {
@@ -39,15 +39,12 @@ class KieAiClient {
 
             const requestData = {
                 prompt: optimizedPrompt,
-                negative_prompt: this.buildNegativePrompt(style),
-                width: 1024,
-                height: 1024,
-                steps: 30,
-                guidance_scale: 7.5,
-                seed: Math.floor(Math.random() * 1000000)
+                quality: 'high', // low, medium, high
+                size: '1024x1024',
+                style: style === '3d' ? 'vivid' : 'natural'
             };
 
-            const response = await axios.post(`${this.baseURL}/text2img`, requestData, {
+            const response = await axios.post(`${this.baseURL}/gpt4o-image/generate`, requestData, {
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json',
@@ -56,25 +53,23 @@ class KieAiClient {
                 timeout: 60000
             });
 
-            if (response.data && response.data.images && response.data.images.length > 0) {
-                const imageData = response.data.images[0];
-                
-                // Gérer différents formats de réponse
-                if (imageData.url) {
-                    // Télécharger depuis l'URL
-                    await this.downloadImage(imageData.url, outputPath);
-                } else if (imageData.base64) {
-                    // Sauvegarder depuis base64
-                    const imageBuffer = Buffer.from(imageData.base64, 'base64');
-                    await fs.writeFile(outputPath, imageBuffer);
-                } else {
-                    throw new Error('Format de réponse Kie AI non reconnu');
-                }
-
+            // GPT-4o format: direct image URL
+            if (response.data && response.data.image_url) {
+                // Télécharger depuis l'URL
+                await this.downloadImage(response.data.image_url, outputPath);
                 console.log(`✅ Image Kie AI générée: ${outputPath}`);
                 return outputPath;
+            } else if (response.data && response.data.url) {
+                // Format alternatif avec 'url'
+                await this.downloadImage(response.data.url, outputPath);
+                console.log(`✅ Image Kie AI générée: ${outputPath}`);
+                return outputPath;
+            } else if (response.data && response.data.task_id) {
+                // Format async avec task_id - attendre ou récupérer plus tard
+                console.log(`🔄 Tâche Kie AI en cours: ${response.data.task_id}`);
+                throw new Error('Traitement asynchrone non implémenté - utilisation du fallback');
             } else {
-                throw new Error('Aucune image retournée par Kie AI');
+                throw new Error('Aucune image retournée par Kie AI - format de réponse inattendu');
             }
 
         } catch (error) {

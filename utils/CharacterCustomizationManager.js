@@ -586,14 +586,23 @@ class CharacterCustomizationManager {
             console.log(`🖼️ Image sauvée: ${imagePath}`);
             
             // Récupérer le joueur
-            const player = await this.dbManager.getPlayerByNumber(playerNumber);
+            const player = await this.dbManager.getPlayerByWhatsApp(playerNumber);
             if (!player) {
-                throw new Error('Joueur introuvable');
+                // Créer le joueur s'il n'existe pas
+                const newPlayer = await this.dbManager.createPlayer({
+                    whatsappNumber: playerNumber,
+                    username: `Joueur_${playerNumber.slice(-4)}`,
+                    lastActivity: new Date()
+                });
+                console.log(`✅ Nouveau joueur créé: ${newPlayer.id}`);
+                var playerId = newPlayer.id;
+            } else {
+                var playerId = player.id;
             }
             
             // Construire les données du personnage depuis les sélections
             const characterData = {
-                playerId: player.id,
+                playerId: playerId,
                 name: `${selections.gender?.key === 'male' ? 'Guerrier' : 'Guerrière'}_${playerNumber.slice(-4)}`,
                 gender: selections.gender?.key || 'male',
                 kingdom: 'ASTORIA', // Royaume par défaut
