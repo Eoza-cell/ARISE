@@ -71,7 +71,7 @@ class ImageGenerator {
             this.blenderClient = new BlenderClient();
             this.hasBlender = false; // Sera vérifié lors de la première utilisation
             console.log('🎨 BlenderClient initialisé - Vérification en cours...');
-            
+
             // Vérification asynchrone de la disponibilité
             this.initializeBlender();
         } catch (error) {
@@ -85,7 +85,7 @@ class ImageGenerator {
             this.runwayClient = new RunwayClient();
             this.hasRunway = false; // Sera vérifié lors de l'initialisation
             console.log('🎬 RunwayClient initialisé - Génération de vidéos activée');
-            
+
             // Vérifier la disponibilité
             this.initializeRunway();
         } catch (error) {
@@ -438,7 +438,7 @@ class ImageGenerator {
 
             if (this.hasFreepik && this.freepikClient) {
                 console.log(`🎨 Génération fiche personnage pour ${character.name} (vue première personne)...`);
-                
+
                 const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
                 const prompt = `Character sheet portrait of ${character.name}, detailed ${genderDesc} from ${character.kingdom} kingdom, level ${character.level}, power level ${character.powerLevel}, fantasy RPG character portrait, detailed armor and equipment, first person POV perspective`;
 
@@ -475,7 +475,7 @@ class ImageGenerator {
 
             if (this.hasFreepik && this.freepikClient) {
                 console.log(`🎨 Génération inventaire pour ${character.name} avec Freepik...`);
-                
+
                 const prompt = `RPG inventory interface for ${character.name}, fantasy game UI, detailed equipment slots, medieval style inventory screen, character equipment display`;
 
                 await this.freepikClient.generateImage(prompt, imagePath, {
@@ -614,7 +614,7 @@ class ImageGenerator {
         return descriptions[kingdom] || 'mysterious lands with unknown customs';
     }
 
-    
+
 
     // Initialisation asynchrone de Blender
     async initializeBlender() {
@@ -701,27 +701,19 @@ class ImageGenerator {
 
     async generateActionVideo(character, action, narration, imagePath = null) {
         try {
+            console.log('🎬 Génération vidéo d\'action avec RunwayML...');
+
             if (!this.hasRunway || !this.runwayClient) {
-                console.log('⚠️ RunwayML non disponible - pas de vidéo générée');
+                console.log('⚠️ RunwayClient non disponible pour vidéo');
                 return null;
             }
 
-            const videoPath = path.join(this.tempPath, `action_video_${character.id}_${Date.now()}.mp4`);
-            
-            console.log(`🎬 Génération vidéo d'action pour ${character.name}: ${action}`);
-            
-            const result = await this.runwayClient.generateCharacterActionVideo(character, action, imagePath, videoPath);
-            
-            if (result) {
-                console.log(`✅ Vidéo d'action générée: ${result}`);
-                return result;
-            } else {
-                console.log('⚠️ Aucune vidéo générée par RunwayML');
-                return null;
-            }
+            // Construire le prompt pour la vidéo
+            const videoPrompt = `${character.name} performing: ${action}. Medieval fantasy setting, cinematic movement, epic fantasy atmosphere`;
 
+            return await this.runwayClient.generateVideo(videoPrompt, imagePath);
         } catch (error) {
-            console.error('❌ Erreur génération vidéo d\'action:', error);
+            console.error('❌ Erreur génération vidéo:', error.message);
             return null;
         }
     }
@@ -734,9 +726,9 @@ class ImageGenerator {
             }
 
             const videoPath = path.join(this.tempPath, `combat_video_${Date.now()}.mp4`);
-            
+
             console.log(`🎬 Génération vidéo de combat: ${combatContext.attacker.name} vs ${combatContext.defender.name}`);
-            
+
             return await this.runwayClient.generateCombatVideo(combatContext, videoPath);
 
         } catch (error) {
@@ -753,9 +745,9 @@ class ImageGenerator {
             }
 
             const videoPath = path.join(this.tempPath, `location_video_${location.replace(/\s+/g, '_')}_${Date.now()}.mp4`);
-            
+
             console.log(`🎬 Génération vidéo de lieu: ${location}`);
-            
+
             return await this.runwayClient.generateLocationVideo(location, character, videoPath);
 
         } catch (error) {
@@ -771,7 +763,7 @@ class ImageGenerator {
             }
 
             console.log(`🎬 Génération vidéo personnalisée: ${prompt.substring(0, 100)}...`);
-            
+
             return await this.runwayClient.generateVideoFromText(prompt, outputPath, options);
 
         } catch (error) {
@@ -852,6 +844,42 @@ class ImageGenerator {
         } catch (error) {
             console.error('❌ Erreur génération image combat:', error);
             throw error;
+        }
+    }
+
+    async generateDialogueImage(character, npcName, dialogue, options = {}) {
+        try {
+            console.log(`🗣️ Génération image dialogue avec Pollinations GRATUIT...`);
+
+            if (!this.hasPollinations || !this.pollinationsClient) {
+                console.log('⚠️ Pollinations non disponible pour dialogue');
+                return null;
+            }
+
+            const imageOptions = {
+                style: options.style || '3d',
+                perspective: 'second_person', // Vue pour dialogue/conversation
+                nudity: options.nudity !== undefined ? options.nudity : false
+            };
+
+            const imagePath = path.join(this.tempPath, `dialogue_${character.id}_${Date.now()}.png`);
+
+            // Créer le prompt pour dialogue
+            const genderDesc = character.gender === 'male' ? 'male' : 'female';
+            const prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom}, talking with ${npcName}, medieval fantasy conversation scene, detailed portrait style, dialogue interaction`;
+
+            await this.pollinationsClient.generateImage(prompt, imagePath, imageOptions);
+            const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+
+            if (imageBuffer) {
+                console.log('✅ Image dialogue générée par Pollinations GRATUIT');
+                return imageBuffer;
+            }
+
+            return null;
+        } catch (error) {
+            console.error('❌ Erreur génération image dialogue:', error.message);
+            return null;
         }
     }
 

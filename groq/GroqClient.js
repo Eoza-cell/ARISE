@@ -22,7 +22,7 @@ class GroqClient {
             location, 
             timestamp: Date.now() 
         });
-        
+
         // Limiter la taille mémoire
         if (memories.length > this.maxMemoryPerSession) {
             memories.splice(0, memories.length - this.maxMemoryPerSession);
@@ -30,10 +30,14 @@ class GroqClient {
         this.sessionMemory.set(sessionId, memories);
     }
 
+    getRecentMemory(sessionId) {
+        return this.sessionMemory.get(sessionId) || [];
+    }
+
     getLocationContinuity(sessionId, currentLocation) {
         const memories = this.sessionMemory.get(sessionId) || [];
         const locationMemories = memories.filter(m => m.location === currentLocation);
-        
+
         if (locationMemories.length > 0) {
             return `Le personnage est dans ${currentLocation} depuis plusieurs actions. Contexte précédent dans ce lieu: ${locationMemories.slice(-3).map(m => m.content).join('; ')}`;
         }
@@ -114,28 +118,53 @@ class GroqClient {
     }
 
     async generateCombatNarration(combatData, maxTokens = 600) {
-        const prompt = `Décris cette action de combat RPG:
+        // Logique pour la continuité des actions et la gestion des PV en combat
+        let actionDescription = `Le combat entre ${combatData.attacker} et ${combatData.defender} continue.`;
+        if (combatData.action) {
+            actionDescription = `Action de ${combatData.attacker} : ${combatData.action}.`;
+        }
+
+        let damageInfo = '';
+        if (combatData.damage !== undefined && combatData.damage !== null) {
+            damageInfo = `Dégâts infligés : ${combatData.damage}.`;
+            // Vérifier si la mort survient sans combat explicite
+            if (combatData.attacker === combatData.defender && combatData.damage > 0 && combatData.result === 'mort' && !combatData.action) {
+                 actionDescription += " La mort semble survenir de manière inexpliquée sans action directe.";
+            } else if (combatData.result === 'mort') {
+                actionDescription += ` ${combatData.defender} est vaincu.`;
+            }
+        }
+        
+        const prompt = `Décris cette action de combat RPG dans un monde médiéval-steampunk :
         Attaquant: ${combatData.attacker} (Niveau ${combatData.attackerLevel})
         Défenseur: ${combatData.defender} (Niveau ${combatData.defenderLevel})
-        Action: ${combatData.action}
-        Dégâts: ${combatData.damage}
-        Résultat: ${combatData.result}
-        
-        Contexte: Combat épique dans un monde médiéval-steampunk avec magie et technologie.`;
+        ${actionDescription}
+        ${damageInfo}
+        Résultat général: ${combatData.result || 'Aucun résultat spécifié'}
 
-        return await this.generateNarration(prompt, maxTokens);
+        Contexte: Combat épique dans un monde médiéval-steampunk avec magie et technologie. La survie est difficile.
+        Style: Sombre, détaillé, avec des conséquences claires pour chaque action.`;
+
+        try {
+            const narration = await this.generateNarration(prompt, maxTokens);
+            this.addToMemory(combatData.sessionId || "default", "combat_action", `${combatData.attacker} vs ${combatData.defender}: ${combatData.action} (${combatData.damage} dmg, ${combatData.result})`);
+            return narration;
+        } catch (error) {
+            console.error('❌ Erreur génération narration combat Groq:', error.message);
+            throw error;
+        }
     }
 
     async generateExplorationNarration(location, action, sessionId = "default", character = null, maxTokens = 1000) {
         const locationContinuity = this.getLocationContinuity(sessionId, location);
-        
+
         // Construire des informations détaillées sur le personnage
         let characterContext = '';
         if (character) {
             const equipmentList = character.equipment && Object.keys(character.equipment).length > 0 ? 
                 Object.entries(character.equipment).map(([slot, item]) => `${slot}: ${item}`).join(', ') : 
                 'aucun équipement';
-            
+
             const inventoryList = character.inventory && character.inventory.length > 0 ? 
                 character.inventory.slice(0, 5).join(', ') + (character.inventory.length > 5 ? '...' : '') : 
                 'inventaire vide';
@@ -149,13 +178,13 @@ class GroqClient {
 - Inventaire: ${inventoryList}
 - Royaume: ${character.kingdom} | Ordre: ${character.order || 'Aucun'}`;
         }
-        
+
         const prompt = `Décris cette exploration dans un monde RPG Dark Souls médiéval-steampunk:
         Lieu: ${location}
         Action du joueur: ${action}
-        
+
         ${locationContinuity}${characterContext}
-        
+
         RÈGLES DE NARRATION:
         1. Le personnage est DÉJÀ dans ce lieu. Ne dis pas qu'il "arrive" sauf si l'action le précise
         2. Décris 4-6 phrases immersives et détaillées
@@ -165,17 +194,17 @@ class GroqClient {
         6. Intègre technologie steampunk (engrenages, vapeur, mécanismes)
         7. Le monde réagit de manière hostile et impitoyable
         8. IMPORTANT: Fais interagir les objets portés avec l'environnement
-        
+
         Contexte: Friction Ultimate - Monde où chaque action peut être fatale, fusion magie/technologie, 
         12 royaumes hostiles, survie difficile, système de friction implacable.`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);
-            
+
             // Ajouter à la mémoire
             this.addToMemory(sessionId, "user", `Action: ${action}`, location);
             this.addToMemory(sessionId, "assistant", narration, location);
-            
+
             return narration;
         } catch (error) {
             console.error('❌ Erreur génération exploration Groq:', error.message);
@@ -183,12 +212,69 @@ class GroqClient {
         }
     }
 
+    async generateDialogueResponse(character, playerMessage, sessionId = "default") {
+        if (!this.hasValidClient()) {
+            // Si le client Groq n'est pas disponible, retournez une réponse par défaut.
+            return "Le PNJ vous regarde en silence.";
+        }
+
+        try {
+            const prompt = this.buildDialoguePrompt(character, playerMessage);
+
+            const messages = this.getRecentMemory(sessionId);
+            messages.push({
+                role: "user",
+                content: prompt
+            });
+
+            // Utiliser le client Groq pour générer la réponse
+            const completion = await this.client.chat.completions.create({
+                messages,
+                model: "llama-3.1-70b-versatile", // Ou un autre modèle approprié pour les dialogues
+                max_tokens: 300,
+                temperature: 0.8
+            });
+
+            const dialogueResponse = completion.choices[0].message.content;
+
+            // Sauvegarder la conversation dans la mémoire
+            this.addToMemory(sessionId, "user", prompt); // Sauvegarde le prompt complet pour le contexte
+            this.addToMemory(sessionId, "assistant", dialogueResponse);
+
+            return dialogueResponse;
+        } catch (error) {
+            console.error('❌ Erreur génération dialogue Groq:', error);
+            // Fournir une réponse de repli en cas d'erreur
+            return "Le PNJ semble distrait et ne répond pas clairement.";
+        }
+    }
+
+    buildDialoguePrompt(character, playerMessage) {
+        // Construction du prompt pour les dialogues avec les PNJ
+        return `Tu es un PNJ du royaume ${character.kingdom} dans le monde de Friction Ultimate.
+
+CONTEXTE:
+- Tu interagis avec ${character.name}, ${character.gender === 'male' ? 'un homme' : 'une femme'} du royaume ${character.kingdom}
+- Niveau de puissance: ${character.powerLevel}
+- Lieu actuel du PNJ: ${character.currentLocation}
+- Message du joueur: "${playerMessage}"
+
+INSTRUCTIONS:
+- Réponds comme un habitant du royaume ${character.kingdom}
+- Reste dans l'ambiance médiévale-technologique
+- Sois naturel et authentique (2-3 phrases max)
+- Intègre des éléments du lieu et du royaume
+- Français fluide et immersif
+
+Génère UNIQUEMENT la réponse du PNJ, rien d'autre:`;
+    }
+
     async generateCharacterCreationNarration(characterData, maxTokens = 200) {
         const prompt = `Décris la création de ce nouveau héros:
         Nom: ${characterData.name}
         Classe: ${characterData.class}
         Royaume d'origine: ${characterData.kingdom}
-        
+
         Contexte: Nouvelle aventure dans un monde RPG médiéval-steampunk épique.`;
 
         return await this.generateNarration(prompt, maxTokens);
@@ -213,7 +299,7 @@ class GroqClient {
                         role: 'user',
                         content: `Crée un prompt d'image optimal pour cette scène RPG:
                         ${context}
-                        
+
                         Inclus: style anime, fantasy, détails steampunk, qualité 8K, composition épique.`
                     }
                 ],

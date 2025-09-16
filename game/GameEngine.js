@@ -14,10 +14,10 @@ class GameEngine {
         this.groqClient = new GroqClient();
         this.geminiClient = new GeminiClient();
         this.ogunGuide = new OgunGuide(this.groqClient);
-        
+
         // Sera initialisé dans setWhatsAppSocket une fois que sock est disponible
         this.characterCustomization = null;
-        
+
         this.commandHandlers = {
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
@@ -112,9 +112,20 @@ class GameEngine {
 
             // Si aucune commande reconnue, traiter comme action de jeu
             if (!response) {
-                response = await this.handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator });
+                // Détecter si c'est un dialogue avec un PNJ
+                const dialogueKeywords = ['parle', 'dis', 'demande', 'salue', 'bonjour', 'bonsoir', 'hey', '"'];
+                const isDialogue = dialogueKeywords.some(keyword => 
+                    message.toLowerCase().includes(keyword)
+                ) || message.includes('"') || message.toLowerCase().startsWith('je dis');
+
+                if (isDialogue) {
+                    return await this.processDialogueAction({ player, character, message, dbManager, imageGenerator });
+                }
+
+                // Traitement des actions de jeu normales avec IA Gemini
+                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
             }
-            
+
             return response;
 
         } catch (error) {
@@ -128,7 +139,7 @@ class GameEngine {
     async handleMenuCommand({ player, dbManager, imageGenerator }) {
         // Désactiver le mode jeu quand on accède au menu
         await dbManager.clearTemporaryData(player.id, 'game_mode');
-        
+
         const character = await dbManager.getCharacterByPlayer(player.id);
 
         let menuText = `🎮 **FRICTION ULTIMATE - Menu Principal**\n\n`;
@@ -195,7 +206,7 @@ class GameEngine {
                 chatId, 
                 false // isModification = false
             );
-            
+
             if (success) {
                 return { text: '' }; // Le système de personnalisation gère l'envoi des messages
             } else {
@@ -367,7 +378,7 @@ class GameEngine {
 
         // Vérifier si le joueur est en mode jeu
         const isInGameMode = await dbManager.getTemporaryData(player.id, 'game_mode');
-        
+
         if (!isInGameMode) {
             return {
                 text: `💬 **Message libre détecté**\n\n` +
@@ -387,6 +398,16 @@ class GameEngine {
                 text: `❌ Tu dois d'abord créer un personnage avec /créer !\n\n` +
                       `Utilise /menu pour sortir du mode jeu.`
             };
+        }
+
+        // Détecter si c'est un dialogue avec un PNJ
+        const dialogueKeywords = ['parle', 'dis', 'demande', 'salue', 'bonjour', 'bonsoir', 'hey', '"'];
+        const isDialogue = dialogueKeywords.some(keyword => 
+            message.toLowerCase().includes(keyword)
+        ) || message.includes('"') || message.toLowerCase().startsWith('je dis');
+
+        if (isDialogue) {
+            return await this.processDialogueAction({ player, character, message, dbManager, imageGenerator });
         }
 
         // Traitement des actions de jeu normales avec IA Gemini
@@ -472,7 +493,7 @@ class GameEngine {
             // Système de dégâts CONTRÔLÉ - seulement dans certaines situations
             let damageText = '';
             let shouldTakeDamage = false;
-            
+
             // Dégâts seulement si :
             // 1. Action explicitement dangereuse (combat, escalade, etc.)
             // 2. OU contre-attaque
@@ -481,20 +502,20 @@ class GameEngine {
             const isDangerousAction = dangerousKeywords.some(keyword => 
                 message.toLowerCase().includes(keyword)
             );
-            
+
             if (isDangerousAction && actionAnalysis.combatAdvantage === 'counter_attacked') {
                 shouldTakeDamage = true;
             } else if (character.currentEnergy <= 0) {
                 shouldTakeDamage = true; // Épuisement = vulnérabilité
             }
-            
+
             if (shouldTakeDamage && actionAnalysis.potentialDamage > 0) {
                 // Dégâts réduits et plafonnés
                 const baseDamage = Math.max(1, Math.min(15, actionAnalysis.potentialDamage || 5));
                 const damage = Math.min(baseDamage, character.currentLife);
                 character.currentLife = Math.max(0, character.currentLife - damage);
                 damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV (action risquée)`;
-                
+
                 console.log(`⚔️ Dégâts appliqués: ${damage} PV (action: ${message}, situation: ${actionAnalysis.combatAdvantage})`);
             }
 
@@ -638,11 +659,11 @@ class GameEngine {
 
         } catch (error) {
             console.error('❌ Erreur lors du traitement IA:', error);
-            
+
             // Appliquer au moins une réduction d'énergie de base
             const energyCost = 10;
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
-            
+
             await dbManager.updateCharacter(character.id, {
                 currentEnergy: character.currentEnergy
             });
@@ -1105,7 +1126,7 @@ class GameEngine {
                 chatId, 
                 true // isModification = true
             );
-            
+
             if (success) {
                 return { text: '' }; // Le système de personnalisation gère l'envoi des messages
             } else {
@@ -1257,6 +1278,86 @@ class GameEngine {
         return descriptions[kingdom] || 'fantasy kingdom with unique customs and equipment';
     }
 
+    async processDialogueAction({ player, character, message, dbManager, imageGenerator }) {
+        try {
+            const sessionId = `player_${player.id}_dialogue`; // Session unique par joueur pour les dialogues
+
+            // Détecter le PNJ auquel le joueur s'adresse
+            let targetNPC = null;
+            const npcNames = ['Ogun']; // Liste des PNJ connus
+            const lowerMessage = message.toLowerCase();
+
+            for (const npcName of npcNames) {
+                if (lowerMessage.includes(npcName.toLowerCase()) || lowerMessage.startsWith(npcName.toLowerCase())) {
+                    targetNPC = npcName;
+                    break;
+                }
+            }
+
+            // Si aucun PNJ spécifique n'est ciblé, utiliser Ogun par défaut si le message est une question générale ou une salutation
+            if (!targetNPC && (lowerMessage.endsWith('?') || lowerMessage.includes('salut') || lowerMessage.includes('bonjour') || lowerMessage.includes('hey') || lowerMessage.startsWith('je dis'))) {
+                targetNPC = 'Ogun';
+            }
+
+            let narration;
+            if (targetNPC) {
+                // Utiliser le client approprié pour le PNJ (ici, OgunGuide)
+                if (targetNPC === 'Ogun') {
+                    narration = await this.ogunGuide.getGuideResponse(message, player.id);
+                } else {
+                    // Gérer d'autres PNJ si nécessaire
+                    narration = await this.openAIClient.analyzePlayerAction(message, { character, location: character.currentLocation, kingdom: character.kingdom, targetNPC: targetNPC }, sessionId);
+                }
+            } else {
+                // Si le message est un dialogue mais sans PNJ clair, le traiter comme une action normale mais avec une réponse générique.
+                // C'est une mesure de sécurité pour éviter les erreurs.
+                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
+            }
+
+            // Appliquer une pénalité d'énergie pour les dialogues (moins coûteux qu'une action complexe)
+            const energyCost = Math.max(0, Math.min(character.currentEnergy, 5)); // 5 points d'énergie pour un dialogue
+            character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
+
+            await dbManager.updateCharacter(character.id, {
+                currentEnergy: character.currentEnergy
+            });
+
+            // Générer les barres de vie et d'énergie
+            const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
+            const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
+
+            // Préparer la réponse
+            const responseText = `💬 **Dialogue avec ${targetNPC} :**\n\n` +
+                               `"${narration.text || narration}"\n\n` + // Assurer que 'narration' est un objet avec une propriété 'text' ou est une chaîne
+                               `❤️ **Vie :** ${lifeBar}\n` +
+                               `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
+                               `💰 **Argent :** ${character.coins} pièces d'or`;
+
+            // Essayer de générer une image spécifique pour le PNJ, sinon utiliser l'image du personnage
+            let npcImage = null;
+            if (targetNPC === 'Ogun') {
+                try {
+                    npcImage = await this.ogunGuide.getImage(); // Obtenir l'image d'Ogun
+                } catch (error) {
+                    console.error('⚠️ Erreur lors de la récupération de l\'image d\'Ogun:', error);
+                    npcImage = await imageGenerator.generateCharacterImage(character); // Fallback vers l'image du personnage
+                }
+            } else {
+                npcImage = await imageGenerator.generateCharacterImage(character); // Image du personnage par défaut
+            }
+
+            return {
+                text: responseText,
+                image: npcImage
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur lors du traitement du dialogue:', error);
+            return {
+                text: `❌ Une erreur s'est produite pendant le dialogue. Veuillez réessayer.`
+            };
+        }
+    }
 }
 
 module.exports = GameEngine;
