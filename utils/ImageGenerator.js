@@ -27,12 +27,12 @@ class ImageGenerator {
             this.hasPollinations = false;
         }
 
-        // Initialisation de Runware Client (générateur payant)
+        // Initialisation de Runware Client (générateur payant) - DÉSACTIVÉ
         try {
             this.runwareClient = new RunwareClient();
-            this.hasRunware = this.runwareClient.hasValidClient();
-            if (this.hasRunware) {
-                console.log('✅ RunwareClient initialisé - Générateur payant (désactivé par défaut)');
+            this.hasRunware = false; // DÉSACTIVÉ - crédits insuffisants
+            if (this.runwareClient && this.runwareClient.hasValidClient()) {
+                console.log('⚠️ RunwareClient disponible mais DÉSACTIVÉ (crédits insuffisants)');
             }
         } catch (error) {
             console.error('❌ Erreur initialisation RunwareClient:', error.message);
@@ -362,43 +362,27 @@ class ImageGenerator {
                 nudity: options.nudity !== undefined ? options.nudity : this.allowNudity
             };
 
-            // Essayer Runware d'abord
-            if (this.hasRunware && this.runwareClient) {
+            // Essayer Pollinations d'abord (GRATUIT)
+            if (this.hasPollinations && this.pollinationsClient) {
                 try {
-                    console.log(`🎨 Génération image personnage ${character.name} avec Runware (vue première personne)...`);
-                    await this.runwareClient.generateCharacterPortrait(character, imagePath, imageOptions);
+                    console.log(`🎨 Génération image personnage ${character.name} avec Pollinations GRATUIT (vue première personne)...`);
+                    await this.pollinationsClient.generateCharacterImage(character, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
                     if (imageBuffer) {
-                        console.log(`✅ Image personnage ${character.name} générée par Runware (vue première personne)`);
+                        console.log(`✅ Image personnage ${character.name} générée par Pollinations GRATUIT (vue première personne)`);
                         this.imageCache.set(cacheKey, imageBuffer);
                         return imageBuffer;
                     }
-                } catch (runwareError) {
-                    console.log(`⚠️ Erreur Runware personnage, fallback vers KieAI:`, runwareError.message);
-                }
-            }
-
-            // Fallback vers KieAI
-            if (this.hasKieAI && this.kieaiClient) {
-                try {
-                    console.log(`🎨 Génération image personnage ${character.name} avec KieAI (fallback, vue première personne)...`);
-                    await this.kieaiClient.generateCharacterPortrait(character, imagePath, imageOptions);
-                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-
-                    if (imageBuffer) {
-                        console.log(`✅ Image personnage ${character.name} générée par KieAI (vue première personne)`);
-                        this.imageCache.set(cacheKey, imageBuffer);
-                        return imageBuffer;
-                    }
-                } catch (kieaiError) {
-                    console.log(`⚠️ Erreur KieAI personnage, fallback vers Freepik:`, kieaiError.message);
+                } catch (pollinationsError) {
+                    console.log(`⚠️ Erreur Pollinations personnage, fallback vers Freepik:`, pollinationsError.message);
                 }
             }
 
             // Fallback vers Freepik
             if (this.hasFreepik && this.freepikClient) {
                 try {
+                    console.log(`🎨 Génération image personnage ${character.name} avec Freepik (vue première personne)...`);
                     await this.freepikClient.generateCharacterImage(character, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
@@ -408,7 +392,24 @@ class ImageGenerator {
                         return imageBuffer;
                     }
                 } catch (freepikError) {
-                    console.log(`⚠️ Erreur Freepik personnage:`, freepikError.message);
+                    console.log(`⚠️ Erreur Freepik personnage, fallback vers KieAI:`, freepikError.message);
+                }
+            }
+
+            // Fallback vers KieAI en dernier
+            if (this.hasKieAI && this.kieaiClient) {
+                try {
+                    console.log(`🎨 Génération image personnage ${character.name} avec KieAI (dernier fallback, vue première personne)...`);
+                    await this.kieaiClient.generateCharacterPortrait(character, imagePath, imageOptions);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+
+                    if (imageBuffer) {
+                        console.log(`✅ Image personnage ${character.name} générée par KieAI (vue première personne)`);
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (kieaiError) {
+                    console.log(`⚠️ Erreur KieAI personnage:`, kieaiError.message);
                 }
             }
 

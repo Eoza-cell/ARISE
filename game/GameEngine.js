@@ -112,6 +112,16 @@ class GameEngine {
 
             // Si aucune commande reconnue, traiter comme action de jeu
             if (!response) {
+                // Récupérer le personnage du joueur pour les actions de jeu
+                const character = await dbManager.getCharacterByPlayer(player.id);
+                
+                if (!character) {
+                    return {
+                        text: `❌ Tu n'as pas encore de personnage !\n\n` +
+                              `Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.`
+                    };
+                }
+
                 // Détecter si c'est un dialogue avec un PNJ
                 const dialogueKeywords = ['parle', 'dis', 'demande', 'salue', 'bonjour', 'bonsoir', 'hey', '"'];
                 const isDialogue = dialogueKeywords.some(keyword => 

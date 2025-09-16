@@ -282,70 +282,70 @@ class FrictionUltimateBot {
             // Envoyer la réponse avec support audio
             if (response.image && response.video && response.audio) {
                 // Envoyer l'image avec le texte
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     image: response.image,
                     caption: response.text
                 });
 
                 // Puis l'audio
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     audio: response.audio,
                     mimetype: 'audio/mp3',
                     caption: '🎙️ Narration vocale'
                 });
 
                 // Puis la vidéo
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     video: response.video,
                     caption: '🎬 Vidéo de l\'action'
                 });
             } else if (response.image && response.audio) {
                 // Envoyer l'image avec le texte
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     image: response.image,
                     caption: response.text
                 });
 
                 // Puis l'audio
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     audio: response.audio,
                     mimetype: 'audio/mp3',
                     caption: '🎙️ Message vocal'
                 });
             } else if (response.image && response.video) {
                 // Envoyer l'image d'abord
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     image: response.image,
                     caption: response.text
                 });
 
                 // Puis la vidéo
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     video: response.video,
                     caption: '🎬 Vidéo de l\'action'
                 });
             } else if (response.image) {
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     image: response.image,
                     caption: response.text
                 });
             } else if (response.audio) {
                 // Envoyer d'abord le texte
-                await sock.sendMessage(chatId, { text: response.text });
+                await this.sock.sendMessage(chatId, { text: response.text });
 
                 // Puis l'audio
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     audio: response.audio,
                     mimetype: 'audio/mp3',
                     caption: '🎙️ Message vocal'
                 });
             } else if (response.video) {
-                await sock.sendMessage(chatId, {
+                await this.sock.sendMessage(chatId, {
                     video: response.video,
                     caption: response.text
                 });
             } else {
-                await sock.sendMessage(chatId, { text: response.text });
+                await this.sock.sendMessage(chatId, { text: response.text });
             }
         } catch (error) {
             console.error('❌ Erreur lors de l\'envoi de la réponse:', error);
