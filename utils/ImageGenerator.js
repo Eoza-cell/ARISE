@@ -4,6 +4,7 @@ const path = require('path');
 const FreepikClient = require('../freepik/FreepikClient');
 const BlenderClient = require('../blender/BlenderClient');
 const RunwayClient = require('../runway/RunwayClient');
+const KieAiClient = require('../kieai/KieAiClient');
 
 class ImageGenerator {
     constructor() {
@@ -11,12 +12,25 @@ class ImageGenerator {
         this.assetsPath = path.join(__dirname, '../assets');
         this.tempPath = path.join(__dirname, '../temp');
 
-        // Initialisation de FreepikClient (seul générateur)
+        // Initialisation de KieAI Client (générateur principal)
+        try {
+            this.kieaiClient = new KieAiClient();
+            this.hasKieAI = this.kieaiClient.hasValidClient();
+            if (this.hasKieAI) {
+                console.log('✅ KieAiClient initialisé - Générateur principal');
+            }
+        } catch (error) {
+            console.error('❌ Erreur initialisation KieAiClient:', error.message);
+            this.kieaiClient = null;
+            this.hasKieAI = false;
+        }
+
+        // Initialisation de FreepikClient (fallback)
         try {
             this.freepikClient = new FreepikClient();
             this.hasFreepik = this.freepikClient.hasValidClient();
             if (this.hasFreepik) {
-                console.log('✅ FreepikClient initialisé - Générateur principal');
+                console.log('✅ FreepikClient initialisé - Générateur de fallback');
             }
         } catch (error) {
             console.error('❌ Erreur initialisation FreepikClient:', error.message);
@@ -60,7 +74,14 @@ class ImageGenerator {
         // Groq pour optimisation des prompts (injecté plus tard)
         this.groqClient = null;
 
-        console.log('🎨 Mode: Groq (narration) + Freepik (images uniquement) - Vue première personne forcée pour actions');
+        // Déterminer le générateur principal
+        if (this.hasKieAI) {
+            console.log('🎨 Mode: Groq (narration) + KieAI (images principales) + Freepik (fallback)');
+        } else if (this.hasFreepik) {
+            console.log('🎨 Mode: Groq (narration) + Freepik (images uniquement)');
+        } else {
+            console.log('🎨 Mode: Groq (narration) + Canvas (images basiques)');
+        }
 
         // Créer les dossiers nécessaires
         this.initializeFolders();
@@ -124,15 +145,34 @@ class ImageGenerator {
 
     async generateMenuImage() {
         try {
-            const cacheKey = 'menu_main_freepik';
+            const cacheKey = 'menu_main_kieai';
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            const imagePath = path.join(this.tempPath, 'menu_main_freepik.png');
+            const imagePath = path.join(this.tempPath, 'menu_main_kieai.png');
 
+            // Essayer KieAI d'abord
+            if (this.hasKieAI && this.kieaiClient) {
+                try {
+                    console.log('🎨 Génération image menu avec KieAI...');
+                    const prompt = 'RPG main menu background, medieval fantasy game interface, epic fantasy landscape, game UI, medieval castle, magical atmosphere';
+                    await this.kieaiClient.generateImage(prompt, imagePath, { style: '3d', perspective: 'landscape' });
+
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log('✅ Image menu générée par KieAI');
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (kieaiError) {
+                    console.log('⚠️ Erreur KieAI menu, fallback vers Freepik:', kieaiError.message);
+                }
+            }
+
+            // Fallback vers Freepik
             if (this.hasFreepik && this.freepikClient) {
-                console.log('🎨 Génération image menu avec Freepik...');
+                console.log('🎨 Génération image menu avec Freepik (fallback)...');
                 await this.freepikClient.generateMenuImage(imagePath);
 
                 const imageBuffer = await fs.readFile(imagePath).catch(() => null);
@@ -143,7 +183,7 @@ class ImageGenerator {
                 }
             }
 
-            throw new Error('Impossible de générer l\'image menu - Freepik requis');
+            throw new Error('Impossible de générer l\'image menu - aucun générateur disponible');
 
         } catch (error) {
             console.error('❌ Erreur génération image menu:', error);
@@ -163,9 +203,26 @@ class ImageGenerator {
 
             const imagePath = path.join(this.tempPath, `character_action_${character.id}_${Date.now()}.png`);
 
+            // Essayer KieAI d'abord
+            if (this.hasKieAI && this.kieaiClient) {
+                try {
+                    console.log(`🎨 Génération image d'action avec KieAI (vue première personne forcée)...`);
+                    const prompt = `${character.gender} ${character.name} from ${character.kingdom} kingdom, ${action}, ${narration}, RPG character action, first person view, POV`;
+                    await this.kieaiClient.generateCombatScene(prompt, imagePath, imageOptions);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+                    if (imageBuffer) {
+                        console.log('✅ Image action générée par KieAI (vue première personne)');
+                        return imageBuffer;
+                    }
+                } catch (kieaiError) {
+                    console.log('⚠️ Erreur KieAI action, fallback vers Freepik:', kieaiError.message);
+                }
+            }
+
+            // Fallback vers Freepik
             if (this.hasFreepik && this.freepikClient) {
                 try {
-                    console.log(`🎨 Génération image d'action avec Freepik (vue première personne forcée)...`);
+                    console.log(`🎨 Génération image d'action avec Freepik (fallback, vue première personne forcée)...`);
                     await this.freepikClient.generateActionImage(character, action, narration, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                     if (imageBuffer) {
@@ -177,7 +234,7 @@ class ImageGenerator {
                 }
             }
 
-            throw new Error('Impossible de générer l\'image d\'action avec Freepik');
+            throw new Error('Impossible de générer l\'image d\'action - aucun générateur disponible');
         } catch (error) {
             console.error('❌ Erreur génération image action:', error);
             throw error;
@@ -209,6 +266,24 @@ class ImageGenerator {
                 nudity: options.nudity !== undefined ? options.nudity : this.allowNudity
             };
 
+            // Essayer KieAI d'abord
+            if (this.hasKieAI && this.kieaiClient) {
+                try {
+                    console.log(`🎨 Génération image personnage ${character.name} avec KieAI (vue première personne)...`);
+                    await this.kieaiClient.generateCharacterPortrait(character, imagePath, imageOptions);
+                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
+
+                    if (imageBuffer) {
+                        console.log(`✅ Image personnage ${character.name} générée par KieAI (vue première personne)`);
+                        this.imageCache.set(cacheKey, imageBuffer);
+                        return imageBuffer;
+                    }
+                } catch (kieaiError) {
+                    console.log(`⚠️ Erreur KieAI personnage, fallback vers Freepik:`, kieaiError.message);
+                }
+            }
+
+            // Fallback vers Freepik
             if (this.hasFreepik && this.freepikClient) {
                 try {
                     await this.freepikClient.generateCharacterImage(character, imagePath, imageOptions);
@@ -224,7 +299,7 @@ class ImageGenerator {
                 }
             }
 
-            throw new Error('Impossible de générer l\'image personnage avec Freepik');
+            throw new Error('Impossible de générer l\'image personnage - aucun générateur disponible');
 
         } catch (error) {
             console.error('❌ Erreur génération image personnage:', error);
