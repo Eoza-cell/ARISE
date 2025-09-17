@@ -131,7 +131,7 @@ class GameEngine {
                 }
 
                 // Traitement des actions de jeu avec système immersif et chronologie réaliste
-                return await this.processGameActionWithImmersiveSystem({ player, character, message, dbManager, imageGenerator });
+                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
             }
 
             return response;
