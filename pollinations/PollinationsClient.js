@@ -172,12 +172,12 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un message vocal avec l'API Pollinations simple
+     * Génère un message vocal avec l'API Pollinations Audio simplifiée
      */
     async generatePollinationsVoice(text, outputPath, options = {}) {
         try {
-            // Choisir la voix selon le contexte
-            let voice = 'alloy'; // Voix par défaut OpenAI
+            // Choisir la voix selon le contexte (voix OpenAI compatibles)
+            let voice = 'alloy'; // Voix par défaut
 
             if (options.gender === 'male') {
                 voice = 'onyx'; // Voix masculine
@@ -202,33 +202,33 @@ class PollinationsClient {
 
             // Nettoyer et limiter le texte
             let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
-            if (cleanText.length > 200) {
-                cleanText = cleanText.substring(0, 200) + '...';
+            if (cleanText.length > 300) {
+                cleanText = cleanText.substring(0, 300) + '...';
             }
 
-            // Encoder le texte pour l'URL
-            const encodedText = encodeURIComponent(cleanText);
-            const audioUrl = `https://text.pollinations.ai/${encodedText}?model=openai-audio&voice=${voice}`;
+            // Utiliser l'API suggérée directement : GET https://text.pollinations.ai/{prompt}?model=openai-audio&voice={voice}
+            const audioUrl = `https://text.pollinations.ai/${encodeURIComponent(cleanText)}?model=openai-audio&voice=${voice}`;
 
-            console.log(`🔊 Téléchargement audio depuis: ${audioUrl.substring(0, 100)}...`);
+            console.log(`🔊 Téléchargement audio depuis Pollinations...`);
 
             // Télécharger l'audio directement
             const response = await axios.get(audioUrl, {
                 responseType: 'arraybuffer',
                 timeout: 30000,
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+                    'Accept': 'audio/mpeg, audio/wav, */*'
                 }
             });
 
             if (response.data && response.data.byteLength > 0) {
                 const audioBuffer = Buffer.from(response.data);
 
-                // Sauvegarder l'audio en fichier aussi
+                // Sauvegarder l'audio en fichier
                 await fs.writeFile(outputPath, audioBuffer);
-                console.log(`✅ Audio Pollinations généré: ${outputPath}`);
+                console.log(`✅ Audio Pollinations généré: ${outputPath} (${audioBuffer.length} bytes)`);
 
-                // Retourner le buffer pour envoi direct
+                // Retourner le buffer pour envoi WhatsApp
                 return audioBuffer;
             } else {
                 throw new Error('Audio vide reçu de Pollinations');
@@ -237,10 +237,20 @@ class PollinationsClient {
         } catch (error) {
             console.error('❌ Erreur Pollinations Audio API:', error.message);
 
-            // Si erreur 402 (payment required), essayer le fallback Edge-TTS
-            if (error.response && error.response.status === 402) {
-                console.log('💡 API Pollinations Audio limitée (402), tentative Edge-TTS...');
-                return await this.generateWebSpeechAPI(text, outputPath, options);
+            // Si erreur 402 ou autre, essayer Edge-TTS avec voix correctes
+            if (error.response && (error.response.status === 402 || error.response.status >= 400)) {
+                console.log('💡 Fallback vers Edge-TTS avec voix correctes...');
+                const edgeResult = await this.generateWebSpeechAPI(text, outputPath, options);
+                if (edgeResult) {
+                    try {
+                        const audioBuffer = await fs.readFile(edgeResult);
+                        console.log('✅ Audio Edge-TTS généré en fallback');
+                        return audioBuffer;
+                    } catch (readError) {
+                        console.log('⚠️ Impossible de lire le fichier Edge-TTS généré');
+                        return null;
+                    }
+                }
             }
 
             return null;
@@ -333,14 +343,28 @@ class PollinationsClient {
     }
 
     /**
-     * Utilise Edge-TTS pour synthèse vocale gratuite
+     * Utilise Edge-TTS pour synthèse vocale gratuite avec voix correctes
      */
     async generateWebSpeechAPI(text, outputPath, options = {}) {
         try {
             console.log('🎤 Utilisation Edge-TTS pour synthèse vocale GRATUITE');
 
-            // Voix française par défaut
-            const voice = options.voice || 'fr-FR-HenriNeural';
+            // Choisir la vraie voix Edge-TTS selon le contexte
+            let voice = 'fr-FR-DeniseNeural'; // Voix féminine par défaut
+
+            if (options.gender === 'male') {
+                voice = 'fr-FR-HenriNeural'; // Voix masculine française
+            }
+
+            // Voix spéciales correctes pour les personnages
+            if (options.voice === 'warrior') {
+                voice = options.gender === 'male' ? 'fr-FR-AlainNeural' : 'fr-FR-BrigitteNeural';
+            } else if (options.voice === 'merchant') {
+                voice = options.gender === 'male' ? 'fr-FR-ClaudeNeural' : 'fr-FR-CoralieNeural';
+            } else if (options.voice === 'noble') {
+                voice = options.gender === 'male' ? 'fr-FR-JeromeNeural' : 'fr-FR-JacquelineNeural';
+            }
+
             const rate = options.rate || '+0%';
 
             // Créer le dossier si nécessaire
@@ -363,7 +387,7 @@ class PollinationsClient {
                     '--voice', voice,
                     '--text', cleanText,
                     '--write-media', outputPath,
-                    '--rate=' + rate
+                    '--rate', rate
                 ], {
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
