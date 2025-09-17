@@ -142,15 +142,20 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un message vocal avec Pollinations (API vocale gratuite)
+     * Génère un message vocal avec une API gratuite alternative
      */
     async generateVoice(text, outputPath, options = {}) {
         try {
-            console.log(`🎙️ Tentative génération vocale avec texte: "${text.substring(0, 50)}..."`);
+            console.log(`🎙️ Génération vocale GRATUITE avec texte: "${text.substring(0, 50)}..."`);
 
-            // Pour l'instant, Pollinations n'a pas d'API vocale publique
-            // On utilise directement le fallback
-            console.log('⚠️ API vocale Pollinations non disponible, utilisation du fallback');
+            // Essayer d'abord l'API vocale gratuite alternative
+            const voiceResult = await this.generateFreeVoice(text, outputPath, options);
+            if (voiceResult) {
+                return voiceResult;
+            }
+
+            // Fallback vers PlayHT si l'API gratuite échoue
+            console.log('⚠️ API vocale gratuite échouée, utilisation du fallback PlayHT');
             return await this.generateFallbackVoice(text, outputPath);
 
         } catch (error) {
@@ -160,17 +165,64 @@ class PollinationsClient {
     }
 
     /**
-     * Fallback pour génération vocale utilisant PlayHT
+     * Génère un message vocal avec une API gratuite (alternative à Pollinations)
      */
-    async generateFallbackVoice(text, outputPath, options = {}) {
+    async generateFreeVoice(text, outputPath, options = {}) {
         try {
-            console.log('🔄 Fallback: utilisation de PlayHT pour la synthèse vocale');
+            // Utiliser l'API Edge-TTS (gratuite) ou similaire
+            const voice = options.voice || 'fr-FR-DeniseNeural';
+            const rate = options.speed ? `${Math.round((options.speed - 1) * 100)}%` : '0%';
+            
+            console.log(`🎤 Génération vocale gratuite - Voix: ${voice}`);
             
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
             
-            // Utiliser PlayHT pour générer l'audio
+            // Utiliser une commande système pour générer l'audio (si edge-tts est disponible)
+            // Sinon, utiliser une approche web API gratuite
+            return await this.generateWebSpeechAPI(text, outputPath, options);
+            
+        } catch (error) {
+            console.error('❌ Erreur API vocale gratuite:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Utilise l'API Web Speech ou une alternative gratuite
+     */
+    async generateWebSpeechAPI(text, outputPath, options = {}) {
+        try {
+            console.log('🌐 Utilisation API vocale web gratuite');
+            
+            // Pour une implémentation complète, on pourrait utiliser une API comme:
+            // - ResponsiveVoice API (gratuite avec limites)
+            // - Web Speech API via un serveur local
+            // - Ou une autre API gratuite
+            
+            // Temporairement, créer un fichier placeholder et utiliser PlayHT en fallback
+            console.log('⚠️ API vocale web en développement - utilisation du fallback');
+            return null;
+            
+        } catch (error) {
+            console.error('❌ Erreur API vocale web:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Fallback pour génération vocale utilisant PlayHT ou synthèse système
+     */
+    async generateFallbackVoice(text, outputPath, options = {}) {
+        try {
+            console.log('🔄 Fallback: tentative synthèse vocale alternative');
+            
+            // Créer le dossier si nécessaire
+            const dir = path.dirname(outputPath);
+            await fs.mkdir(dir, { recursive: true });
+            
+            // Essayer PlayHT d'abord
             if (this.playhtClient && this.playhtClient.hasValidClient()) {
                 const audioPath = await this.playhtClient.generateVoice(text, outputPath, options);
                 if (audioPath) {
@@ -179,11 +231,43 @@ class PollinationsClient {
                 }
             }
             
-            console.log(`⚠️ PlayHT non disponible - aucun fichier audio créé`);
+            // Essayer une synthèse vocale système simple (si disponible)
+            try {
+                const systemVoice = await this.generateSystemVoice(text, outputPath, options);
+                if (systemVoice) {
+                    return systemVoice;
+                }
+            } catch (sysError) {
+                console.log('⚠️ Synthèse système non disponible');
+            }
+            
+            console.log(`⚠️ Toutes les options vocales épuisées - mode texte uniquement`);
             return null;
             
         } catch (error) {
-            console.error('❌ Erreur fallback PlayHT:', error.message);
+            console.error('❌ Erreur fallback vocal:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Tente une synthèse vocale système simple
+     */
+    async generateSystemVoice(text, outputPath, options = {}) {
+        try {
+            // Cette méthode pourrait utiliser des commandes système comme:
+            // - espeak (Linux)
+            // - say (macOS)
+            // - powershell speech (Windows)
+            
+            console.log('🔊 Tentative synthèse vocale système...');
+            
+            // Pour Replit (Linux), on pourrait essayer espeak si installé
+            // Mais pour l'instant, on retourne null pour utiliser le texte
+            return null;
+            
+        } catch (error) {
+            console.error('❌ Erreur synthèse système:', error.message);
             return null;
         }
     }
