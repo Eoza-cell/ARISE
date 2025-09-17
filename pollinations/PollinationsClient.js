@@ -2,13 +2,17 @@ const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
 const PlayHTClient = require('../playht/PlayHTClient');
+const CambAIClient = require('../camb/CambAIClient');
 
 class PollinationsClient {
     constructor() {
         this.baseURL = 'https://image.pollinations.ai/prompt';
         this.isAvailable = true;
 
-        // Initialiser le client de synthèse vocale PlayHT
+        // Initialiser le client de synthèse vocale Camb AI en priorité
+        this.cambAIClient = new CambAIClient();
+
+        // Initialiser PlayHT comme fallback
         this.playhtClient = new PlayHTClient();
 
         console.log('✅ PollinationsClient initialisé avec succès (GRATUIT)');
@@ -141,13 +145,26 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un message vocal avec l'API Pollinations simple
+     * Génère un message vocal avec Camb AI en priorité, puis fallback
      */
     async generateVoice(text, outputPath, options = {}) {
         try {
             console.log(`🎙️ Génération vocale: "${text.substring(0, 50)}..."`);
 
-            // Essayer d'abord Pollinations Audio API
+            // Essayer d'abord Camb AI (qualité supérieure)
+            if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
+                try {
+                    const cambResult = await this.cambAIClient.generateVoice(text, outputPath, options);
+                    if (cambResult) {
+                        console.log('✅ Audio généré avec Camb AI MARS5');
+                        return cambResult;
+                    }
+                } catch (cambError) {
+                    console.log('⚠️ Camb AI échec, utilisation fallback...');
+                }
+            }
+
+            // Fallback vers Pollinations Audio API
             try {
                 return await this.generatePollinationsVoice(text, outputPath, options);
             } catch (pollinationsError) {
@@ -559,19 +576,35 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un dialogue vocal pour les PNJ
+     * Génère un dialogue vocal pour les PNJ avec Camb AI en priorité
      */
     async generateDialogueVoice(character, npcName, dialogue, outputPath, options = {}) {
         try {
             console.log(`🎭 Génération dialogue vocal pour ${npcName}: "${dialogue.substring(0, 30)}..."`);
 
-            // Utiliser la nouvelle API Pollinations directement
+            // Préparer les options de voix
             const voiceOptions = {
-                voice: 'warrior',
+                voice: 'warrior', // Type de personnage
                 gender: character.gender || 'male',
+                age: character.age || 30,
+                language: 'fr',
                 ...options
             };
 
+            // Essayer d'abord Camb AI (qualité supérieure)
+            if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
+                try {
+                    const cambResult = await this.cambAIClient.generateDialogueVoice(dialogue, outputPath, npcName, character.gender || 'male');
+                    if (cambResult) {
+                        console.log('✅ Dialogue généré avec Camb AI MARS5');
+                        return cambResult;
+                    }
+                } catch (cambError) {
+                    console.log('⚠️ Camb AI dialogue échec, utilisation fallback...');
+                }
+            }
+
+            // Fallback vers Pollinations
             return await this.generatePollinationsVoice(dialogue, outputPath, voiceOptions);
 
         } catch (error) {
@@ -591,19 +624,35 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un audio de narration pour les actions
+     * Génère un audio de narration pour les actions avec Camb AI en priorité
      */
     async generateNarrationVoice(narration, outputPath, options = {}) {
         try {
             console.log(`📖 Génération narration vocale: "${narration.substring(0, 30)}..."`);
 
-            // Utiliser la nouvelle API Pollinations directement
+            // Préparer les options pour la narration
             const voiceOptions = {
                 voice: 'fable', // Voix narrative
                 gender: 'male',
+                age: 35,
+                language: 'fr',
                 ...options
             };
 
+            // Essayer d'abord Camb AI (qualité supérieure)
+            if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
+                try {
+                    const cambResult = await this.cambAIClient.generateNarrationVoice(narration, outputPath, voiceOptions);
+                    if (cambResult) {
+                        console.log('✅ Narration générée avec Camb AI MARS5');
+                        return cambResult;
+                    }
+                } catch (cambError) {
+                    console.log('⚠️ Camb AI narration échec, utilisation fallback...');
+                }
+            }
+
+            // Fallback vers Pollinations
             return await this.generatePollinationsVoice(narration, outputPath, voiceOptions);
 
         } catch (error) {
