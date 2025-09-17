@@ -325,8 +325,82 @@ class PollinationsClient {
                     console.log('⚠️ Edge-TTS non disponible:', error.message);
                     resolve(null);
                 });
-            });ion gratuite
-            return await this.generateWebSpeechAPI(text, outputPath, { voice, speed, rate });
+            });
+            
+        } catch (error) {
+            console.error('❌ Erreur Edge-TTS gratuit:', error.message);
+            return null;
+        }
+    }
+    
+    /**
+     * Utilise Edge-TTS pour synthèse vocale gratuite
+     */
+    async generateWebSpeechAPI(text, outputPath, options = {}) {
+        try {
+            console.log('🎤 Utilisation Edge-TTS pour synthèse vocale GRATUITE');
+            
+            // Voix française par défaut
+            const voice = options.voice || 'fr-FR-HenriNeural';
+            const rate = options.rate || '+0%';
+            
+            // Créer le dossier si nécessaire
+            const dir = path.dirname(outputPath);
+            await fs.mkdir(dir, { recursive: true });
+            
+            // Nettoyer et raccourcir le texte
+            let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
+            if (cleanText.length > 100) {
+                cleanText = cleanText.substring(0, 100) + '...';
+            }
+            
+            // Utiliser Edge-TTS directement
+            const { spawn } = require('child_process');
+            
+            return new Promise((resolve, reject) => {
+                console.log(`🔊 Génération vocale Edge-TTS - Voix: ${voice}`);
+                
+                const edgeProcess = spawn('edge-tts', [
+                    '--voice', voice,
+                    '--text', cleanText,
+                    '--write-media', outputPath,
+                    '--rate=' + rate  // Corriger le format du paramètre rate
+                ], {
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+                
+                let errorOutput = '';
+                
+                edgeProcess.stderr.on('data', (data) => {
+                    errorOutput += data.toString();
+                });
+                
+                edgeProcess.on('close', async (code) => {
+                    if (code === 0) {
+                        try {
+                            await fs.access(outputPath);
+                            console.log(`✅ Audio Edge-TTS généré: ${outputPath}`);
+                            resolve(outputPath);
+                        } catch (accessError) {
+                            console.log('⚠️ Fichier audio non créé');
+                            resolve(null);
+                        }
+                    } else {
+                        console.log(`⚠️ Edge-TTS erreur code ${code}: ${errorOutput}`);
+                        resolve(null);
+                    }
+                });
+                
+                edgeProcess.on('error', (error) => {
+                    console.log('⚠️ Edge-TTS non disponible:', error.message);
+                    resolve(null);
+                });
+            });
+            
+        } catch (error) {
+            console.log('⚠️ Erreur Edge-TTS:', error.message);
+            return null;
+        }
             
         } catch (error) {
             console.error('❌ Erreur Edge-TTS gratuit:', error.message);
