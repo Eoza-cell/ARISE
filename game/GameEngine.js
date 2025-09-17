@@ -1288,95 +1288,83 @@ class GameEngine {
 
             // Détecter si le joueur utilise des guillemets pour parler à un PNJ
             const hasQuotes = message.includes('"') || message.includes('«') || message.includes('»');
-            const isDialogue = hasQuotes || 
-                              message.toLowerCase().includes('parler') || 
-                              message.toLowerCase().includes('dire') ||
-                              message.toLowerCase().includes('demander');
 
-            // Si c'est un dialogue avec guillemets, générer la réponse vocale du PNJ
-            if (hasQuotes && this.pollinationsClient) {
+            if (hasQuotes) {
+                // Dialogue avec PNJ détecté
+                console.log(`💬 Dialogue PNJ détecté pour ${character.name}: ${message}`);
+
+                // Extraire le texte entre guillemets
+                const dialogueMatch = message.match(/["""«»]([^"""«»]+)["""«»]/);
+                const playerSpeech = dialogueMatch ? dialogueMatch[1] : message;
+
+                // Générer un PNJ générique pour le dialogue
+                const npcName = "Habitant local";
+                const npcDescription = `Un habitant de ${character.currentLocation} dans le royaume ${character.kingdom}`;
+
+                // Générer la réponse du PNJ avec IA
+                let npcResponse;
                 try {
-                    console.log('🎭 Génération réponse vocale PNJ...');
+                    if (this.groqClient && this.groqClient.hasValidClient()) {
+                        console.log('🎭 Génération réponse PNJ avec Groq...');
+                        npcResponse = await this.groqClient.generateNPCResponse(npcName, npcDescription, playerSpeech, {
+                            location: character.currentLocation,
+                            kingdom: character.kingdom,
+                            playerName: character.name
+                        });
+                    } else if (this.openAIClient && this.openAIClient.hasValidClient()) {
+                        console.log('🎭 Génération réponse PNJ avec OpenAI...');
+                        npcResponse = await this.openAIClient.generateNPCResponse({
+                            name: npcName,
+                            faction: character.kingdom,
+                            personality: "local",
+                            status: "habitant"
+                        }, `Dialogue avec ${character.name} à ${character.currentLocation}`, playerSpeech);
+                    } else {
+                        npcResponse = `"Bonjour ${character.name}, comment puis-je vous aider ?"`;
+                    }
+                } catch (error) {
+                    console.error('❌ Erreur génération réponse PNJ:', error);
+                    npcResponse = `"Je vous écoute, ${character.name}."`;
+                }
 
-                    // Extraire le texte entre guillemets
-                    const dialogueMatch = message.match(/["""«]([^"""»]+)["""»]/);
-                    const playerDialogue = dialogueMatch ? dialogueMatch[1] : message;
+                // Générer l'image et l'audio du dialogue
+                try {
+                    const dialogueResult = await imageGenerator.generateDialogueImage(character, npcName, npcResponse, {
+                        style: '3d',
+                        voice: 'local'
+                    });
 
-                    // Générer une réponse de PNJ
-                    const npcResponse = await this.generateNPCResponse(character, playerDialogue, sessionId);
+                    const dialogueImage = dialogueResult.image;
+                    const dialogueAudio = dialogueResult.audio;
 
-                    // Générer l'audio pour la réponse du PNJ (pas la narration)
-                    audioPath = await this.pollinationsClient.generateDialogueVoice(
-                        character,
-                        "PNJ",
-                        npcResponse,
-                        path.join(process.cwd(), 'temp', `dialogue_${timestamp}.mp3`),
-                        { gender: 'male', speed: 0.9 } // Utiliser 'male' par défaut pour les PNJ
-                    );
+                    // Retourner la réponse complète
+                    return {
+                        text: `🗣️ **Dialogue avec ${npcName}**\n\n` +
+                              `👤 **Vous dites :** "${playerSpeech}"\n\n` +
+                              `🎭 **${npcName} répond :** ${npcResponse}\n\n` +
+                              `📍 **Lieu :** ${character.currentLocation}`,
+                        image: dialogueImage,
+                        audio: dialogueAudio
+                    };
 
-                    // Ajouter la réponse du PNJ à la narration
-                    narration = `💬 **PNJ répond :** "${npcResponse}"`; // Remplacer la narration par la réponse du PNJ
-
-                } catch (audioError) {
-                    console.log('⚠️ Erreur génération dialogue PNJ:', audioError.message);
-                    audioPath = null;
+                } catch (imageError) {
+                    console.error('❌ Erreur génération image PNJ:', imageError);
+                    return {
+                        text: `🗣️ **Dialogue avec ${npcName}**\n\n` +
+                              `👤 **Vous dites :** "${playerSpeech}"\n\n` +
+                              `🎭 **${npcName} répond :** ${npcResponse}\n\n` +
+                              `📍 **Lieu :** ${character.currentLocation}`
+                    };
                 }
             }
 
-            // Si ce n'est pas un dialogue avec guillemets, traiter comme une action de jeu normale
-            if (!isDialogue) {
-                 return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
-            }
-            
-            // Si c'est un dialogue, on utilise la narration du PNJ et l'audio associé
-            // On réutilise processGameActionWithAI pour gérer la logique de jeu et la génération d'images/vidéos,
-            // mais on force la narration et l'audio du PNJ.
-
-            // Récupérer l'analyse d'action (nécessaire pour les dégâts, etc.)
-            const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
-                character: character,
-                location: character.currentLocation,
-                kingdom: character.kingdom
-            }, sessionId);
-
-            // Appliquer les modifications de vie/énergie basées sur l'analyse
-            const energyCost = Math.max(0, Math.min(character.currentEnergy, actionAnalysis.energyCost || 10));
-            character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
-            // Dans un dialogue, on ne prend pas de dégâts, sauf si le PNJ est agressif.
-            // Pour l'instant, pas de dégâts lors des dialogues classiques.
-
-            await dbManager.updateCharacter(character.id, {
-                currentEnergy: character.currentEnergy
-            });
-
-            const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
-            const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
-
-            // Générer une image pour l'interaction avec le PNJ
-            let actionImage = null;
-            try {
-                actionImage = await imageGenerator.generateNPCInteractionImage(character, message, narration);
-            } catch (mediaError) {
-                console.error('❌ Erreur génération image PNJ:', mediaError.message);
-            }
-
-            const responseText = `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
-                               `💬 **Dialogue :** ${narration}\n\n` +
-                               `❤️ **Vie :** ${lifeBar}\n` +
-                               `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
-                               `💰 **Argent :** ${character.coins} pièces d'or\n\n` +
-                               `💭 *Que réponds-tu au PNJ ?*`;
-
-            return {
-                text: responseText,
-                image: actionImage,
-                audio: audioPath // Audio du PNJ s'il a été généré
-            };
+            // Si pas de guillemets, traiter comme action normale
+            return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
 
         } catch (error) {
             console.error('❌ Erreur lors du traitement du dialogue:', error);
             return {
-                text: `❌ Une erreur s'est produite pendant le dialogue. Veuillez réessayer.`
+                text: `❌ Erreur lors du traitement de votre message. Réessayez.`
             };
         }
     }

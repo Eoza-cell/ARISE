@@ -1,6 +1,6 @@
 const { Pool } = require('@neondatabase/serverless');
 const { drizzle } = require('drizzle-orm/neon-serverless');
-const { eq, and } = require('drizzle-orm');
+const { eq, and, desc, gte, lt } = require('drizzle-orm');
 const ws = require('ws');
 
 // Import du schéma
@@ -10,6 +10,7 @@ class DatabaseManager {
     constructor() {
         this.pool = null;
         this.db = null;
+        this.tempData = new Map(); // Initialiser tempData ici
     }
 
     async initialize() {
@@ -26,10 +27,10 @@ class DatabaseManager {
             this.db = drizzle(this.pool, { schema });
 
             console.log('✅ Connexion à la base de données établie');
-            
+
             // Push du schéma vers la base de données
             await this.pushSchema();
-            
+
         } catch (error) {
             console.error('❌ Erreur de connexion à la base de données:', error);
             throw error;
@@ -39,7 +40,7 @@ class DatabaseManager {
     async pushSchema() {
         try {
             console.log('📊 Initialisation du schéma de base de données...');
-            
+
             // Vérifier si les tables existent déjà
             const tableCheckQuery = `
                 SELECT table_name 
@@ -47,20 +48,20 @@ class DatabaseManager {
                 WHERE table_schema = 'public' 
                 AND table_name IN ('players', 'characters', 'kingdoms', 'orders', 'techniques', 'equipment', 'game_sessions')
             `;
-            
+
             const existingTables = await this.pool.query(tableCheckQuery);
-            
+
             if (existingTables.rows.length === 0) {
                 console.log('📊 Création des tables de base de données...');
-                
+
                 // Créer les tables dans l'ordre correct (dépendances)
                 await this.createTables();
-                
+
                 console.log('✅ Tables créées avec succès');
             } else {
                 console.log('✅ Tables de base de données déjà existantes');
             }
-            
+
             console.log('✅ Schéma de base de données initialisé');
         } catch (error) {
             console.error('❌ Erreur lors de la création du schéma:', error);
@@ -295,17 +296,51 @@ class DatabaseManager {
 
     async updateCharacter(characterId, updates) {
         try {
-            const [character] = await this.db
-                .update(schema.characters)
-                .set({
-                    ...updates,
-                    updatedAt: new Date()
-                })
-                .where(eq(schema.characters.id, characterId))
-                .returning();
-            return character;
+            const query = `
+                UPDATE characters 
+                SET currentLife = ?, currentEnergy = ?, coins = ?, 
+                    currentLocation = ?, position = ?, equipment = ?, 
+                    learnedTechniques = ?, inventory = ?, updatedAt = CURRENT_TIMESTAMP
+                WHERE id = ?
+            `;
+
+            const result = await this.db.run(query, [
+                updates.currentLife,
+                updates.currentEnergy,
+                updates.coins,
+                updates.currentLocation || '',
+                JSON.stringify(updates.position || {}),
+                JSON.stringify(updates.equipment || {}),
+                JSON.stringify(updates.learnedTechniques || []),
+                JSON.stringify(updates.inventory || []),
+                characterId
+            ]);
+
+            if (result.changes === 0) {
+                throw new Error(`Aucun personnage trouvé avec l'ID ${characterId}`);
+            }
+
+            console.log(`✅ Personnage ${characterId} mis à jour`);
+            return true;
         } catch (error) {
-            console.error('❌ Erreur lors de la mise à jour du personnage:', error);
+            console.error('❌ Erreur mise à jour personnage:', error);
+            throw error;
+        }
+    }
+
+    async deleteCharacter(characterId) {
+        try {
+            const query = `DELETE FROM characters WHERE id = ?`;
+            const result = await this.db.run(query, [characterId]);
+
+            if (result.changes === 0) {
+                throw new Error(`Aucun personnage trouvé avec l'ID ${characterId}`);
+            }
+
+            console.log(`✅ Personnage ${characterId} supprimé`);
+            return true;
+        } catch (error) {
+            console.error('❌ Erreur suppression personnage:', error);
             throw error;
         }
     }
@@ -442,15 +477,15 @@ class DatabaseManager {
             if (!this.tempData) {
                 this.tempData = new Map();
             }
-            
+
             const playerKey = `${playerId}_${key}`;
             this.tempData.set(playerKey, value);
-            
+
             // Auto-nettoyage après 10 minutes
             setTimeout(() => {
                 this.tempData.delete(playerKey);
             }, 10 * 60 * 1000);
-            
+
         } catch (error) {
             console.error('❌ Erreur lors de la sauvegarde temporaire:', error);
         }
@@ -461,10 +496,10 @@ class DatabaseManager {
             if (!this.tempData) {
                 return null;
             }
-            
+
             const playerKey = `${playerId}_${key}`;
             return this.tempData.get(playerKey) || null;
-            
+
         } catch (error) {
             console.error('❌ Erreur lors de la récupération temporaire:', error);
             return null;
@@ -476,10 +511,10 @@ class DatabaseManager {
             if (!this.tempData) {
                 return;
             }
-            
+
             const playerKey = `${playerId}_${key}`;
             this.tempData.delete(playerKey);
-            
+
         } catch (error) {
             console.error('❌ Erreur lors du nettoyage temporaire:', error);
         }
@@ -492,7 +527,7 @@ class DatabaseManager {
                 .from(schema.characters)
                 .where(eq(schema.characters.name, name))
                 .limit(1);
-            
+
             return character || null;
         } catch (error) {
             console.error('❌ Erreur lors de la recherche par nom:', error);
@@ -520,7 +555,7 @@ class DatabaseManager {
                 .insert(schema.conversationMemory)
                 .values(memoryData)
                 .returning();
-            
+
             return memory;
         } catch (error) {
             console.error('❌ Erreur lors de la sauvegarde mémoire:', error);
@@ -536,7 +571,7 @@ class DatabaseManager {
                 .where(eq(schema.conversationMemory.sessionId, sessionId))
                 .orderBy(desc(schema.conversationMemory.timestamp))
                 .limit(limit);
-            
+
             return memories.reverse(); // Retourner dans l'ordre chronologique
         } catch (error) {
             console.error('❌ Erreur lors de la récupération mémoire:', error);
@@ -548,22 +583,22 @@ class DatabaseManager {
         try {
             // Recherche simple par mots-clés dans le contenu
             const keywords = searchText.toLowerCase().split(' ').filter(word => word.length > 3);
-            
+
             if (keywords.length === 0) return [];
-            
+
             const memories = await this.db
                 .select()
                 .from(schema.conversationMemory)
                 .where(eq(schema.conversationMemory.sessionId, sessionId))
                 .orderBy(desc(schema.conversationMemory.importance))
                 .limit(100); // Récupérer plus pour filtrer
-            
+
             // Filtrer par pertinence
             const relevantMemories = memories.filter(memory => {
                 const content = memory.content.toLowerCase();
                 return keywords.some(keyword => content.includes(keyword));
             });
-            
+
             return relevantMemories.slice(0, limit);
         } catch (error) {
             console.error('❌ Erreur lors de la recherche mémoire:', error);
@@ -575,10 +610,10 @@ class DatabaseManager {
         try {
             const player = await this.getPlayerByWhatsApp(playerId);
             if (!player) return null;
-            
+
             const character = await this.getCharacterByPlayer(player.id);
             const memories = await this.getConversationMemory(`player_${player.id}`, 1000);
-            
+
             const backup = {
                 player: player,
                 character: character,
@@ -586,19 +621,19 @@ class DatabaseManager {
                 timestamp: new Date(),
                 version: '1.0'
             };
-            
+
             // Sauvegarder dans une table de backup
             const backupData = {
                 playerId: player.id,
                 backupData: JSON.stringify(backup),
                 createdAt: new Date()
             };
-            
+
             await this.pool.query(
                 'INSERT INTO game_backups (player_id, backup_data, created_at) VALUES ($1, $2, $3)',
                 [backupData.playerId, backupData.backupData, backupData.createdAt]
             );
-            
+
             console.log(`✅ Sauvegarde créée pour le joueur ${player.id}`);
             return backup;
         } catch (error) {
@@ -620,7 +655,7 @@ class DatabaseManager {
                 )
                 .orderBy(desc(schema.conversationMemory.importance))
                 .limit(limit);
-            
+
             return memories;
         } catch (error) {
             console.error('❌ Erreur lors de la récupération mémoires importantes:', error);
@@ -644,7 +679,7 @@ class DatabaseManager {
                 .insert(schema.characterMemories)
                 .values(memoryData)
                 .returning();
-            
+
             return memory;
         } catch (error) {
             console.error('❌ Erreur lors de la sauvegarde mémoire personnage:', error);
@@ -660,7 +695,7 @@ class DatabaseManager {
                 .where(eq(schema.characterMemories.characterId, characterId))
                 .orderBy(desc(schema.characterMemories.importance))
                 .limit(limit);
-            
+
             return memories;
         } catch (error) {
             console.error('❌ Erreur lors de la récupération mémoires personnage:', error);
@@ -673,7 +708,7 @@ class DatabaseManager {
         try {
             const cutoffDate = new Date();
             cutoffDate.setDate(cutoffDate.getDate() - daysOld);
-            
+
             const deleted = await this.db
                 .delete(schema.conversationMemory)
                 .where(
@@ -682,7 +717,7 @@ class DatabaseManager {
                         lt(schema.conversationMemory.importance, minImportance)
                     )
                 );
-            
+
             console.log(`🧹 Nettoyage mémoire: ${deleted.rowCount} entrées supprimées`);
             return deleted.rowCount;
         } catch (error) {
