@@ -2,11 +2,15 @@
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
+const PlayHTClient = require('../playht/PlayHTClient');
 
 class PollinationsClient {
     constructor() {
         this.baseURL = 'https://image.pollinations.ai/prompt';
         this.isAvailable = true;
+        
+        // Initialiser le client de synthèse vocale PlayHT
+        this.playhtClient = new PlayHTClient();
         
         console.log('✅ PollinationsClient initialisé avec succès (GRATUIT)');
     }
@@ -156,49 +160,89 @@ class PollinationsClient {
     }
 
     /**
-     * Fallback pour génération vocale si Pollinations ne fonctionne pas
+     * Fallback pour génération vocale utilisant PlayHT
      */
-    async generateFallbackVoice(text, outputPath) {
-        console.log('🔄 Fallback: génération vocale désactivée temporairement');
-        
-        // Créer le dossier si nécessaire
-        const dir = path.dirname(outputPath);
-        await fs.mkdir(dir, { recursive: true });
-        
-        // Retourner null pour indiquer qu'aucun audio n'a été généré
-        // Cela évitera d'envoyer des fichiers audio vides
-        console.log(`⚠️ Génération vocale désactivée - aucun fichier audio créé`);
-        return null;
+    async generateFallbackVoice(text, outputPath, options = {}) {
+        try {
+            console.log('🔄 Fallback: utilisation de PlayHT pour la synthèse vocale');
+            
+            // Créer le dossier si nécessaire
+            const dir = path.dirname(outputPath);
+            await fs.mkdir(dir, { recursive: true });
+            
+            // Utiliser PlayHT pour générer l'audio
+            if (this.playhtClient && this.playhtClient.hasValidClient()) {
+                const audioPath = await this.playhtClient.generateVoice(text, outputPath, options);
+                if (audioPath) {
+                    console.log(`✅ Audio généré avec PlayHT: ${audioPath}`);
+                    return audioPath;
+                }
+            }
+            
+            console.log(`⚠️ PlayHT non disponible - aucun fichier audio créé`);
+            return null;
+            
+        } catch (error) {
+            console.error('❌ Erreur fallback PlayHT:', error.message);
+            return null;
+        }
     }
 
     /**
      * Génère un dialogue vocal pour les PNJ
      */
     async generateDialogueVoice(character, npcName, dialogue, outputPath, options = {}) {
-        // Adapter la voix selon le sexe du personnage ou du PNJ
-        const voiceOptions = {
-            voice: character.gender === 'male' ? 'echo' : 'nova',
-            speed: 0.9, // Un peu plus lent pour les dialogues
-            language: 'fr',
-            ...options
-        };
+        try {
+            console.log(`🎭 Génération dialogue vocal pour ${npcName}: "${dialogue.substring(0, 30)}..."`);
+            
+            // Utiliser directement PlayHT pour les dialogues
+            if (this.playhtClient && this.playhtClient.hasValidClient()) {
+                return await this.playhtClient.generateDialogueVoice(character, npcName, dialogue, outputPath, options);
+            }
+            
+            // Fallback si PlayHT n'est pas disponible
+            const voiceOptions = {
+                voice: character.gender === 'male' ? 'warrior' : 'warrior',
+                gender: character.gender || 'male',
+                speed: 0.9,
+                ...options
+            };
 
-        const voiceText = `${npcName} dit: ${dialogue}`;
-        return await this.generateVoice(voiceText, outputPath, voiceOptions);
+            const voiceText = `${dialogue}`;
+            return await this.generateFallbackVoice(voiceText, outputPath, voiceOptions);
+            
+        } catch (error) {
+            console.error('❌ Erreur génération dialogue vocal:', error.message);
+            return null;
+        }
     }
 
     /**
      * Génère un audio de narration pour les actions
      */
     async generateNarrationVoice(narration, outputPath, options = {}) {
-        const voiceOptions = {
-            voice: 'onyx', // Voix narrative
-            speed: 1.0,
-            language: 'fr',
-            ...options
-        };
+        try {
+            console.log(`📖 Génération narration vocale: "${narration.substring(0, 30)}..."`);
+            
+            // Utiliser directement PlayHT pour la narration
+            if (this.playhtClient && this.playhtClient.hasValidClient()) {
+                return await this.playhtClient.generateNarrationVoice(narration, outputPath, options);
+            }
+            
+            // Fallback si PlayHT n'est pas disponible
+            const voiceOptions = {
+                voice: 'default',
+                gender: 'male',
+                speed: 1.0,
+                ...options
+            };
 
-        return await this.generateVoice(narration, outputPath, voiceOptions);
+            return await this.generateFallbackVoice(narration, outputPath, voiceOptions);
+            
+        } catch (error) {
+            console.error('❌ Erreur génération narration vocale:', error.message);
+            return null;
+        }
     }
 }
 
