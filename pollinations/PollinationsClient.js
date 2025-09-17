@@ -445,20 +445,29 @@ class PollinationsClient {
         try {
             console.log(`📖 Génération narration vocale: "${narration.substring(0, 30)}..."`);
             
-            // Utiliser directement PlayHT pour la narration
-            if (this.playhtClient && this.playhtClient.hasValidClient()) {
-                return await this.playhtClient.generateNarrationVoice(narration, outputPath, options);
-            }
-            
-            // Fallback si PlayHT n'est pas disponible
+            // Forcer l'utilisation d'Edge-TTS directement
             const voiceOptions = {
-                voice: 'default',
+                voice: 'fr-FR-HenriNeural', // Voix masculine pour narrateur
                 gender: 'male',
-                speed: 1.0,
+                speed: 0.9,
                 ...options
             };
 
-            return await this.generateFallbackVoice(narration, outputPath, voiceOptions);
+            // Essayer Edge-TTS en priorité
+            const edgeResult = await this.generateFreeVoice(narration, outputPath, voiceOptions);
+            if (edgeResult) {
+                console.log('✅ Audio narrateur généré avec Edge-TTS');
+                return edgeResult;
+            }
+
+            // Fallback vers PlayHT uniquement si Edge-TTS échoue
+            if (this.playhtClient && this.playhtClient.hasValidClient()) {
+                console.log('🔄 Fallback vers PlayHT pour narration');
+                return await this.playhtClient.generateNarrationVoice(narration, outputPath, options);
+            }
+            
+            console.log('⚠️ Aucune synthèse vocale disponible pour la narration');
+            return null;
             
         } catch (error) {
             console.error('❌ Erreur génération narration vocale:', error.message);

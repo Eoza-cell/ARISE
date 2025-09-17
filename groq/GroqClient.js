@@ -76,7 +76,7 @@ class GroqClient {
         return this.isAvailable && this.client;
     }
 
-    async generateNarration(prompt, maxTokens = 80) {
+    async generateNarration(prompt, maxTokens = 120) {
         if (!this.hasValidClient()) {
             throw new Error('Client Groq non disponible');
         }
@@ -86,10 +86,12 @@ class GroqClient {
                 messages: [
                     {
                         role: 'system',
-                        content: `Tu es un narrateur RPG ULTRA-CONCIS. 
-                        Génère EXACTEMENT 1-2 phrases COURTES en français.
-                        INTERDICTION de décrire les détails d'équipement, inventaire, vapeur, engrenages.
-                        Style: Action directe → conséquence immédiate. Point final.`
+                        content: `Tu es un narrateur RPG immersif et créatif. 
+                        Génère 3-4 phrases riches et évocatrices en français.
+                        DÉVELOPPE l'ambiance, les réactions des PNJ, l'environnement.
+                        ÉVITE seulement les longs inventaires d'objets techniques.
+                        Style: Action du joueur → conséquences vivantes → ambiance du lieu → réaction des personnages.
+                        Sois créatif et immersif, pas juste descriptif.`
                     },
                     {
                         role: 'user',
@@ -98,10 +100,10 @@ class GroqClient {
                 ],
                 model: this.model,
                 max_tokens: maxTokens,
-                temperature: 0.6,
-                top_p: 0.8,
-                frequency_penalty: 0.5,
-                presence_penalty: 0.3
+                temperature: 0.8,
+                top_p: 0.9,
+                frequency_penalty: 0.3,
+                presence_penalty: 0.4
             });
 
             const narration = response.choices[0]?.message?.content?.trim();
@@ -109,7 +111,7 @@ class GroqClient {
                 throw new Error('Réponse vide de Groq');
             }
 
-            console.log('✅ Narration courte générée avec Groq');
+            console.log('✅ Narration immersive générée avec Groq');
             return narration;
         } catch (error) {
             console.error('❌ Erreur génération narration Groq:', error.message);
@@ -155,23 +157,25 @@ class GroqClient {
         }
     }
 
-    async generateExplorationNarration(location, action, sessionId = "default", character = null, maxTokens = 200) {
+    async generateExplorationNarration(location, action, sessionId = "default", character = null, maxTokens = 250) {
         const locationContinuity = this.getLocationContinuity(sessionId, location);
 
-        const prompt = `Décris cette action RPG en 2 phrases courtes et directes:
+        const prompt = `Raconte cette scène RPG de façon immersive et vivante:
+        Personnage: ${character ? character.name : 'Le héros'}
         Lieu: ${location}
-        Action: ${action}
+        Action du joueur: ${action}
 
         ${locationContinuity}
 
-        RÈGLES STRICTES:
-        1. MAXIMUM 2 phrases courtes
-        2. Pas de descriptions d'équipement/inventaire
-        3. Action directe et conséquences immédiates
-        4. Style Dark Souls - dangereux mais concis
-        5. Évite les détails inutiles sur la vapeur, engrenages, etc.
+        CRÉÉ UNE NARRATION RICHE:
+        1. Commence par l'action du personnage
+        2. Décris les réactions de l'environnement et des PNJ
+        3. Ajoute l'ambiance du lieu (sons, odeurs, lumière)
+        4. Termine par les conséquences ou nouvelles possibilités
+        5. 3-4 phrases évocatrices et immersives
+        6. Évite seulement les longs détails techniques répétitifs
 
-        Réponds de façon TRÈS concise:`;
+        Sois créatif et captivant:`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);
