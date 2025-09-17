@@ -1,4 +1,3 @@
-
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
@@ -8,10 +7,10 @@ class PollinationsClient {
     constructor() {
         this.baseURL = 'https://image.pollinations.ai/prompt';
         this.isAvailable = true;
-        
+
         // Initialiser le client de synthèse vocale PlayHT
         this.playhtClient = new PlayHTClient();
-        
+
         console.log('✅ PollinationsClient initialisé avec succès (GRATUIT)');
     }
 
@@ -27,17 +26,17 @@ class PollinationsClient {
             const style = options.style || '3d';
             const perspective = options.perspective || 'first_person';
             const nudity = options.nudity || true;
-            
+
             // Optimiser le prompt
             const optimizedPrompt = this.optimizePrompt(prompt, style, perspective, nudity);
-            
+
             console.log(`✨ Prompt final optimisé: "${optimizedPrompt}"`);
 
             // URL de l'API Pollinations avec paramètres
             const imageUrl = `${this.baseURL}/${encodeURIComponent(optimizedPrompt)}?width=1024&height=1024&seed=-1&model=flux&nologo=true`;
-            
+
             console.log(`📥 Téléchargement depuis: ${imageUrl.substring(0, 100)}...`);
-            
+
             // Télécharger l'image directement
             const response = await axios.get(imageUrl, {
                 responseType: 'arraybuffer',
@@ -50,11 +49,11 @@ class PollinationsClient {
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
-            
+
             // Sauvegarder l'image
             await fs.writeFile(outputPath, Buffer.from(response.data));
             console.log(`✅ Image Pollinations générée GRATUITEMENT: ${outputPath}`);
-            
+
             return outputPath;
 
         } catch (error) {
@@ -79,10 +78,10 @@ class PollinationsClient {
         // Perspectives FORCÉES vue première personne style Skyrim
         const perspectiveMap = {
             'first_person': 'first person POV, immersive first-person view, Skyrim gameplay perspective, hands visible holding weapon, immersive camera angle',
-            'second_person': 'close-up portrait, face focus, detailed Skyrim character features, Elder Scrolls style face', 
+            'second_person': 'close-up portrait, face focus, detailed Skyrim character features, Elder Scrolls style face',
             'third_person': 'full body, dynamic pose, action shot, Skyrim character model'
         };
-        
+
         optimized = `${optimized}, ${perspectiveMap[perspective]}`;
 
         // Environnement et atmosphère Skyrim
@@ -111,7 +110,7 @@ class PollinationsClient {
 
     async generateMenuImage(outputPath) {
         const prompt = `Fantasy RPG main menu, epic medieval castle, magical atmosphere, cinematic lighting, game interface background`;
-        
+
         return await this.generateImage(prompt, outputPath, {
             style: '3d',
             perspective: 'third_person',
@@ -153,14 +152,14 @@ class PollinationsClient {
                 return await this.generatePollinationsVoice(text, outputPath, options);
             } catch (pollinationsError) {
                 console.log('⚠️ API Pollinations Audio échouée, utilisation Edge-TTS...');
-                
+
                 // Fallback vers Edge-TTS
                 const edgeResult = await this.generateFreeVoice(text, outputPath, options);
                 if (edgeResult) {
                     console.log('✅ Audio généré avec Edge-TTS');
                     return edgeResult;
                 }
-                
+
                 // Si Edge-TTS échoue aussi, essayer les méthodes système
                 console.log('⚠️ Edge-TTS échoué, tentative méthodes système...');
                 return await this.generateFallbackVoice(text, outputPath, options);
@@ -179,13 +178,13 @@ class PollinationsClient {
         try {
             // Choisir la voix selon le contexte
             let voice = 'alloy'; // Voix par défaut OpenAI
-            
+
             if (options.gender === 'male') {
                 voice = 'onyx'; // Voix masculine
             } else if (options.gender === 'female') {
                 voice = 'nova'; // Voix féminine
             }
-            
+
             // Voix spéciales pour les personnages
             if (options.voice === 'warrior') {
                 voice = options.gender === 'male' ? 'onyx' : 'shimmer';
@@ -194,25 +193,25 @@ class PollinationsClient {
             } else if (options.voice === 'noble') {
                 voice = options.gender === 'male' ? 'fable' : 'nova';
             }
-            
+
             console.log(`🎤 Pollinations Audio API - Voix: ${voice}, Texte: "${text.substring(0, 30)}..."`);
-            
+
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
-            
+
             // Nettoyer et limiter le texte
             let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
             if (cleanText.length > 200) {
                 cleanText = cleanText.substring(0, 200) + '...';
             }
-            
+
             // Encoder le texte pour l'URL
             const encodedText = encodeURIComponent(cleanText);
             const audioUrl = `https://text.pollinations.ai/${encodedText}?model=openai-audio&voice=${voice}`;
-            
+
             console.log(`🔊 Téléchargement audio depuis: ${audioUrl.substring(0, 100)}...`);
-            
+
             // Télécharger l'audio directement
             const response = await axios.get(audioUrl, {
                 responseType: 'arraybuffer',
@@ -224,26 +223,26 @@ class PollinationsClient {
 
             if (response.data && response.data.byteLength > 0) {
                 const audioBuffer = Buffer.from(response.data);
-                
+
                 // Sauvegarder l'audio en fichier aussi
                 await fs.writeFile(outputPath, audioBuffer);
                 console.log(`✅ Audio Pollinations généré: ${outputPath}`);
-                
+
                 // Retourner le buffer pour envoi direct
                 return audioBuffer;
             } else {
                 throw new Error('Audio vide reçu de Pollinations');
             }
-            
+
         } catch (error) {
             console.error('❌ Erreur Pollinations Audio API:', error.message);
-            
+
             // Si erreur 402 (payment required), essayer le fallback Edge-TTS
             if (error.response && error.response.status === 402) {
                 console.log('💡 API Pollinations Audio limitée (402), tentative Edge-TTS...');
                 return await this.generateWebSpeechAPI(text, outputPath, options);
             }
-            
+
             return null;
         }
     }
@@ -255,11 +254,11 @@ class PollinationsClient {
         try {
             // Choisir la voix selon le contexte
             let voice = 'fr-FR-DeniseNeural'; // Voix féminine par défaut
-            
+
             if (options.gender === 'male') {
                 voice = 'fr-FR-HenriNeural'; // Voix masculine
             }
-            
+
             // Voix spéciales pour les personnages
             if (options.voice === 'warrior') {
                 voice = options.gender === 'male' ? 'fr-FR-AlainNeural' : 'fr-FR-BrigitteNeural';
@@ -268,28 +267,28 @@ class PollinationsClient {
             } else if (options.voice === 'noble') {
                 voice = options.gender === 'male' ? 'fr-FR-JeromeNeural' : 'fr-FR-JacquelineNeural';
             }
-            
+
             const speed = options.speed || 1.0;
             const rate = speed !== 1.0 ? `+${Math.round((speed - 1) * 100)}%` : '+0%';
-            
+
             console.log(`🎤 Edge-TTS GRATUIT - Voix: ${voice}, Vitesse: ${rate}`);
-            
+
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
-            
+
             // Nettoyer le texte
             let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
             if (cleanText.length > 500) {
                 cleanText = cleanText.substring(0, 500) + '...';
             }
-            
+
             // Utiliser Edge-TTS pour générer l'audio
             const { spawn } = require('child_process');
-            
+
             return new Promise((resolve) => {
                 console.log(`🔊 Génération vocale Edge-TTS - Voix: ${voice}`);
-                
+
                 const edgeProcess = spawn('edge-tts', [
                     '--voice', voice,
                     '--text', cleanText,
@@ -298,13 +297,13 @@ class PollinationsClient {
                 ], {
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
-                
+
                 let errorOutput = '';
-                
+
                 edgeProcess.stderr.on('data', (data) => {
                     errorOutput += data.toString();
                 });
-                
+
                 edgeProcess.on('close', async (code) => {
                     if (code === 0) {
                         try {
@@ -320,88 +319,13 @@ class PollinationsClient {
                         resolve(null);
                     }
                 });
-                
+
                 edgeProcess.on('error', (error) => {
                     console.log('⚠️ Edge-TTS non disponible:', error.message);
                     resolve(null);
                 });
             });
-            
-        } catch (error) {
-            console.error('❌ Erreur Edge-TTS gratuit:', error.message);
-            return null;
-        }
-    }
-    
-    /**
-     * Utilise Edge-TTS pour synthèse vocale gratuite
-     */
-    async generateWebSpeechAPI(text, outputPath, options = {}) {
-        try {
-            console.log('🎤 Utilisation Edge-TTS pour synthèse vocale GRATUITE');
-            
-            // Voix française par défaut
-            const voice = options.voice || 'fr-FR-HenriNeural';
-            const rate = options.rate || '+0%';
-            
-            // Créer le dossier si nécessaire
-            const dir = path.dirname(outputPath);
-            await fs.mkdir(dir, { recursive: true });
-            
-            // Nettoyer et raccourcir le texte
-            let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
-            if (cleanText.length > 100) {
-                cleanText = cleanText.substring(0, 100) + '...';
-            }
-            
-            // Utiliser Edge-TTS directement
-            const { spawn } = require('child_process');
-            
-            return new Promise((resolve, reject) => {
-                console.log(`🔊 Génération vocale Edge-TTS - Voix: ${voice}`);
-                
-                const edgeProcess = spawn('edge-tts', [
-                    '--voice', voice,
-                    '--text', cleanText,
-                    '--write-media', outputPath,
-                    '--rate=' + rate  // Corriger le format du paramètre rate
-                ], {
-                    stdio: ['pipe', 'pipe', 'pipe']
-                });
-                
-                let errorOutput = '';
-                
-                edgeProcess.stderr.on('data', (data) => {
-                    errorOutput += data.toString();
-                });
-                
-                edgeProcess.on('close', async (code) => {
-                    if (code === 0) {
-                        try {
-                            await fs.access(outputPath);
-                            console.log(`✅ Audio Edge-TTS généré: ${outputPath}`);
-                            resolve(outputPath);
-                        } catch (accessError) {
-                            console.log('⚠️ Fichier audio non créé');
-                            resolve(null);
-                        }
-                    } else {
-                        console.log(`⚠️ Edge-TTS erreur code ${code}: ${errorOutput}`);
-                        resolve(null);
-                    }
-                });
-                
-                edgeProcess.on('error', (error) => {
-                    console.log('⚠️ Edge-TTS non disponible:', error.message);
-                    resolve(null);
-                });
-            });
-            
-        } catch (error) {
-            console.log('⚠️ Erreur Edge-TTS:', error.message);
-            return null;
-        }
-            
+
         } catch (error) {
             console.error('❌ Erreur Edge-TTS gratuit:', error.message);
             return null;
@@ -414,42 +338,42 @@ class PollinationsClient {
     async generateWebSpeechAPI(text, outputPath, options = {}) {
         try {
             console.log('🎤 Utilisation Edge-TTS pour synthèse vocale GRATUITE');
-            
+
             // Voix française par défaut
             const voice = options.voice || 'fr-FR-HenriNeural';
             const rate = options.rate || '+0%';
-            
+
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
-            
+
             // Nettoyer et raccourcir le texte
             let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
             if (cleanText.length > 100) {
                 cleanText = cleanText.substring(0, 100) + '...';
             }
-            
+
             // Utiliser Edge-TTS directement
             const { spawn } = require('child_process');
-            
+
             return new Promise((resolve, reject) => {
                 console.log(`🔊 Génération vocale Edge-TTS - Voix: ${voice}`);
-                
+
                 const edgeProcess = spawn('edge-tts', [
                     '--voice', voice,
                     '--text', cleanText,
                     '--write-media', outputPath,
-                    '--rate=' + rate  // Corriger le format du paramètre rate
+                    '--rate=' + rate
                 ], {
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
-                
+
                 let errorOutput = '';
-                
+
                 edgeProcess.stderr.on('data', (data) => {
                     errorOutput += data.toString();
                 });
-                
+
                 edgeProcess.on('close', async (code) => {
                     if (code === 0) {
                         try {
@@ -465,13 +389,13 @@ class PollinationsClient {
                         resolve(null);
                     }
                 });
-                
+
                 edgeProcess.on('error', (error) => {
                     console.log('⚠️ Edge-TTS non disponible:', error.message);
                     resolve(null);
                 });
             });
-            
+
         } catch (error) {
             console.log('⚠️ Erreur Edge-TTS:', error.message);
             return null;
@@ -484,11 +408,11 @@ class PollinationsClient {
     async generateFallbackVoice(text, outputPath, options = {}) {
         try {
             console.log('🔄 Fallback: tentative synthèse vocale alternative');
-            
+
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
-            
+
             // Essayer PlayHT d'abord
             if (this.playhtClient && this.playhtClient.hasValidClient()) {
                 const audioPath = await this.playhtClient.generateVoice(text, outputPath, options);
@@ -497,7 +421,7 @@ class PollinationsClient {
                     return audioPath;
                 }
             }
-            
+
             // Essayer une synthèse vocale système simple (si disponible)
             try {
                 const systemVoice = await this.generateSystemVoice(text, outputPath, options);
@@ -507,10 +431,10 @@ class PollinationsClient {
             } catch (sysError) {
                 console.log('⚠️ Synthèse système non disponible');
             }
-            
+
             console.log(`⚠️ Toutes les options vocales épuisées - mode texte uniquement`);
             return null;
-            
+
         } catch (error) {
             console.error('❌ Erreur fallback vocal:', error.message);
             return null;
@@ -523,18 +447,18 @@ class PollinationsClient {
     async generateSystemVoice(text, outputPath, options = {}) {
         try {
             console.log('🔊 Tentative synthèse système avec espeak...');
-            
+
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
-            
+
             const { spawn } = require('child_process');
-            
+
             return new Promise((resolve, reject) => {
                 // Utiliser espeak pour générer un fichier WAV temporaire
                 const tempWavPath = outputPath.replace('.mp3', '.wav');
                 const speed = options.speed ? Math.round(options.speed * 175) : 175;
-                
+
                 const espeakProcess = spawn('espeak', [
                     '-v', 'fr',
                     '-s', speed.toString(),
@@ -543,7 +467,7 @@ class PollinationsClient {
                 ], {
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
-                
+
                 espeakProcess.on('close', async (code) => {
                     if (code === 0) {
                         try {
@@ -554,7 +478,7 @@ class PollinationsClient {
                                 '-b:a', '128k',
                                 outputPath
                             ], { stdio: ['pipe', 'pipe', 'pipe'] });
-                            
+
                             ffmpegProcess.on('close', async (ffmpegCode) => {
                                 // Nettoyer le fichier WAV temporaire
                                 try {
@@ -562,7 +486,7 @@ class PollinationsClient {
                                 } catch (unlinkError) {
                                     console.log('⚠️ Impossible de supprimer le fichier temporaire');
                                 }
-                                
+
                                 if (ffmpegCode === 0) {
                                     console.log(`✅ Audio système généré (espeak + ffmpeg): ${outputPath}`);
                                     resolve(outputPath);
@@ -577,7 +501,7 @@ class PollinationsClient {
                                     }
                                 }
                             });
-                            
+
                             ffmpegProcess.on('error', async () => {
                                 // Si ffmpeg n'est pas disponible, utiliser le WAV
                                 try {
@@ -588,7 +512,7 @@ class PollinationsClient {
                                     resolve(null);
                                 }
                             });
-                            
+
                         } catch (conversionError) {
                             resolve(null);
                         }
@@ -597,13 +521,13 @@ class PollinationsClient {
                         resolve(null);
                     }
                 });
-                
+
                 espeakProcess.on('error', (error) => {
                     console.log('⚠️ espeak non installé');
                     resolve(null);
                 });
             });
-            
+
         } catch (error) {
             console.error('❌ Erreur synthèse système:', error.message);
             return null;
@@ -616,7 +540,7 @@ class PollinationsClient {
     async generateDialogueVoice(character, npcName, dialogue, outputPath, options = {}) {
         try {
             console.log(`🎭 Génération dialogue vocal pour ${npcName}: "${dialogue.substring(0, 30)}..."`);
-            
+
             // Utiliser la nouvelle API Pollinations directement
             const voiceOptions = {
                 voice: 'warrior',
@@ -625,10 +549,10 @@ class PollinationsClient {
             };
 
             return await this.generatePollinationsVoice(dialogue, outputPath, voiceOptions);
-            
+
         } catch (error) {
             console.error('❌ Erreur génération dialogue vocal:', error.message);
-            
+
             // Fallback vers PlayHT ou autres méthodes
             if (this.playhtClient && this.playhtClient.hasValidClient()) {
                 try {
@@ -637,7 +561,7 @@ class PollinationsClient {
                     console.log('⚠️ Fallback PlayHT échoué aussi');
                 }
             }
-            
+
             return null;
         }
     }
@@ -648,7 +572,7 @@ class PollinationsClient {
     async generateNarrationVoice(narration, outputPath, options = {}) {
         try {
             console.log(`📖 Génération narration vocale: "${narration.substring(0, 30)}..."`);
-            
+
             // Utiliser la nouvelle API Pollinations directement
             const voiceOptions = {
                 voice: 'fable', // Voix narrative
@@ -657,10 +581,10 @@ class PollinationsClient {
             };
 
             return await this.generatePollinationsVoice(narration, outputPath, voiceOptions);
-            
+
         } catch (error) {
             console.error('❌ Erreur génération narration vocale:', error.message);
-            
+
             // Fallback vers les anciennes méthodes
             try {
                 const fallbackResult = await this.generateFallbackVoice(narration, outputPath, options);
@@ -670,7 +594,7 @@ class PollinationsClient {
             } catch (fallbackError) {
                 console.log('⚠️ Tous les fallbacks vocaux échoués');
             }
-            
+
             return null;
         }
     }
