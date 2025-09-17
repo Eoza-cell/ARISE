@@ -3,6 +3,7 @@ const OpenAIClient = require('../ai/OpenAIClient');
 const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
 const CharacterCustomizationManager = require('../utils/CharacterCustomizationManager');
+const ImmersiveNarrationManager = require('../utils/ImmersiveNarrationManager');
 const path = require('path'); // Importer le module path pour gérer les chemins de fichiers
 
 class GameEngine {
@@ -12,6 +13,9 @@ class GameEngine {
         this.ollamaClient = new OllamaClient();
         this.groqClient = new GroqClient();
         this.geminiClient = new GeminiClient();
+
+        // Système de narration immersive avec chronologie réaliste
+        this.narrationManager = new ImmersiveNarrationManager(this.dbManager);
 
         // Sera initialisé dans setWhatsAppSocket une fois que sock est disponible
         this.characterCustomization = null;
@@ -126,8 +130,8 @@ class GameEngine {
                     return await this.processDialogueAction({ player, character, message, dbManager, imageGenerator });
                 }
 
-                // Traitement des actions de jeu normales avec IA Gemini
-                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
+                // Traitement des actions de jeu avec système immersif et chronologie réaliste
+                return await this.processGameActionWithImmersiveSystem({ player, character, message, dbManager, imageGenerator });
             }
 
             return response;

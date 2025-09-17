@@ -76,12 +76,12 @@ class CambAIClient {
                 cleanText = cleanText.substring(0, 500) + '...';
             }
 
-            // Configuration par défaut avec options personnalisables
+            // Configuration simple selon la documentation Camb AI
             const ttsConfig = {
                 text: cleanText,
-                language: this.getLanguageId(options.language || 'fr'), // Français par défaut
-                age: options.age || 25,
-                gender: this.getGenderId(options.gender || 'male')
+                language: 1, // 1 = Français selon la doc API
+                age: options.age || 30,
+                gender: options.gender === 'female' ? 1 : 0 // 0 = male, 1 = female
             };
 
             // Ajouter voice_id si spécifié
