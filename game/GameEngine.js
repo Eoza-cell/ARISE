@@ -257,10 +257,13 @@ class GameEngine {
             console.log(`🎭 Création par IA pour ${player.whatsappNumber}: ${description}`);
 
             // Utiliser l'IA pour analyser la description et générer le personnage
-            const characterData = await this.generateCharacterFromDescription(description, player);
+            const characterDataFromAI = await this.generateCharacterFromDescription(description, player);
 
             // Créer le personnage dans la base de données
-            const newCharacter = await dbManager.createCharacter(characterData);
+            const newCharacter = await dbManager.createCharacter({
+                ...characterDataFromAI,
+                appearance: description // Sauvegarder la description originale du joueur
+            });
 
             // Nettoyer les données temporaires
             await dbManager.clearTemporaryData(player.id, 'creation_started');

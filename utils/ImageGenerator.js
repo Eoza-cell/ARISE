@@ -235,7 +235,7 @@ class ImageGenerator {
                 try {
                     console.log('🎨 Génération image menu avec KieAI (fallback)...');
                     const prompt = 'RPG main menu background, medieval fantasy game interface, epic fantasy landscape, game UI, medieval castle, magical atmosphere';
-                    await this.kieaiClient.generateImage(prompt, imagePath, { style: '3d', perspective: 'landscape' });
+                    await this.kieaiClient.generateCombatScene(prompt, imagePath, { style: '3d', perspective: 'landscape' });
 
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                     if (imageBuffer) {
@@ -380,7 +380,26 @@ class ImageGenerator {
             if (this.hasPollinations && this.pollinationsClient) {
                 try {
                     console.log(`🎨 Génération image personnage ${sanitizedCharacter.name} avec Pollinations GRATUIT (vue première personne)...`);
-                    await this.pollinationsClient.generateCharacterImage(sanitizedCharacter, imagePath, imageOptions);
+                    // Construire le prompt détaillé avec toutes les caractéristiques
+                    const genderDesc = sanitizedCharacter.gender === 'male' ? 'male' : 'female';
+                    let prompt = `detailed fantasy ${genderDesc} character named ${sanitizedCharacter.name}`;
+
+                    // Ajouter les caractéristiques physiques si disponibles
+                    if (sanitizedCharacter.appearance) {
+                        // Si le personnage a une description personnalisée, l'utiliser prioritairement
+                        prompt += `, appearance: ${sanitizedCharacter.appearance}`;
+                    } else {
+                        // Sinon utiliser les caractéristiques par défaut du royaume
+                        const kingdomDesc = this.getDetailedKingdomAppearance(sanitizedCharacter.kingdom);
+                        prompt += `, ${kingdomDesc}`;
+                    }
+
+                    if (sanitizedCharacter.kingdom) {
+                        prompt += `, from ${sanitizedCharacter.kingdom} kingdom`;
+                    }
+
+                    prompt += ', detailed fantasy RPG character art, high quality, medieval fantasy style';
+                    await this.pollinationsClient.generateImage(prompt, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
                     if (imageBuffer) {
@@ -389,7 +408,7 @@ class ImageGenerator {
                         return imageBuffer;
                     }
                 } catch (pollinationsError) {
-                    console.log(`⚠️ Erreur Pollinations personnage, fallback vers Freepik:`, pollinationsError.message);
+                    console.log(`⚠️ Erreur Pollinations personnage, fallback vers Freepik:`, pollinatorsError.message);
                 }
             }
 
@@ -397,7 +416,26 @@ class ImageGenerator {
             if (this.hasFreepik && this.freepikClient) {
                 try {
                     console.log(`🎨 Génération image personnage ${character.name} avec Freepik (vue première personne)...`);
-                    await this.freepikClient.generateCharacterImage(character, imagePath, imageOptions);
+                    // Construire le prompt détaillé avec toutes les caractéristiques
+                    const genderDesc = character.gender === 'male' ? 'male' : 'female';
+                    let prompt = `detailed fantasy ${genderDesc} character named ${character.name}`;
+
+                    // Ajouter les caractéristiques physiques si disponibles
+                    if (character.appearance) {
+                        // Si le personnage a une description personnalisée, l'utiliser prioritairement
+                        prompt += `, appearance: ${character.appearance}`;
+                    } else {
+                        // Sinon utiliser les caractéristiques par défaut du royaume
+                        const kingdomDesc = this.getDetailedKingdomAppearance(character.kingdom);
+                        prompt += `, ${kingdomDesc}`;
+                    }
+
+                    if (character.kingdom) {
+                        prompt += `, from ${character.kingdom} kingdom`;
+                    }
+
+                    prompt += ', detailed fantasy RPG character art, high quality, medieval fantasy style';
+                    await this.freepikClient.generateImage(prompt, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
                     if (imageBuffer) {
@@ -631,6 +669,32 @@ class ImageGenerator {
         return descriptions[kingdom] || 'mysterious lands with unknown customs';
     }
 
+    getKingdomStyle(kingdom) {
+        const styles = {
+            'AEGYRIA': 'golden armor, noble appearance, bright colors',
+            'SOMBRENUIT': 'dark robes, mystical appearance, lunar symbols',
+            'KHELOS': 'desert warrior, ancient artifacts, sandy colors'
+        };
+        return styles[kingdom] || 'medieval fantasy style';
+    }
+
+    getDetailedKingdomAppearance(kingdom) {
+        const appearances = {
+            'AEGYRIA': 'noble bearing, golden hair, bright eyes, pristine armor with gold trim',
+            'SOMBRENUIT': 'pale skin, dark hair, mysterious eyes, flowing dark robes with moon patterns',
+            'KHELOS': 'bronzed skin, weathered face, desert clothing, ancient jewelry',
+            'ABRANTIS': 'seafaring appearance, sun-bleached hair, weathered skin, naval clothing',
+            'VARHA': 'rugged mountain dweller, thick build, fur clothing, battle scars',
+            'SYLVARIA': 'ethereal elven features, green eyes, nature-inspired clothing',
+            'ECLYPSIA': 'shadowy appearance, dark clothing, mysterious aura',
+            'TERRE_DESOLE': 'battle-hardened survivor, scars, patched armor',
+            'DRAK_TARR': 'fire-forged appearance, red-tinted skin, smith clothing',
+            'URVALA': 'alchemist robes, mystical accessories, scholarly appearance',
+            'OMBREFIEL': 'stealthy assassin, dark leather, concealed weapons',
+            'KHALDAR': 'techno-magical gear, electric blue accents, futuristic elements'
+        };
+        return appearances[kingdom] || 'typical medieval fantasy appearance';
+    }
 
 
     // Initialisation asynchrone de Blender
@@ -698,7 +762,7 @@ class ImageGenerator {
             } else if (this.hasAimlApi && this.aimlApiClient) {
                 // Fallback sur AimlApi
                 const prompt = `${character.name} wearing ${clothingType} clothing, ${this.getKingdomDescription(character.kingdom)}, detailed fashion illustration`;
-                await this.aimlApiClient.generateImage(prompt, outputPath, {
+                await this.aimlApi.generateImage(prompt, outputPath, {
                     style: this.defaultStyle,
                     perspective: 'third_person',
                     nudity: false
@@ -902,9 +966,9 @@ class ImageGenerator {
 
             if (imageBuffer) {
                 console.log('✅ Image dialogue générée par Pollinations GRATUIT');
-                return { 
-                    image: imageBuffer, 
-                    audio: audioBuffer 
+                return {
+                    image: imageBuffer,
+                    audio: audioBuffer
                 };
             }
 
@@ -921,14 +985,14 @@ class ImageGenerator {
     async generateCharacterActionImageWithVoice(character, action, narration, options = {}) {
         try {
             const result = await this.generateCharacterActionImage(character, action, narration, options);
-            
+
             // Générer aussi l'audio de narration
             let audioBuffer = null;
             if (this.hasPollinations && this.pollinationsClient) {
                 try {
                     const audioPath = path.join(this.tempPath, `narration_audio_${character.id}_${Date.now()}.mp3`);
                     const audioResult = await this.pollinationsClient.generateNarrationVoice(narration, audioPath);
-                    
+
                     // Seulement si un fichier audio a été créé
                     if (audioResult) {
                         audioBuffer = await fs.readFile(audioPath).catch(() => null);

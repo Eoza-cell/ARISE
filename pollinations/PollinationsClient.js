@@ -112,6 +112,25 @@ class PollinationsClient {
         return optimized;
     }
 
+    optimizePromptForPollinations(prompt) {
+        // Ajouter des mots-clés spécifiques à Pollinations pour améliorer la qualité et la précision
+        const qualityKeywords = "Skyrim style, Elder Scrolls aesthetic, 3D render, unreal engine 5, photorealistic, detailed medieval fantasy";
+        const precisionKeywords = "accurate to description, exactly as described, precise details";
+
+        // Nettoyer le prompt et optimiser pour Pollinations
+        let optimizedPrompt = prompt
+            .replace(/\n/g, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // Si le prompt contient "MUST SHOW EXACTLY", le prioriser
+        if (optimizedPrompt.includes("MUST SHOW EXACTLY")) {
+            return `${precisionKeywords}, ${qualityKeywords}, ${optimizedPrompt}`;
+        }
+
+        return `${qualityKeywords}, ${optimizedPrompt}`;
+    }
+
     async generateMenuImage(outputPath) {
         const prompt = `Fantasy RPG main menu, epic medieval castle, magical atmosphere, cinematic lighting, game interface background`;
 
@@ -170,7 +189,7 @@ class PollinationsClient {
             // Fallback vers Pollinations Audio
             console.log('🔄 Fallback vers Pollinations Audio...');
             return await this.generatePollinationsVoice(text, outputPath, options);
-            
+
         } catch (error) {
             console.log('⚠️ Erreur génération vocale, essai fallback:', error.message);
             return await this.generateFallbackVoice(text, outputPath, options);
@@ -487,7 +506,7 @@ class PollinationsClient {
             'prêtre': 50,
             'voleur': 28
         };
-        
+
         return ageMap[characterType.toLowerCase()] || 35;
     }
 
@@ -504,7 +523,7 @@ class PollinationsClient {
             'noble_male': null,
             'noble_female': null
         };
-        
+
         const key = `${characterType.toLowerCase()}_${gender}`;
         return voiceMap[key] || null;
     }
@@ -623,12 +642,12 @@ class PollinationsClient {
                 console.log('🎙️ Génération dialogue avec Camb AI MARS5...');
                 try {
                     const cambResult = await this.cambAIClient.generateDialogueVoice(
-                        dialogue, 
-                        outputPath, 
-                        npcName, 
+                        dialogue,
+                        outputPath,
+                        npcName,
                         character.gender || 'male'
                     );
-                    
+
                     if (cambResult) {
                         console.log('✅ Dialogue généré avec Camb AI MARS5');
                         return cambResult;
