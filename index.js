@@ -322,6 +322,7 @@ class FrictionUltimateBot {
                     const fs = require('fs');
                     
                     let audioBuffer = null;
+                    let audioPath = null;
                     
                     // Si response.audio est déjà un buffer
                     if (Buffer.isBuffer(response.audio)) {
@@ -330,40 +331,50 @@ class FrictionUltimateBot {
                     } 
                     // Si c'est un chemin de fichier
                     else if (typeof response.audio === 'string') {
-                        const audioExists = await fs.promises.access(response.audio).then(() => true).catch(() => false);
-                        
-                        if (audioExists) {
-                            audioBuffer = await fs.promises.readFile(response.audio);
-                            console.log('✅ Audio lu depuis fichier');
-                        } else {
-                            console.log('⚠️ Fichier audio introuvable:', response.audio);
+                        audioPath = response.audio;
+                        try {
+                            await fs.promises.access(audioPath);
+                            audioBuffer = await fs.promises.readFile(audioPath);
+                            console.log(`✅ Audio lu depuis fichier: ${audioPath}`);
+                        } catch (fileError) {
+                            console.log(`⚠️ Fichier audio introuvable: ${audioPath}`, fileError.message);
+                            audioBuffer = null;
                         }
                     }
                     
                     // Envoyer l'audio si on a un buffer valide
                     if (audioBuffer && audioBuffer.length > 0) {
+                        // Déterminer le mimetype selon l'extension
+                        let mimetype = 'audio/mpeg';
+                        if (audioPath && audioPath.endsWith('.wav')) {
+                            mimetype = 'audio/wav';
+                        } else if (audioPath && audioPath.endsWith('.ogg')) {
+                            mimetype = 'audio/ogg';
+                        }
+                        
                         await this.sock.sendMessage(chatId, {
                             audio: audioBuffer,
-                            mimetype: 'audio/mpeg',
+                            mimetype: mimetype,
                             ptt: true, // Voice message
                             seconds: Math.min(60, Math.max(5, Math.round(response.text.length / 15)))
                         });
-                        console.log('✅ Message vocal envoyé avec buffer');
+                        console.log(`✅ Message vocal envoyé (${mimetype}, ${audioBuffer.length} bytes)`);
                         
                         // Nettoyer le fichier temporaire si c'était un chemin
-                        if (typeof response.audio === 'string') {
+                        if (audioPath) {
                             setTimeout(() => {
-                                fs.unlink(response.audio, (err) => {
-                                    if (!err) console.log(`🗑️ Fichier audio supprimé: ${response.audio}`);
+                                fs.unlink(audioPath, (err) => {
+                                    if (!err) console.log(`🗑️ Fichier audio supprimé: ${audioPath}`);
                                 });
                             }, 5000);
                         }
                     } else {
-                        console.log('⚠️ Aucun audio valide à envoyer');
+                        console.log('⚠️ Aucun audio valide à envoyer - buffer vide ou inexistant');
                     }
                     
                 } catch (audioError) {
-                    console.log('⚠️ Erreur envoi audio avec buffer:', audioError.message);
+                    console.log('⚠️ Erreur envoi audio:', audioError.message);
+                    console.log('Stack trace:', audioError.stack);
                 }
             } else if (response.video) {
                 await this.sock.sendMessage(chatId, {

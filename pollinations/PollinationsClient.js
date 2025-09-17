@@ -146,22 +146,29 @@ class PollinationsClient {
      */
     async generateVoice(text, outputPath, options = {}) {
         try {
-            console.log(`🎙️ Génération vocale GRATUITE avec Pollinations: "${text.substring(0, 50)}..."`);
+            console.log(`🎙️ Génération vocale: "${text.substring(0, 50)}..."`);
 
-            // Utiliser la nouvelle API simple de Pollinations
-            return await this.generatePollinationsVoice(text, outputPath, options);
+            // Essayer d'abord Pollinations Audio API
+            try {
+                return await this.generatePollinationsVoice(text, outputPath, options);
+            } catch (pollinationsError) {
+                console.log('⚠️ API Pollinations Audio échouée, utilisation Edge-TTS...');
+                
+                // Fallback vers Edge-TTS
+                const edgeResult = await this.generateFreeVoice(text, outputPath, options);
+                if (edgeResult) {
+                    console.log('✅ Audio généré avec Edge-TTS');
+                    return edgeResult;
+                }
+                
+                // Si Edge-TTS échoue aussi, essayer les méthodes système
+                console.log('⚠️ Edge-TTS échoué, tentative méthodes système...');
+                return await this.generateFallbackVoice(text, outputPath, options);
+            }
 
         } catch (error) {
-            console.error('❌ Erreur génération vocale Pollinations:', error.message);
-            
-            // Fallback vers les anciennes méthodes si la nouvelle API échoue
-            try {
-                const fallbackResult = await this.generateFallbackVoice(text, outputPath, options);
-                if (fallbackResult) {
-                    return fallbackResult;
-                }
-            } catch (fallbackError) {
-                console.error('❌ Fallback vocal également échoué:', fallbackError.message);
+            console.error('❌ Erreur génération vocale complète:', error.message);
+            return null;
             }
             
             throw error;
@@ -266,7 +273,7 @@ class PollinationsClient {
             }
             
             const speed = options.speed || 1.0;
-            const rate = speed !== 1.0 ? `${Math.round((speed - 1) * 100)}%` : '+0%';
+            const rate = speed !== 1.0 ? `+${Math.round((speed - 1) * 100)}%` : '+0%';
             
             console.log(`🎤 Edge-TTS GRATUIT - Voix: ${voice}, Vitesse: ${rate}`);
             
@@ -274,7 +281,54 @@ class PollinationsClient {
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
             
-            // Utiliser Edge-TTS pour génération gratuite
+            // Nettoyer le texte
+            let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
+            if (cleanText.length > 500) {
+                cleanText = cleanText.substring(0, 500) + '...';
+            }
+            
+            // Utiliser Edge-TTS pour générer l'audio
+            const { spawn } = require('child_process');
+            
+            return new Promise((resolve) => {
+                console.log(`🔊 Génération vocale Edge-TTS - Voix: ${voice}`);
+                
+                const edgeProcess = spawn('edge-tts', [
+                    '--voice', voice,
+                    '--text', cleanText,
+                    '--write-media', outputPath,
+                    '--rate', rate
+                ], {
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+                
+                let errorOutput = '';
+                
+                edgeProcess.stderr.on('data', (data) => {
+                    errorOutput += data.toString();
+                });
+                
+                edgeProcess.on('close', async (code) => {
+                    if (code === 0) {
+                        try {
+                            await fs.access(outputPath);
+                            console.log(`✅ Audio Edge-TTS généré: ${outputPath}`);
+                            resolve(outputPath);
+                        } catch (accessError) {
+                            console.log('⚠️ Fichier audio non créé par Edge-TTS');
+                            resolve(null);
+                        }
+                    } else {
+                        console.log(`⚠️ Edge-TTS erreur code ${code}: ${errorOutput}`);
+                        resolve(null);
+                    }
+                });
+                
+                edgeProcess.on('error', (error) => {
+                    console.log('⚠️ Edge-TTS non disponible:', error.message);
+                    resolve(null);
+                });
+            });ion gratuite
             return await this.generateWebSpeechAPI(text, outputPath, { voice, speed, rate });
             
         } catch (error) {
