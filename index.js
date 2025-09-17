@@ -360,15 +360,11 @@ class FrictionUltimateBot {
                         }
                     } else {
                         console.log('⚠️ Aucun audio valide à envoyer');
-                    } introuvable:', response.audio);
                     }
                     
-                    // Nettoyer le fichier audio temporaire
-                    setTimeout(() => {
-                        fs.unlink(response.audio, (err) => {
-                            if (!err) console.log(`🗑️ Fichier audio supprimé: ${response.audio}`);
-                        });
-                    }, 5000);
+                } catch (audioError) {
+                    console.log('⚠️ Erreur envoi audio avec buffer:', audioError.message);
+                }
                 } catch (audioError) {
                     console.log('⚠️ Erreur envoi audio avec buffer:', audioError.message);
                 }
