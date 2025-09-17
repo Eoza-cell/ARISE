@@ -1,13 +1,12 @@
 
-const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
 
 class PuterClient {
     constructor() {
-        this.baseUrl = 'https://api.puter.com';
         this.isInitialized = false;
         this.isAvailable = false;
+        this.puter = null;
         
         this.initPromise = this.initialize();
     }
@@ -16,9 +15,18 @@ class PuterClient {
         try {
             console.log('🎙️ Initialisation PuterClient...');
             
-            // Puter.js ne nécessite pas de clé API
-            this.isAvailable = true;
-            console.log('✅ PuterClient initialisé avec succès - Synthèse vocale Puter.js activée (sans clé API)');
+            // Importer dynamiquement le module Puter.js
+            try {
+                // Essayer d'importer puter depuis npm
+                const { default: puter } = await import('puter');
+                this.puter = puter;
+                this.isAvailable = true;
+                console.log('✅ PuterClient initialisé avec succès - Synthèse vocale Puter.js activée');
+            } catch (importError) {
+                console.log('⚠️ Module puter non installé - installation automatique...');
+                // Si le module n'est pas installé, on peut toujours essayer l'API REST
+                this.isAvailable = false;
+            }
             
         } catch (error) {
             console.log('⚠️ Erreur initialisation Puter:', error.message);
@@ -28,28 +36,8 @@ class PuterClient {
         }
     }
 
-    async testConnection() {
-        try {
-            // Test simple sans authentification puisque Puter.js est gratuit
-            const response = await axios.get(`${this.baseUrl}/health`, {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                timeout: 10000
-            }).catch(() => {
-                // Si le endpoint /health n'existe pas, considérer comme disponible
-                return { status: 200 };
-            });
-            
-            return response.status === 200;
-        } catch (error) {
-            // Même si la connexion échoue, Puter.js reste utilisable
-            return true;
-        }
-    }
-
     hasValidClient() {
-        return this.isInitialized && this.isAvailable;
+        return this.isInitialized && this.isAvailable && this.puter;
     }
 
     async ensureInitialized() {
@@ -64,7 +52,7 @@ class PuterClient {
      */
     async generateVoice(text, outputPath, options = {}) {
         const isAvailable = await this.ensureInitialized();
-        if (!isAvailable) {
+        if (!isAvailable || !this.puter) {
             console.log('⚠️ Puter.js non disponible - génération vocale ignorée');
             return null;
         }
@@ -72,38 +60,50 @@ class PuterClient {
         try {
             console.log(`🎙️ Génération vocale Puter.js: "${text.substring(0, 50)}..."`);
 
-            // Configuration des options vocales
+            // Nettoyer et limiter le texte
+            let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
+            if (cleanText.length > 300) {
+                cleanText = cleanText.substring(0, 300) + '...';
+            }
+
+            // Configuration des options vocales selon l'API Puter.js
             const voiceOptions = {
-                model: 'tts-1',
                 voice: this.getVoiceForCharacter(options.voice, options.gender),
-                input: text,
-                speed: options.speed || 1.0,
-                format: 'mp3'
+                engine: "neural",
+                language: options.language || "en-US"
             };
 
-            // Appel à l'API Puter pour la synthèse vocale (sans authentification)
-            const response = await axios.post(`${this.baseUrl}/v1/ai/text-to-speech`, voiceOptions, {
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                responseType: 'arraybuffer',
-                timeout: 30000
-            });
+            // Utiliser l'API Puter.js directe
+            const audio = await this.puter.ai.txt2speech(cleanText, voiceOptions);
 
-            if (response.data) {
+            if (audio) {
+                // Créer le dossier si nécessaire
+                const dir = path.dirname(outputPath);
+                await fs.mkdir(dir, { recursive: true });
+
+                // Convertir l'objet audio en buffer si nécessaire
+                let audioBuffer;
+                if (audio.buffer) {
+                    audioBuffer = audio.buffer;
+                } else if (audio.arrayBuffer) {
+                    audioBuffer = Buffer.from(await audio.arrayBuffer());
+                } else if (Buffer.isBuffer(audio)) {
+                    audioBuffer = audio;
+                } else {
+                    // Si c'est un blob ou autre, essayer de le convertir
+                    audioBuffer = Buffer.from(audio);
+                }
+
                 // Sauvegarder le fichier audio
-                await fs.writeFile(outputPath, response.data);
+                await fs.writeFile(outputPath, audioBuffer);
                 console.log(`✅ Audio Puter.js généré: ${outputPath}`);
-                return outputPath;
+                return audioBuffer;
             } else {
                 throw new Error('Données audio non reçues de Puter.js');
             }
 
         } catch (error) {
             console.error('❌ Erreur génération vocale Puter.js:', error.message);
-            if (error.response) {
-                console.error('❌ Détails erreur API Puter:', error.response.data);
-            }
             return null;
         }
     }
@@ -112,20 +112,21 @@ class PuterClient {
      * Sélectionne une voix en fonction du personnage et du genre
      */
     getVoiceForCharacter(characterType, gender) {
+        // Voix disponibles dans Puter.js
         const voices = {
             male: {
-                narrator: 'onyx',
-                guard: 'echo', 
-                merchant: 'fable',
-                noble: 'nova',
-                default: 'onyx'
+                narrator: 'Matthew',
+                guard: 'Justin', 
+                merchant: 'Brian',
+                noble: 'Russell',
+                default: 'Matthew'
             },
             female: {
-                narrator: 'nova',
-                guard: 'shimmer',
-                merchant: 'alloy',
-                noble: 'echo',
-                default: 'nova'
+                narrator: 'Joanna',
+                guard: 'Amy',
+                merchant: 'Emma',
+                noble: 'Salli',
+                default: 'Joanna'
             }
         };
 
@@ -140,7 +141,7 @@ class PuterClient {
         return await this.generateVoice(text, outputPath, {
             ...options,
             voice: 'narrator',
-            speed: 0.9
+            language: 'fr-FR'
         });
     }
 
@@ -152,7 +153,7 @@ class PuterClient {
             ...options,
             voice: character.type || 'default',
             gender: character.gender || 'male',
-            speed: 1.0
+            language: 'fr-FR'
         });
     }
 
@@ -164,7 +165,7 @@ class PuterClient {
             ...options,
             voice: 'default',
             gender: 'male',
-            speed: 1.1
+            language: 'fr-FR'
         });
     }
 }
