@@ -76,7 +76,7 @@ class GroqClient {
         return this.isAvailable && this.client;
     }
 
-    async generateNarration(prompt, maxTokens = 800) {
+    async generateNarration(prompt, maxTokens = 150) {
         if (!this.hasValidClient()) {
             throw new Error('Client Groq non disponible');
         }
@@ -86,10 +86,10 @@ class GroqClient {
                 messages: [
                     {
                         role: 'system',
-                        content: `Tu es un narrateur expert de jeux RPG médiéval-steampunk. 
-                        Génère des descriptions immersives et captivantes en français.
-                        Style: Épique, détaillé, avec des éléments technologiques steampunk.
-                        Ton: Dramatique mais accessible, comme un conteur professionnel.`
+                        content: `Tu es un narrateur de jeu RPG concis. 
+                        Génère des descriptions COURTES et DIRECTES en français (2-3 phrases max).
+                        Style: Simple, efficace, sans fioritures inutiles.
+                        Ton: Direct et informatif, va droit au but.`
                     },
                     {
                         role: 'user',
@@ -117,7 +117,7 @@ class GroqClient {
         }
     }
 
-    async generateCombatNarration(combatData, maxTokens = 600) {
+    async generateCombatNarration(combatData, maxTokens = 100) {
         // Logique pour la continuité des actions et la gestion des PV en combat
         let actionDescription = `Le combat entre ${combatData.attacker} et ${combatData.defender} continue.`;
         if (combatData.action) {
@@ -142,8 +142,8 @@ class GroqClient {
         ${damageInfo}
         Résultat général: ${combatData.result || 'Aucun résultat spécifié'}
 
-        Contexte: Combat épique dans un monde médiéval-steampunk avec magie et technologie. La survie est difficile.
-        Style: Sombre, détaillé, avec des conséquences claires pour chaque action.`;
+        Contexte: Combat rapide dans un monde médiéval-steampunk.
+        Style: Court et direct, 2 phrases maximum.`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);
