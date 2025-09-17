@@ -177,12 +177,23 @@ class ImageGenerator {
 
     async generateMenuImage() {
         try {
-            const cacheKey = 'menu_main_kieai';
+            const cacheKey = 'menu_main_star';
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            const imagePath = path.join(this.tempPath, 'menu_main_kieai.png');
+            // Utiliser d'abord l'image personnalisée avec l'étoile et "Friction Ultimate"
+            const customImagePath = path.join(this.tempPath, 'menu_main.png');
+            try {
+                const customImageBuffer = await fs.readFile(customImagePath);
+                console.log('✅ Image menu personnalisée avec étoile et "Friction Ultimate" chargée');
+                this.imageCache.set(cacheKey, customImageBuffer);
+                return customImageBuffer;
+            } catch (customError) {
+                console.log('⚠️ Image menu personnalisée non trouvée, génération automatique...');
+            }
+
+            const imagePath = path.join(this.tempPath, 'menu_main_generated.png');
 
             // Essayer Pollinations d'abord (GRATUIT)
             if (this.hasPollinations && this.pollinationsClient) {
