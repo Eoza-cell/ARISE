@@ -76,7 +76,7 @@ class GroqClient {
         return this.isAvailable && this.client;
     }
 
-    async generateNarration(prompt, maxTokens = 150) {
+    async generateNarration(prompt, maxTokens = 80) {
         if (!this.hasValidClient()) {
             throw new Error('Client Groq non disponible');
         }
@@ -86,10 +86,10 @@ class GroqClient {
                 messages: [
                     {
                         role: 'system',
-                        content: `Tu es un narrateur de jeu RPG concis. 
-                        Génère des descriptions COURTES et DIRECTES en français (2-3 phrases max).
-                        Style: Simple, efficace, sans fioritures inutiles.
-                        Ton: Direct et informatif, va droit au but.`
+                        content: `Tu es un narrateur RPG ULTRA-CONCIS. 
+                        Génère EXACTEMENT 1-2 phrases COURTES en français.
+                        INTERDICTION de décrire les détails d'équipement, inventaire, vapeur, engrenages.
+                        Style: Action directe → conséquence immédiate. Point final.`
                     },
                     {
                         role: 'user',
@@ -98,10 +98,10 @@ class GroqClient {
                 ],
                 model: this.model,
                 max_tokens: maxTokens,
-                temperature: 0.8, // Créativité élevée pour narration
-                top_p: 0.9,
-                frequency_penalty: 0.3, // Éviter les répétitions
-                presence_penalty: 0.2
+                temperature: 0.6,
+                top_p: 0.8,
+                frequency_penalty: 0.5,
+                presence_penalty: 0.3
             });
 
             const narration = response.choices[0]?.message?.content?.trim();
@@ -109,7 +109,7 @@ class GroqClient {
                 throw new Error('Réponse vide de Groq');
             }
 
-            console.log('✅ Narration générée avec Groq (ultra-rapide)');
+            console.log('✅ Narration courte générée avec Groq');
             return narration;
         } catch (error) {
             console.error('❌ Erreur génération narration Groq:', error.message);
@@ -155,48 +155,23 @@ class GroqClient {
         }
     }
 
-    async generateExplorationNarration(location, action, sessionId = "default", character = null, maxTokens = 1000) {
+    async generateExplorationNarration(location, action, sessionId = "default", character = null, maxTokens = 200) {
         const locationContinuity = this.getLocationContinuity(sessionId, location);
 
-        // Construire des informations détaillées sur le personnage
-        let characterContext = '';
-        if (character) {
-            const equipmentList = character.equipment && Object.keys(character.equipment).length > 0 ? 
-                Object.entries(character.equipment).map(([slot, item]) => `${slot}: ${item}`).join(', ') : 
-                'aucun équipement';
-
-            const inventoryList = character.inventory && character.inventory.length > 0 ? 
-                character.inventory.slice(0, 5).join(', ') + (character.inventory.length > 5 ? '...' : '') : 
-                'inventaire vide';
-
-            characterContext = `
-État du personnage ${character.name}:
-- Niveau: ${character.level} | Puissance: ${character.powerLevel} | Friction: ${character.frictionLevel}
-- Vie: ${character.currentLife}/${character.maxLife} | Énergie: ${character.currentEnergy}/${character.maxEnergy}
-- Argent: ${character.coins} pièces d'or
-- Équipement: ${equipmentList}
-- Inventaire: ${inventoryList}
-- Royaume: ${character.kingdom} | Ordre: ${character.order || 'Aucun'}`;
-        }
-
-        const prompt = `Décris cette exploration dans un monde RPG Dark Souls médiéval-steampunk:
+        const prompt = `Décris cette action RPG en 2 phrases courtes et directes:
         Lieu: ${location}
-        Action du joueur: ${action}
+        Action: ${action}
 
-        ${locationContinuity}${characterContext}
+        ${locationContinuity}
 
-        RÈGLES DE NARRATION:
-        1. Le personnage est DÉJÀ dans ce lieu. Ne dis pas qu'il "arrive" sauf si l'action le précise
-        2. Décris 4-6 phrases immersives et détaillées
-        3. Référence l'équipement et l'inventaire quand pertinent à l'action
-        4. Mentionne des conséquences sur l'inventaire/équipement si applicable  
-        5. Style sombre et dangereux comme Dark Souls
-        6. Intègre technologie steampunk (engrenages, vapeur, mécanismes)
-        7. Le monde réagit de manière hostile et impitoyable
-        8. IMPORTANT: Fais interagir les objets portés avec l'environnement
+        RÈGLES STRICTES:
+        1. MAXIMUM 2 phrases courtes
+        2. Pas de descriptions d'équipement/inventaire
+        3. Action directe et conséquences immédiates
+        4. Style Dark Souls - dangereux mais concis
+        5. Évite les détails inutiles sur la vapeur, engrenages, etc.
 
-        Contexte: Friction Ultimate - Monde où chaque action peut être fatale, fusion magie/technologie, 
-        12 royaumes hostiles, survie difficile, système de friction implacable.`;
+        Réponds de façon TRÈS concise:`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);

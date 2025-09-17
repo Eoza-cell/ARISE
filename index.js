@@ -251,7 +251,7 @@ class FrictionUltimateBot {
     async sendResponse(chatId, response) {
         try {
 
-            // Envoyer la réponse avec support audio
+            // Envoyer la réponse avec support audio amélioré
             if (response.image && response.video && response.audio) {
                 // Envoyer l'image avec le texte
                 await this.sock.sendMessage(chatId, {
@@ -259,12 +259,18 @@ class FrictionUltimateBot {
                     caption: response.text
                 });
 
-                // Puis l'audio
-                await this.sock.sendMessage(chatId, {
-                    audio: response.audio,
-                    mimetype: 'audio/mp3',
-                    caption: '🎙️ Narration vocale'
-                });
+                // Puis l'audio si disponible
+                try {
+                    await this.sock.sendMessage(chatId, {
+                        audio: response.audio,
+                        mimetype: 'audio/mpeg',
+                        ptt: true, // Voice message
+                        seconds: 10
+                    });
+                    console.log('✅ Message vocal envoyé');
+                } catch (audioError) {
+                    console.log('⚠️ Erreur envoi audio:', audioError.message);
+                }
 
                 // Puis la vidéo
                 await this.sock.sendMessage(chatId, {
@@ -278,12 +284,18 @@ class FrictionUltimateBot {
                     caption: response.text
                 });
 
-                // Puis l'audio
-                await this.sock.sendMessage(chatId, {
-                    audio: response.audio,
-                    mimetype: 'audio/mp3',
-                    caption: '🎙️ Message vocal'
-                });
+                // Puis l'audio comme message vocal
+                try {
+                    await this.sock.sendMessage(chatId, {
+                        audio: response.audio,
+                        mimetype: 'audio/mpeg',
+                        ptt: true, // Voice message
+                        seconds: 15
+                    });
+                    console.log('✅ Message vocal envoyé');
+                } catch (audioError) {
+                    console.log('⚠️ Erreur envoi message vocal:', audioError.message);
+                }
             } else if (response.image && response.video) {
                 // Envoyer l'image d'abord
                 await this.sock.sendMessage(chatId, {
@@ -305,12 +317,18 @@ class FrictionUltimateBot {
                 // Envoyer d'abord le texte
                 await this.sock.sendMessage(chatId, { text: response.text });
 
-                // Puis l'audio
-                await this.sock.sendMessage(chatId, {
-                    audio: response.audio,
-                    mimetype: 'audio/mp3',
-                    caption: '🎙️ Message vocal'
-                });
+                // Puis l'audio comme message vocal
+                try {
+                    await this.sock.sendMessage(chatId, {
+                        audio: response.audio,
+                        mimetype: 'audio/mpeg',
+                        ptt: true, // Voice message
+                        seconds: 20
+                    });
+                    console.log('✅ Message vocal envoyé');
+                } catch (audioError) {
+                    console.log('⚠️ Erreur envoi audio seul:', audioError.message);
+                }
             } else if (response.video) {
                 await this.sock.sendMessage(chatId, {
                     video: response.video,
