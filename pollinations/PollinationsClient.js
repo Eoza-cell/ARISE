@@ -169,9 +169,6 @@ class PollinationsClient {
         } catch (error) {
             console.error('❌ Erreur génération vocale complète:', error.message);
             return null;
-            }
-            
-            throw error;
         }
     }
 
