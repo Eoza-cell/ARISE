@@ -365,9 +365,6 @@ class FrictionUltimateBot {
                 } catch (audioError) {
                     console.log('⚠️ Erreur envoi audio avec buffer:', audioError.message);
                 }
-                } catch (audioError) {
-                    console.log('⚠️ Erreur envoi audio avec buffer:', audioError.message);
-                }
             } else if (response.video) {
                 await this.sock.sendMessage(chatId, {
                     video: response.video,
