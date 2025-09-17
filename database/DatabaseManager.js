@@ -19,11 +19,19 @@ class DatabaseManager {
                 throw new Error('DATABASE_URL environment variable is required');
             }
 
-            // Configuration Neon
-            const { neonConfig } = require('@neondatabase/serverless');
-            neonConfig.webSocketConstructor = ws;
-
-            this.pool = new Pool({ connectionString: process.env.DATABASE_URL });
+            // Try standard PostgreSQL connection first, fallback to Neon if needed
+            try {
+                // For development environment with standard PostgreSQL
+                const { Pool: StandardPool } = require('pg');
+                this.pool = new StandardPool({ connectionString: process.env.DATABASE_URL });
+                console.log('🔌 Using standard PostgreSQL connection');
+            } catch (standardError) {
+                console.log('⚠️ Standard PostgreSQL not available, trying Neon serverless...');
+                // Fallback to Neon serverless
+                const { Pool: NeonPool, neonConfig } = require('@neondatabase/serverless');
+                neonConfig.webSocketConstructor = ws;
+                this.pool = new NeonPool({ connectionString: process.env.DATABASE_URL });
+            }
             this.db = drizzle(this.pool, { schema });
 
             console.log('✅ Connexion à la base de données établie');
