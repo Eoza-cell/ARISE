@@ -2,7 +2,6 @@ const GeminiClient = require('../gemini/GeminiClient');
 const OpenAIClient = require('../ai/OpenAIClient');
 const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
-const OgunGuide = require('../characters/OgunGuide');
 const CharacterCustomizationManager = require('../utils/CharacterCustomizationManager');
 const path = require('path'); // Importer le module path pour gérer les chemins de fichiers
 
@@ -13,7 +12,6 @@ class GameEngine {
         this.ollamaClient = new OllamaClient();
         this.groqClient = new GroqClient();
         this.geminiClient = new GeminiClient();
-        this.ogunGuide = new OgunGuide(this.groqClient);
 
         // Sera initialisé dans setWhatsAppSocket une fois que sock est disponible
         this.characterCustomization = null;
@@ -24,10 +22,9 @@ class GameEngine {
             '/créer_personnage': this.handleCreateCharacterCommand.bind(this),
             '/modifier': this.handleModifyCharacterCommand.bind(this),
             '/fiche': this.handleCharacterSheetCommand.bind(this),
-            '/aide': this.ogunGuide.getHelpMenu.bind(this),
-            '/help': this.ogunGuide.getHelpMenu.bind(this),
-            '/guide': this.ogunGuide.getHelpMenu.bind(this),
-            '/ogun': this.ogunGuide.getHelpMenu.bind(this),
+            '/aide': this.handleHelpCommand.bind(this),
+            '/help': this.handleHelpCommand.bind(this),
+            '/guide': this.handleHelpCommand.bind(this),
             '/jouer': this.handlePlayCommand.bind(this),
             '/royaumes': this.handleKingdomsCommand.bind(this),
             '/ordres': this.handleOrdersCommand.bind(this),
@@ -93,22 +90,6 @@ class GameEngine {
             const playerId = player.id;
             const normalizedMessage = message.toLowerCase().trim();
 
-            // Vérifier si c'est une question DIRECTE pour Ogun (plus restrictif)
-            const directOgunKeywords = ['aide', 'help', 'conseil', 'guide', 'ogun', 'comment commencer', 'comment jouer'];
-            const isDirectQuestion = directOgunKeywords.some(keyword => 
-                normalizedMessage.includes(keyword)
-            ) || (normalizedMessage.endsWith('?') && normalizedMessage.length < 50); // Questions courtes seulement
-
-            // Détecter si Ogun est mentionné directement
-            const ogunMentioned = normalizedMessage.includes('ogun') || 
-                                normalizedMessage.includes('montgomery') ||
-                                normalizedMessage.includes('@ogun') ||
-                                normalizedMessage.startsWith('salut ogun') ||
-                                normalizedMessage.startsWith('hey ogun');
-
-            if ((isDirectQuestion || ogunMentioned) && !response) {
-                response = await this.ogunGuide.getGuideResponse(message, playerId);
-            }
 
             // Si aucune commande reconnue, traiter comme action de jeu
             if (!response) {
@@ -171,7 +152,6 @@ class GameEngine {
                    `• /combat - Système de combat\n` +
                    `• /inventaire - Gérer ton équipement\n` +
                    `• /carte - Carte du monde\n` +
-                   `• /ogun - 🔥 Parler avec Ogun (guide)\n` +
                    `• /aide - Aide complète\n\n` +
                    `💀 **Le monde bouge en permanence. Chaque seconde compte !**`;
 
@@ -394,7 +374,6 @@ class GameEngine {
                 text: `💬 **Message libre détecté**\n\n` +
                       `Salut ! Pour jouer à Friction Ultimate, utilise :\n` +
                       `🎮 **/jouer** - Entrer en mode jeu\n` +
-                      `🔥 **/ogun** - Parler avec Ogun (guide)\n` +
                       `📋 **/menu** - Voir toutes les options\n\n` +
                       `En mode libre, je ne traite pas les actions de jeu.`
             };
@@ -886,7 +865,7 @@ class GameEngine {
                       `1️⃣ Utilise /créer pour créer ton personnage\n` +
                       `2️⃣ Puis utilise /jouer pour entrer dans le monde\n\n` +
                       `💬 **Note :** En mode jeu, tes messages seront interprétés comme des actions de jeu.\n` +
-                      `Pour parler avec Ogun, utilise /ogun ou commence par "Ogun, ..."`,
+                      `Utilise /aide pour voir toutes les commandes disponibles.`,
                 image: await imageGenerator.generateMenuImage()
             };
         }
@@ -906,7 +885,7 @@ class GameEngine {
                   `• "J'avance vers le nord"\n` +
                   `• "Je cherche des ennemis"\n` +
                   `• "J'attaque avec mon épée"\n\n` +
-                  `💬 **Pour parler avec Ogun :** commence par "Ogun, ..." ou utilise /ogun\n` +
+                  `💬 **Besoin d'aide :** utilise /aide pour voir toutes les commandes\n` +
                   `⚙️ **Pour sortir du mode jeu :** utilise /menu\n\n` +
                   `🔥 **L'aventure commence maintenant !**`,
             image: await imageGenerator.generateCharacterImage(character)
@@ -1295,99 +1274,8 @@ class GameEngine {
 
     async processDialogueAction({ player, character, message, dbManager, imageGenerator }) {
         try {
-            const sessionId = `player_${player.id}_dialogue`; // Session unique par joueur pour les dialogues
-
-            // Détecter le PNJ auquel le joueur s'adresse
-            let targetNPC = null;
-            const npcNames = ['Ogun']; // Liste des PNJ connus
-            const lowerMessage = message.toLowerCase();
-
-            for (const npcName of npcNames) {
-                if (lowerMessage.includes(npcName.toLowerCase()) || lowerMessage.startsWith(npcName.toLowerCase())) {
-                    targetNPC = npcName;
-                    break;
-                }
-            }
-
-            // Si aucun PNJ spécifique n'est ciblé, utiliser Ogun par défaut si le message est une question générale ou une salutation
-            if (!targetNPC && (lowerMessage.endsWith('?') || lowerMessage.includes('salut') || lowerMessage.includes('bonjour') || lowerMessage.includes('hey') || lowerMessage.startsWith('je dis'))) {
-                targetNPC = 'Ogun';
-            }
-
-            let narration;
-            if (targetNPC) {
-                // Utiliser le client approprié pour le PNJ (ici, OgunGuide)
-                if (targetNPC === 'Ogun') {
-                    narration = await this.ogunGuide.getGuideResponse(message, player.id);
-                } else {
-                    // Gérer d'autres PNJ si nécessaire
-                    narration = await this.openAIClient.analyzePlayerAction(message, { character, location: character.currentLocation, kingdom: character.kingdom, targetNPC: targetNPC }, sessionId);
-                }
-            } else {
-                // Si le message est un dialogue mais sans PNJ clair, le traiter comme une action normale mais avec une réponse générique.
-                // C'est une mesure de sécurité pour éviter les erreurs.
-                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
-            }
-
-            // Appliquer une pénalité d'énergie pour les dialogues (moins coûteux qu'une action complexe)
-            const energyCost = Math.max(0, Math.min(character.currentEnergy, 5)); // 5 points d'énergie pour un dialogue
-            character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
-
-            await dbManager.updateCharacter(character.id, {
-                currentEnergy: character.currentEnergy
-            });
-
-            // Générer les barres de vie et d'énergie
-            const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
-            const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
-
-            // Préparer la réponse
-            const responseText = `💬 **Dialogue avec ${targetNPC} :**\n\n` +
-                               `"${narration.text || narration}"\n\n` + // Assurer que 'narration' est un objet avec une propriété 'text' ou est une chaîne
-                               `❤️ **Vie :** ${lifeBar}\n` +
-                               `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
-                               `💰 **Argent :** ${character.coins} pièces d'or`;
-
-            // Essayer de générer une image et audio spécifique pour le PNJ
-            let npcImage = null;
-            let dialogueAudio = null;
-
-            if (targetNPC === 'Ogun') {
-                try {
-                    npcImage = await this.ogunGuide.getImage(); // Obtenir l'image d'Ogun
-
-                    // Générer l'audio du dialogue avec Ogun
-                    const dialogueResult = await imageGenerator.generateDialogueImage(character, targetNPC, narration.text || narration, {
-                        style: '3d',
-                        perspective: 'second_person'
-                    });
-                    dialogueAudio = dialogueResult.audio;
-
-                } catch (error) {
-                    console.error('⚠️ Erreur lors de la génération du dialogue Ogun:', error);
-                    npcImage = await imageGenerator.generateCharacterImage(character); // Fallback vers l'image du personnage
-                }
-            } else {
-                // Générer image et audio pour autres PNJ
-                try {
-                    const dialogueResult = await imageGenerator.generateDialogueImage(character, targetNPC, narration.text || narration, {
-                        style: '3d',
-                        perspective: 'second_person'
-                    });
-                    npcImage = dialogueResult.image || await imageGenerator.generateCharacterImage(character);
-                    dialogueAudio = dialogueResult.audio;
-                } catch (error) {
-                    console.error('⚠️ Erreur génération dialogue PNJ:', error);
-                    npcImage = await imageGenerator.generateCharacterImage(character);
-                }
-            }
-
-            return {
-                text: responseText,
-                image: npcImage,
-                audio: dialogueAudio
-            };
-
+            // Traiter le dialogue comme une action de jeu normale avec des PNJ génériques
+            return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
         } catch (error) {
             console.error('❌ Erreur lors du traitement du dialogue:', error);
             return {
