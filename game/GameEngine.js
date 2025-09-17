@@ -70,9 +70,9 @@ class GameEngine {
 
             // Traitement des commandes - gérer les cas où message est null (ex: images)
             if (!message) {
-                return { 
+                return {
                     text: "🖼️ J'ai reçu votre image ! Cependant, je ne peux traiter que les commandes textuelles.\n\n" +
-                          "💬 Utilisez `/menu` pour voir les commandes disponibles." 
+                          "💬 Utilisez `/menu` pour voir les commandes disponibles."
                 };
             }
 
@@ -122,7 +122,7 @@ class GameEngine {
 
                 // Détecter si c'est un dialogue avec un PNJ
                 const dialogueKeywords = ['parle', 'dis', 'demande', 'salue', 'bonjour', 'bonsoir', 'hey', '"'];
-                const isDialogue = dialogueKeywords.some(keyword => 
+                const isDialogue = dialogueKeywords.some(keyword =>
                     message.toLowerCase().includes(keyword)
                 ) || message.includes('"') || message.toLowerCase().startsWith('je dis');
 
@@ -473,12 +473,12 @@ Règles importantes:
 
                     if (imageBuffer && imageBuffer.length > 0) {
                         console.log(`✅ Image téléchargée avec succès: ${imageBuffer.length} bytes`);
-                        return await this.finalizeCharacterCreation({ 
-                            player, 
-                            dbManager, 
-                            imageGenerator, 
-                            hasCustomImage: true, 
-                            imageBuffer 
+                        return await this.finalizeCharacterCreation({
+                            player,
+                            dbManager,
+                            imageGenerator,
+                            hasCustomImage: true,
+                            imageBuffer
                         });
                     } else {
                         console.log('❌ Échec du téléchargement - buffer vide ou null');
@@ -521,7 +521,7 @@ Règles importantes:
             return await this.handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator });
         }
 
-        // Gestion du nom de personnage (si en cours de création)  
+        // Gestion du nom de personnage (si en cours de création)
         const tempKingdom = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
         const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
 
@@ -574,8 +574,8 @@ Règles importantes:
         // Détecter si c'est un dialogue avec un PNJ
         // Détecter si le joueur utilise des guillemets pour parler à un PNJ
         const hasQuotes = message.includes('"') || message.includes('«') || message.includes('»');
-        const isDialogue = hasQuotes || 
-                          message.toLowerCase().includes('parler') || 
+        const isDialogue = hasQuotes ||
+                          message.toLowerCase().includes('parler') ||
                           message.toLowerCase().includes('dire') ||
                           message.toLowerCase().includes('demander');
 
@@ -656,8 +656,8 @@ Règles importantes:
 
             // Valider combatAdvantage dans une liste sécurisée
             const validCombatAdvantages = ['critical_hit', 'normal_hit', 'glancing_blow', 'miss', 'counter_attacked'];
-            actionAnalysis.combatAdvantage = validCombatAdvantages.includes(actionAnalysis.combatAdvantage) 
-                ? actionAnalysis.combatAdvantage 
+            actionAnalysis.combatAdvantage = validCombatAdvantages.includes(actionAnalysis.combatAdvantage)
+                ? actionAnalysis.combatAdvantage
                 : 'miss';
 
             // Appliquer le système de combat Dark Souls strict
@@ -669,7 +669,7 @@ Règles importantes:
 
             // Dégâts seulement pour les vrais actions de COMBAT agressif
             const realCombatKeywords = ['attaque', 'combat', 'frappe', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite'];
-            const isRealCombat = realCombatKeywords.some(keyword => 
+            const isRealCombat = realCombatKeywords.some(keyword =>
                 message.toLowerCase().includes(keyword)
             );
 
@@ -744,7 +744,7 @@ Règles importantes:
 
             const riskEmoji = {
                 'low': '🟢',
-                'medium': '🟡', 
+                'medium': '🟡',
                 'high': '🟠',
                 'extreme': '🔴'
             }[actionAnalysis.riskLevel] || '⚪';
@@ -756,7 +756,7 @@ Règles importantes:
             // Indicateur d'avantage de combat
             const combatEmoji = {
                 'critical_hit': '🎯',
-                'normal_hit': '⚔️', 
+                'normal_hit': '⚔️',
                 'glancing_blow': '🛡️',
                 'miss': '❌',
                 'counter_attacked': '💀'
@@ -783,8 +783,8 @@ Règles importantes:
                 'low': '❌'
             }[actionAnalysis.precision] || '❓';
 
-            const staminaText = staminaRecovery !== 0 
-                ? `\n⚡ **RÉCUP. ENDURANCE :** ${staminaRecovery > 0 ? '+' : ''}${staminaRecovery}` 
+            const staminaText = staminaRecovery !== 0
+                ? `\n⚡ **RÉCUP. ENDURANCE :** ${staminaRecovery > 0 ? '+' : ''}${staminaRecovery}`
                 : '';
 
             // Préparer la réponse avec toutes les métriques Dark Souls
@@ -936,7 +936,7 @@ Règles importantes:
             console.log('⚠️ Impossible de générer l\'image des royaumes, continuons sans image');
         }
 
-        return { 
+        return {
             text: kingdomsText,
             image: kingdomImage
         };
@@ -954,7 +954,7 @@ Règles importantes:
                          `⚔️ **Spécialités :** ${order.specialties.join(', ')}\n\n`;
         });
 
-        return { 
+        return {
             text: ordersText,
             image: await imageGenerator.generateOrdersOverview()
         };
@@ -1148,7 +1148,7 @@ Règles importantes:
 
         return {
             text: `🏰 **Royaume sélectionné :** ${selectedKingdom.name}\n\n` +
-                  `👤 **Sexe :** ${gender === 'male' ? 'HOMME' : 'FEMME'}\n` +
+                  `👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}\n` +
                   `🏰 **Royaume :** ${selectedKingdom.name}\n\n` +
                   `📝 **Étape 3/4 - Donne un nom à ton personnage :**\n\n` +
                   `✍️ Écris simplement le nom que tu veux pour ton personnage.\n` +
@@ -1297,8 +1297,8 @@ Règles importantes:
         // Utiliser le nouveau système de personnalisation sophistiqué pour modification
         if (this.characterCustomization) {
             const success = await this.characterCustomization.startCharacterCustomization(
-                player.whatsappNumber, 
-                chatId, 
+                player.whatsappNumber,
+                chatId,
                 true // isModification = true
             );
 
@@ -1455,81 +1455,71 @@ Règles importantes:
 
     async processDialogueAction({ player, character, message, dbManager, imageGenerator }) {
         try {
-            // Générer l'audio seulement pour les dialogues de PNJ (pas pour la narration)
-            let audioPath = null;
-            const timestamp = Date.now(); // Timestamp pour les noms de fichiers audio
-            const sessionId = `player_${player.id}`; // Session unique par joueur
+            console.log(`💬 Dialogue PNJ détecté pour ${character.name}: ${message}`);
 
-            // Détecter si le joueur utilise des guillemets pour parler à un PNJ
-            const hasQuotes = message.includes('"') || message.includes('«') || message.includes('»');
+            // Extraire le dialogue du joueur (enlever les guillemets s'il y en a)
+            let playerSpeech = message;
+            if (message.includes('"')) {
+                const matches = message.match(/"([^"]+)"/);
+                if (matches && matches[1]) {
+                    playerSpeech = matches[1];
+                }
+            }
 
-            if (hasQuotes) {
-                // Dialogue avec PNJ détecté
-                console.log('💬 Dialogue PNJ détecté pour', character.name + ':', message);
+            // Générer une réponse de PNJ avec Groq
+            let npcResponse;
+            const sessionId = `player_${player.id}`;
 
-                try {
-                    // Générer la réponse du PNJ
-                    console.log('🎭 Génération réponse PNJ avec Groq...');
-                    const npcResponse = await this.groqClient.generateNPCResponse(
-                        'Habitant local',
-                        'un habitant du village qui connaît bien la région',
-                        message,
+            try {
+                console.log('🎭 Génération réponse PNJ avec Groq...');
+
+                if (this.groqClient && this.groqClient.hasValidClient()) {
+                    npcResponse = await this.groqClient.generateNPCResponse(
+                        'Habitant du village',
+                        `un habitant du royaume ${character.kingdom}, personnage amical et curieux`,
+                        playerSpeech,
                         {
                             location: character.currentLocation,
                             kingdom: character.kingdom,
                             playerName: character.name
                         }
                     );
-
-                    // Générer l'image du dialogue
-                    const dialogueResult = await imageGenerator.generateDialogueImage(
-                        character, 
-                        'Habitant local', 
-                        npcResponse,
-                        { style: '3d', nudity: false }
-                    );
-
-                    // Texte unifié avec dialogue et contexte narratif
-                    const dialogueText = `💬 **Rencontre avec un habitant local**
-
-Dans ${character.currentLocation}, ${character.name} s'approche d'un habitant du village pour engager la conversation.
-
-🗣️ **${character.name}** : "${message}"
-
-L'habitant local vous regarde attentivement avant de répondre :
-
-👤 **Habitant local** : ${npcResponse}
-
-L'échange se déroule dans l'atmosphère typique de ${character.kingdom}, où les habitants sont habitués aux aventuriers de passage.`;
-
-                    return {
-                        text: dialogueText,
-                        image: dialogueResult.image,
-                        character: character
-                    };
-
-                } catch (error) {
-                    console.error('❌ Erreur génération dialogue PNJ:', error);
-                    return {
-                        text: `💬 **Dialogue avec un habitant**
-
-${character.name} engage la conversation avec un habitant local dans ${character.currentLocation}.
-
-🗣️ **${character.name}** : "${message}"
-
-👤 **Habitant local** : "Bonjour ${character.name}, que puis-je faire pour vous ?"`,
-                        character: character
-                    };
+                } else {
+                    // Fallback simple si Groq non disponible
+                    npcResponse = `"Salut ${character.name} ! Que fais-tu par ici ?"`;
                 }
+            } catch (error) {
+                console.error('❌ Erreur génération dialogue PNJ:', error.message);
+                npcResponse = `"Bonjour, voyageur. Belle journée, n'est-ce pas ?"`;
             }
 
-            // Si pas de guillemets, traiter comme action normale
-            return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
+            // Générer l'image et l'audio du dialogue
+            let dialogueImage = null;
+            let dialogueAudio = null;
+
+            try {
+                const mediaResult = await imageGenerator.generateDialogueImage(
+                    character,
+                    'Habitant du village',
+                    npcResponse,
+                    { style: '3d', perspective: 'second_person' }
+                );
+                dialogueImage = mediaResult.image;
+                dialogueAudio = mediaResult.audio;
+            } catch (mediaError) {
+                console.error('❌ Erreur génération média dialogue:', mediaError.message);
+            }
+
+            return {
+                text: `💬 ${playerSpeech}\n\n${npcResponse}\n\n📍 *${character.currentLocation}*`,
+                image: dialogueImage,
+                audio: dialogueAudio
+            };
 
         } catch (error) {
-            console.error('❌ Erreur lors du traitement du dialogue:', error);
+            console.error('❌ Erreur processDialogueAction:', error);
             return {
-                text: `❌ Erreur lors du traitement de votre message. Réessayez.`
+                text: `❌ Erreur lors du dialogue. Les habitants semblent occupés en ce moment.`
             };
         }
     }
