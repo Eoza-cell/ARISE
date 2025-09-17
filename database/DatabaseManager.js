@@ -1,5 +1,5 @@
-const { Pool } = require('@neondatabase/serverless');
-const { drizzle } = require('drizzle-orm/neon-serverless');
+const { Pool } = require('pg');
+const { drizzle } = require('drizzle-orm/node-postgres');
 const { eq, and, desc, gte, lt } = require('drizzle-orm');
 const ws = require('ws');
 
@@ -19,19 +19,14 @@ class DatabaseManager {
                 throw new Error('DATABASE_URL environment variable is required');
             }
 
-            // Try standard PostgreSQL connection first, fallback to Neon if needed
-            try {
-                // For development environment with standard PostgreSQL
-                const { Pool: StandardPool } = require('pg');
-                this.pool = new StandardPool({ connectionString: process.env.DATABASE_URL });
-                console.log('🔌 Using standard PostgreSQL connection');
-            } catch (standardError) {
-                console.log('⚠️ Standard PostgreSQL not available, trying Neon serverless...');
-                // Fallback to Neon serverless
-                const { Pool: NeonPool, neonConfig } = require('@neondatabase/serverless');
-                neonConfig.webSocketConstructor = ws;
-                this.pool = new NeonPool({ connectionString: process.env.DATABASE_URL });
-            }
+            // Use PostgreSQL connection with proper SSL configuration
+            this.pool = new Pool({ 
+                connectionString: process.env.DATABASE_URL,
+                ssl: {
+                    rejectUnauthorized: false // Accept self-signed certificates in development
+                }
+            });
+            console.log('🔌 Using PostgreSQL connection with SSL configuration');
             this.db = drizzle(this.pool, { schema });
 
             console.log('✅ Connexion à la base de données établie');
@@ -304,32 +299,28 @@ class DatabaseManager {
 
     async updateCharacter(characterId, updates) {
         try {
-            const query = `
-                UPDATE characters 
-                SET currentLife = ?, currentEnergy = ?, coins = ?, 
-                    currentLocation = ?, position = ?, equipment = ?, 
-                    learnedTechniques = ?, inventory = ?, updatedAt = CURRENT_TIMESTAMP
-                WHERE id = ?
-            `;
+            const [updatedCharacter] = await this.db
+                .update(schema.characters)
+                .set({
+                    currentLife: updates.currentLife,
+                    currentEnergy: updates.currentEnergy,
+                    coins: updates.coins,
+                    currentLocation: updates.currentLocation || '',
+                    position: updates.position || {},
+                    equipment: updates.equipment || {},
+                    learnedTechniques: updates.learnedTechniques || [],
+                    inventory: updates.inventory || [],
+                    updatedAt: new Date()
+                })
+                .where(eq(schema.characters.id, characterId))
+                .returning();
 
-            const result = await this.db.run(query, [
-                updates.currentLife,
-                updates.currentEnergy,
-                updates.coins,
-                updates.currentLocation || '',
-                JSON.stringify(updates.position || {}),
-                JSON.stringify(updates.equipment || {}),
-                JSON.stringify(updates.learnedTechniques || []),
-                JSON.stringify(updates.inventory || []),
-                characterId
-            ]);
-
-            if (result.changes === 0) {
+            if (!updatedCharacter) {
                 throw new Error(`Aucun personnage trouvé avec l'ID ${characterId}`);
             }
 
             console.log(`✅ Personnage ${characterId} mis à jour`);
-            return true;
+            return updatedCharacter;
         } catch (error) {
             console.error('❌ Erreur mise à jour personnage:', error);
             throw error;
@@ -338,15 +329,17 @@ class DatabaseManager {
 
     async deleteCharacter(characterId) {
         try {
-            const query = `DELETE FROM characters WHERE id = ?`;
-            const result = await this.db.run(query, [characterId]);
+            const [deletedCharacter] = await this.db
+                .delete(schema.characters)
+                .where(eq(schema.characters.id, characterId))
+                .returning();
 
-            if (result.changes === 0) {
+            if (!deletedCharacter) {
                 throw new Error(`Aucun personnage trouvé avec l'ID ${characterId}`);
             }
 
             console.log(`✅ Personnage ${characterId} supprimé`);
-            return true;
+            return deletedCharacter;
         } catch (error) {
             console.error('❌ Erreur suppression personnage:', error);
             throw error;
@@ -630,16 +623,10 @@ class DatabaseManager {
                 version: '1.0'
             };
 
-            // Sauvegarder dans une table de backup
-            const backupData = {
-                playerId: player.id,
-                backupData: JSON.stringify(backup),
-                createdAt: new Date()
-            };
-
+            // Sauvegarder dans une table de backup en utilisant raw query pour cette table spécifique
             await this.pool.query(
                 'INSERT INTO game_backups (player_id, backup_data, created_at) VALUES ($1, $2, $3)',
-                [backupData.playerId, backupData.backupData, backupData.createdAt]
+                [player.id, JSON.stringify(backup), new Date()]
             );
 
             console.log(`✅ Sauvegarde créée pour le joueur ${player.id}`);
