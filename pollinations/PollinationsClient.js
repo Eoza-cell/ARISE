@@ -219,10 +219,14 @@ class PollinationsClient {
             });
 
             if (response.data && response.data.byteLength > 0) {
-                // Sauvegarder l'audio
-                await fs.writeFile(outputPath, Buffer.from(response.data));
+                const audioBuffer = Buffer.from(response.data);
+                
+                // Sauvegarder l'audio en fichier aussi
+                await fs.writeFile(outputPath, audioBuffer);
                 console.log(`✅ Audio Pollinations généré: ${outputPath}`);
-                return outputPath;
+                
+                // Retourner le buffer pour envoi direct
+                return audioBuffer;
             } else {
                 throw new Error('Audio vide reçu de Pollinations');
             }

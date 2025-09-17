@@ -91,6 +91,11 @@ class GameEngine {
                 return await this.handleDescriptionCreation({ player, description: message, dbManager, imageGenerator });
             }
 
+            // Gestion de la suppression de personnage
+            if (message && message.toUpperCase().trim() === 'SUPPRIMER_PERSONNAGE') {
+                return await this.handleDeleteCharacter({ player, dbManager, imageGenerator });
+            }
+
             if (this.commandHandlers[command]) {
                 response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock });
             }
@@ -1538,6 +1543,44 @@ Règles importantes:
             console.error('❌ Erreur lors du traitement du dialogue:', error);
             return {
                 text: `❌ Erreur lors du traitement de votre message. Réessayez.`
+            };
+        }
+    }
+
+    async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+
+            if (!character) {
+                return {
+                    text: `❌ Tu n'as pas de personnage à supprimer.\n\n` +
+                          `Utilise /créer pour créer un nouveau personnage.`
+                };
+            }
+
+            // Supprimer le personnage de la base de données
+            await dbManager.deleteCharacter(character.id);
+
+            // Nettoyer les données temporaires
+            await dbManager.clearTemporaryData(player.id, 'game_mode');
+            await dbManager.clearTemporaryData(player.id, 'creation_started');
+            await dbManager.clearTemporaryData(player.id, 'creation_mode');
+
+            console.log(`🗑️ Personnage supprimé: ${character.name} (ID: ${character.id})`);
+
+            return {
+                text: `🗑️ **PERSONNAGE SUPPRIMÉ** 🗑️\n\n` +
+                      `👤 **${character.name}** a été définitivement supprimé de ${character.kingdom}.\n\n` +
+                      `✨ Tu peux maintenant créer un nouveau personnage avec /créer\n\n` +
+                      `💀 **Attention :** Cette action est irréversible !`,
+                image: await imageGenerator.generateMenuImage()
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur lors de la suppression du personnage:', error);
+            return {
+                text: `❌ **Erreur lors de la suppression**\n\n` +
+                      `Une erreur s'est produite. Veuillez réessayer plus tard.`
             };
         }
     }

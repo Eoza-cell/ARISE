@@ -321,26 +321,46 @@ class FrictionUltimateBot {
                 try {
                     const fs = require('fs');
                     
-                    // Vérifier si le fichier audio existe
-                    const audioExists = await fs.promises.access(response.audio).then(() => true).catch(() => false);
+                    let audioBuffer = null;
                     
-                    if (audioExists) {
-                        const audioBuffer = await fs.promises.readFile(response.audio);
+                    // Si response.audio est déjà un buffer
+                    if (Buffer.isBuffer(response.audio)) {
+                        audioBuffer = response.audio;
+                        console.log('✅ Audio reçu comme buffer');
+                    } 
+                    // Si c'est un chemin de fichier
+                    else if (typeof response.audio === 'string') {
+                        const audioExists = await fs.promises.access(response.audio).then(() => true).catch(() => false);
                         
-                        // Vérifier que le buffer n'est pas vide
-                        if (audioBuffer && audioBuffer.length > 0) {
-                            await this.sock.sendMessage(chatId, {
-                                audio: audioBuffer,
-                                mimetype: 'audio/mpeg',
-                                ptt: true, // Voice message
-                                seconds: Math.min(60, Math.max(5, Math.round(response.text.length / 15)))
-                            });
-                            console.log('✅ Message vocal envoyé avec buffer');
+                        if (audioExists) {
+                            audioBuffer = await fs.promises.readFile(response.audio);
+                            console.log('✅ Audio lu depuis fichier');
                         } else {
-                            console.log('⚠️ Fichier audio vide, envoi ignoré');
+                            console.log('⚠️ Fichier audio introuvable:', response.audio);
+                        }
+                    }
+                    
+                    // Envoyer l'audio si on a un buffer valide
+                    if (audioBuffer && audioBuffer.length > 0) {
+                        await this.sock.sendMessage(chatId, {
+                            audio: audioBuffer,
+                            mimetype: 'audio/mpeg',
+                            ptt: true, // Voice message
+                            seconds: Math.min(60, Math.max(5, Math.round(response.text.length / 15)))
+                        });
+                        console.log('✅ Message vocal envoyé avec buffer');
+                        
+                        // Nettoyer le fichier temporaire si c'était un chemin
+                        if (typeof response.audio === 'string') {
+                            setTimeout(() => {
+                                fs.unlink(response.audio, (err) => {
+                                    if (!err) console.log(`🗑️ Fichier audio supprimé: ${response.audio}`);
+                                });
+                            }, 5000);
                         }
                     } else {
-                        console.log('⚠️ Fichier audio introuvable:', response.audio);
+                        console.log('⚠️ Aucun audio valide à envoyer');
+                    } introuvable:', response.audio);
                     }
                     
                     // Nettoyer le fichier audio temporaire
