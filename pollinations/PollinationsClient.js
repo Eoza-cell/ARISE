@@ -165,48 +165,98 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un message vocal avec une API gratuite (alternative à Pollinations)
+     * Génère un message vocal avec Edge-TTS (API gratuite)
      */
     async generateFreeVoice(text, outputPath, options = {}) {
         try {
-            // Utiliser l'API Edge-TTS (gratuite) ou similaire
-            const voice = options.voice || 'fr-FR-DeniseNeural';
-            const rate = options.speed ? `${Math.round((options.speed - 1) * 100)}%` : '0%';
+            // Choisir la voix selon le contexte
+            let voice = 'fr-FR-DeniseNeural'; // Voix féminine par défaut
             
-            console.log(`🎤 Génération vocale gratuite - Voix: ${voice}`);
+            if (options.gender === 'male') {
+                voice = 'fr-FR-HenriNeural'; // Voix masculine
+            }
+            
+            // Voix spéciales pour les personnages
+            if (options.voice === 'warrior') {
+                voice = options.gender === 'male' ? 'fr-FR-AlainNeural' : 'fr-FR-BrigitteNeural';
+            } else if (options.voice === 'merchant') {
+                voice = options.gender === 'male' ? 'fr-FR-ClaudeNeural' : 'fr-FR-CoralieNeural';
+            } else if (options.voice === 'noble') {
+                voice = options.gender === 'male' ? 'fr-FR-JeromeNeural' : 'fr-FR-JacquelineNeural';
+            }
+            
+            const speed = options.speed || 1.0;
+            const rate = speed !== 1.0 ? `${Math.round((speed - 1) * 100)}%` : '+0%';
+            
+            console.log(`🎤 Edge-TTS GRATUIT - Voix: ${voice}, Vitesse: ${rate}`);
             
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
             
-            // Utiliser une commande système pour générer l'audio (si edge-tts est disponible)
-            // Sinon, utiliser une approche web API gratuite
-            return await this.generateWebSpeechAPI(text, outputPath, options);
+            // Utiliser Edge-TTS pour génération gratuite
+            return await this.generateWebSpeechAPI(text, outputPath, { voice, speed, rate });
             
         } catch (error) {
-            console.error('❌ Erreur API vocale gratuite:', error.message);
+            console.error('❌ Erreur Edge-TTS gratuit:', error.message);
             return null;
         }
     }
 
     /**
-     * Utilise l'API Web Speech ou une alternative gratuite
+     * Utilise Edge-TTS pour synthèse vocale gratuite
      */
     async generateWebSpeechAPI(text, outputPath, options = {}) {
         try {
-            console.log('🌐 Utilisation API vocale web gratuite');
+            console.log('🎤 Utilisation Edge-TTS pour synthèse vocale GRATUITE');
             
-            // Pour une implémentation complète, on pourrait utiliser une API comme:
-            // - ResponsiveVoice API (gratuite avec limites)
-            // - Web Speech API via un serveur local
-            // - Ou une autre API gratuite
+            // Voix française par défaut
+            const voice = options.voice || 'fr-FR-DeniseNeural';
+            const rate = options.speed ? `${Math.round((options.speed - 1) * 100)}%` : '+0%';
             
-            // Temporairement, créer un fichier placeholder et utiliser PlayHT en fallback
-            console.log('⚠️ API vocale web en développement - utilisation du fallback');
-            return null;
+            // Créer le dossier si nécessaire
+            const dir = path.dirname(outputPath);
+            await fs.mkdir(dir, { recursive: true });
+            
+            // Utiliser Edge-TTS via Python
+            const { spawn } = require('child_process');
+            
+            return new Promise((resolve, reject) => {
+                console.log(`🔊 Génération vocale avec Edge-TTS - Voix: ${voice}`);
+                
+                const edgeProcess = spawn('python3', ['-m', 'edge_tts', '--voice', voice, '--text', text, '--write-media', outputPath, '--rate', rate], {
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+                
+                let output = '';
+                let errorOutput = '';
+                
+                edgeProcess.stdout.on('data', (data) => {
+                    output += data.toString();
+                });
+                
+                edgeProcess.stderr.on('data', (data) => {
+                    errorOutput += data.toString();
+                });
+                
+                edgeProcess.on('close', (code) => {
+                    if (code === 0) {
+                        console.log(`✅ Audio Edge-TTS généré GRATUITEMENT: ${outputPath}`);
+                        resolve(outputPath);
+                    } else {
+                        console.error(`❌ Erreur Edge-TTS (code ${code}):`, errorOutput);
+                        resolve(null); // Ne pas rejeter, juste retourner null pour fallback
+                    }
+                });
+                
+                edgeProcess.on('error', (error) => {
+                    console.error('❌ Erreur lancement Edge-TTS:', error.message);
+                    resolve(null); // Fallback vers PlayHT
+                });
+            });
             
         } catch (error) {
-            console.error('❌ Erreur API vocale web:', error.message);
+            console.error('❌ Erreur Edge-TTS:', error.message);
             return null;
         }
     }
@@ -251,20 +301,91 @@ class PollinationsClient {
     }
 
     /**
-     * Tente une synthèse vocale système simple
+     * Synthèse vocale système avec espeak (Linux)
      */
     async generateSystemVoice(text, outputPath, options = {}) {
         try {
-            // Cette méthode pourrait utiliser des commandes système comme:
-            // - espeak (Linux)
-            // - say (macOS)
-            // - powershell speech (Windows)
+            console.log('🔊 Tentative synthèse système avec espeak...');
             
-            console.log('🔊 Tentative synthèse vocale système...');
+            // Créer le dossier si nécessaire
+            const dir = path.dirname(outputPath);
+            await fs.mkdir(dir, { recursive: true });
             
-            // Pour Replit (Linux), on pourrait essayer espeak si installé
-            // Mais pour l'instant, on retourne null pour utiliser le texte
-            return null;
+            const { spawn } = require('child_process');
+            
+            return new Promise((resolve, reject) => {
+                // Utiliser espeak pour générer un fichier WAV temporaire
+                const tempWavPath = outputPath.replace('.mp3', '.wav');
+                const speed = options.speed ? Math.round(options.speed * 175) : 175;
+                
+                const espeakProcess = spawn('espeak', [
+                    '-v', 'fr',
+                    '-s', speed.toString(),
+                    '-w', tempWavPath,
+                    text
+                ], {
+                    stdio: ['pipe', 'pipe', 'pipe']
+                });
+                
+                espeakProcess.on('close', async (code) => {
+                    if (code === 0) {
+                        try {
+                            // Convertir WAV en MP3 avec ffmpeg si disponible
+                            const ffmpegProcess = spawn('ffmpeg', [
+                                '-y', '-i', tempWavPath,
+                                '-acodec', 'libmp3lame',
+                                '-b:a', '128k',
+                                outputPath
+                            ], { stdio: ['pipe', 'pipe', 'pipe'] });
+                            
+                            ffmpegProcess.on('close', async (ffmpegCode) => {
+                                // Nettoyer le fichier WAV temporaire
+                                try {
+                                    await fs.unlink(tempWavPath);
+                                } catch (unlinkError) {
+                                    console.log('⚠️ Impossible de supprimer le fichier temporaire');
+                                }
+                                
+                                if (ffmpegCode === 0) {
+                                    console.log(`✅ Audio système généré (espeak + ffmpeg): ${outputPath}`);
+                                    resolve(outputPath);
+                                } else {
+                                    // Si ffmpeg échoue, renommer le WAV en MP3
+                                    try {
+                                        await fs.rename(tempWavPath, outputPath);
+                                        console.log(`✅ Audio système généré (espeak WAV): ${outputPath}`);
+                                        resolve(outputPath);
+                                    } catch (renameError) {
+                                        resolve(null);
+                                    }
+                                }
+                            });
+                            
+                            ffmpegProcess.on('error', async () => {
+                                // Si ffmpeg n'est pas disponible, utiliser le WAV
+                                try {
+                                    await fs.rename(tempWavPath, outputPath);
+                                    console.log(`✅ Audio système généré (espeak WAV): ${outputPath}`);
+                                    resolve(outputPath);
+                                } catch (renameError) {
+                                    resolve(null);
+                                }
+                            });
+                            
+                        } catch (conversionError) {
+                            resolve(null);
+                        }
+                    } else {
+                        console.log('⚠️ espeak non disponible');
+                        resolve(null);
+                    }
+                });
+                
+                espeakProcess.on('error', (error) => {
+                    console.log('⚠️ espeak non installé');
+                    resolve(null);
+                });
+            });
             
         } catch (error) {
             console.error('❌ Erreur synthèse système:', error.message);
