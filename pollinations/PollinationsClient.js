@@ -145,21 +145,35 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un message vocal - temporairement désactivé à cause des erreurs API
+     * Génère un message vocal avec priorité à Camb AI
      */
     async generateVoice(text, outputPath, options = {}) {
         try {
-            console.log(`🎙️ Génération vocale temporairement désactivée (APIs indisponibles)`);
-            return null;
+            console.log(`🎙️ Génération vocale - Essai avec Camb AI MARS5...`);
 
-            // Les services audio sont temporairement désactivés car :
-            // - Camb AI retourne erreur 422
-            // - Pollinations Audio retourne erreur 402 
-            // - Edge-TTS retourne erreur 401 (problème d'authentification)
+            // Essayer d'abord Camb AI (qualité supérieure)
+            if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
+                console.log('🎙️ Utilisation de Camb AI MARS5 pour la synthèse vocale');
+                const cambResult = await this.cambAIClient.generateVoice(text, outputPath, {
+                    gender: options.gender || 'male',
+                    age: options.age || 30,
+                    language: 'fr',
+                    ...options
+                });
+
+                if (cambResult) {
+                    console.log('✅ Audio généré avec succès par Camb AI');
+                    return cambResult;
+                }
+            }
+
+            // Fallback vers Pollinations Audio
+            console.log('🔄 Fallback vers Pollinations Audio...');
+            return await this.generatePollinationsVoice(text, outputPath, options);
             
         } catch (error) {
-            console.log('⚠️ Génération vocale désactivée:', error.message);
-            return null;
+            console.log('⚠️ Erreur génération vocale, essai fallback:', error.message);
+            return await this.generateFallbackVoice(text, outputPath, options);
         }
     }
 
@@ -458,6 +472,44 @@ class PollinationsClient {
     }
 
     /**
+     * Obtenir l'âge approprié selon le type de personnage pour Camb AI
+     */
+    getAgeForCharacterType(characterType) {
+        const ageMap = {
+            'warrior': 30,
+            'merchant': 45,
+            'noble': 35,
+            'wizard': 55,
+            'child': 18,
+            'elder': 65,
+            'habitant': 40,
+            'garde': 32,
+            'prêtre': 50,
+            'voleur': 28
+        };
+        
+        return ageMap[characterType.toLowerCase()] || 35;
+    }
+
+    /**
+     * Obtenir un voice_id spécifique pour Camb AI selon le personnage
+     */
+    getVoiceIdForCharacter(characterType, gender) {
+        // Ces IDs doivent correspondre aux voix disponibles dans Camb AI
+        const voiceMap = {
+            'warrior_male': null, // Laisser l'API choisir selon l'âge/genre
+            'warrior_female': null,
+            'merchant_male': null,
+            'merchant_female': null,
+            'noble_male': null,
+            'noble_female': null
+        };
+        
+        const key = `${characterType.toLowerCase()}_${gender}`;
+        return voiceMap[key] || null;
+    }
+
+    /**
      * Synthèse vocale système avec espeak (Linux)
      */
     async generateSystemVoice(text, outputPath, options = {}) {
@@ -557,43 +609,41 @@ class PollinationsClient {
         try {
             console.log(`🎭 Génération dialogue vocal pour ${npcName}: "${dialogue.substring(0, 30)}..."`);
 
-            // Préparer les options de voix
+            // Préparer les options de voix optimisées pour Camb AI
             const voiceOptions = {
-                voice: 'warrior', // Type de personnage
                 gender: character.gender || 'male',
-                age: character.age || 30,
+                age: this.getAgeForCharacterType(npcName),
                 language: 'fr',
+                voice_id: this.getVoiceIdForCharacter(npcName, character.gender),
                 ...options
             };
 
             // Essayer d'abord Camb AI (qualité supérieure)
             if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
+                console.log('🎙️ Génération dialogue avec Camb AI MARS5...');
                 try {
-                    const cambResult = await this.cambAIClient.generateDialogueVoice(dialogue, outputPath, npcName, character.gender || 'male');
+                    const cambResult = await this.cambAIClient.generateDialogueVoice(
+                        dialogue, 
+                        outputPath, 
+                        npcName, 
+                        character.gender || 'male'
+                    );
+                    
                     if (cambResult) {
                         console.log('✅ Dialogue généré avec Camb AI MARS5');
                         return cambResult;
                     }
                 } catch (cambError) {
-                    console.log('⚠️ Camb AI dialogue échec, utilisation fallback...');
+                    console.log('⚠️ Camb AI dialogue échec:', cambError.message);
                 }
             }
 
-            // Fallback vers Pollinations
+            // Fallback vers Pollinations avec voix adaptée
+            console.log('🔄 Fallback dialogue vers Pollinations...');
             return await this.generatePollinationsVoice(dialogue, outputPath, voiceOptions);
 
         } catch (error) {
             console.error('❌ Erreur génération dialogue vocal:', error.message);
-
-            // Fallback vers PlayHT ou autres méthodes
-            if (this.playhtClient && this.playhtClient.hasValidClient()) {
-                try {
-                    return await this.playhtClient.generateDialogueVoice(character, npcName, dialogue, outputPath, options);
-                } catch (playhtError) {
-                    console.log('⚠️ Fallback PlayHT échoué aussi');
-                }
-            }
-
             return null;
         }
     }
@@ -605,17 +655,18 @@ class PollinationsClient {
         try {
             console.log(`📖 Génération narration vocale: "${narration.substring(0, 30)}..."`);
 
-            // Préparer les options pour la narration
+            // Préparer les options pour la narration avec Camb AI
             const voiceOptions = {
-                voice: 'fable', // Voix narrative
-                gender: 'male',
-                age: 35,
+                gender: options.gender || 'male',
+                age: options.age || 35,
                 language: 'fr',
+                voice_id: options.voice_id || null,
                 ...options
             };
 
-            // Essayer d'abord Camb AI (qualité supérieure)
+            // Essayer d'abord Camb AI (qualité supérieure MARS5)
             if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
+                console.log('🎙️ Génération narration avec Camb AI MARS5...');
                 try {
                     const cambResult = await this.cambAIClient.generateNarrationVoice(narration, outputPath, voiceOptions);
                     if (cambResult) {
@@ -623,26 +674,18 @@ class PollinationsClient {
                         return cambResult;
                     }
                 } catch (cambError) {
-                    console.log('⚠️ Camb AI narration échec, utilisation fallback...');
+                    console.log('⚠️ Camb AI narration échec:', cambError.message);
                 }
+            } else {
+                console.log('⚠️ Camb AI non disponible pour la narration');
             }
 
             // Fallback vers Pollinations
+            console.log('🔄 Fallback narration vers Pollinations...');
             return await this.generatePollinationsVoice(narration, outputPath, voiceOptions);
 
         } catch (error) {
             console.error('❌ Erreur génération narration vocale:', error.message);
-
-            // Fallback vers les anciennes méthodes
-            try {
-                const fallbackResult = await this.generateFallbackVoice(narration, outputPath, options);
-                if (fallbackResult) {
-                    return fallbackResult;
-                }
-            } catch (fallbackError) {
-                console.log('⚠️ Tous les fallbacks vocaux échoués');
-            }
-
             return null;
         }
     }
