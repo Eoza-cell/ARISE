@@ -7,6 +7,7 @@ const RunwayClient = require('../runway/RunwayClient');
 const KieAiClient = require('../kieai/KieAiClient');
 const RunwareClient = require('../runware/RunwareClient');
 const PollinationsClient = require('../pollinations/PollinationsClient');
+const CharacterDefaults = require('./CharacterDefaults');
 
 class ImageGenerator {
     constructor() {
@@ -314,7 +315,8 @@ class ImageGenerator {
             if (this.hasKieAI && this.kieaiClient) {
                 try {
                     console.log(`🎨 Génération image d'action avec KieAI (fallback, vue première personne forcée)...`);
-                    const prompt = `${character.gender || 'warrior'} ${character.name || 'character'} from ${character.kingdom || 'fantasy'} kingdom, ${action}, ${narration}, RPG character action, first person view, POV`;
+                    const sanitizedCharacter = CharacterDefaults.sanitizeCharacter(character);
+                    const prompt = CharacterDefaults.generateImagePrompt(sanitizedCharacter, action, narration + ', first person view, POV');
                     await this.kieaiClient.generateCombatScene(prompt, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
                     if (imageBuffer) {
@@ -351,20 +353,21 @@ class ImageGenerator {
     async generateCharacterImage(character, options = {}) {
         try {
             // D'abord vérifier s'il y a une image personnalisée
-            const customImage = await this.getCustomCharacterImage(character.id);
+            const sanitizedCharacter = CharacterDefaults.sanitizeCharacter(character);
+            const customImage = await this.getCustomCharacterImage(sanitizedCharacter.id);
             if (customImage) {
-                console.log(`✅ Image personnalisée trouvée pour ${character.name}`);
+                console.log(`✅ Image personnalisée trouvée pour ${sanitizedCharacter.name}`);
                 return customImage;
             }
 
-            const cacheKey = `character_${character.id}_freepik_${options.style || this.defaultStyle}`;
+            const cacheKey = `character_${sanitizedCharacter.id}_freepik_${options.style || this.defaultStyle}`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            console.log(`🎨 Génération image personnage ${character.name} avec AimlApi (vue première personne)...`);
+            console.log(`🎨 Génération image personnage ${sanitizedCharacter.name} avec AimlApi (vue première personne)...`);
 
-            const imagePath = path.join(this.tempPath, `character_${character.id}_freepik.png`);
+            const imagePath = path.join(this.tempPath, `character_${sanitizedCharacter.id}_freepik.png`);
 
             // FORCER la vue première personne pour toutes les images IA
             const imageOptions = {
@@ -376,12 +379,12 @@ class ImageGenerator {
             // Essayer Pollinations d'abord (GRATUIT)
             if (this.hasPollinations && this.pollinationsClient) {
                 try {
-                    console.log(`🎨 Génération image personnage ${character.name} avec Pollinations GRATUIT (vue première personne)...`);
-                    await this.pollinationsClient.generateCharacterImage(character, imagePath, imageOptions);
+                    console.log(`🎨 Génération image personnage ${sanitizedCharacter.name} avec Pollinations GRATUIT (vue première personne)...`);
+                    await this.pollinationsClient.generateCharacterImage(sanitizedCharacter, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
                     if (imageBuffer) {
-                        console.log(`✅ Image personnage ${character.name} générée par Pollinations GRATUIT (vue première personne)`);
+                        console.log(`✅ Image personnage ${sanitizedCharacter.name} générée par Pollinations GRATUIT (vue première personne)`);
                         this.imageCache.set(cacheKey, imageBuffer);
                         return imageBuffer;
                     }
@@ -435,24 +438,25 @@ class ImageGenerator {
     async generateCharacterSheet(character) {
         try {
             // Vérifier d'abord s'il y a une image personnalisée pour la fiche
-            const customImage = await this.getCustomCharacterImage(character.id);
+            const sanitizedCharacter = CharacterDefaults.sanitizeCharacter(character);
+            const customImage = await this.getCustomCharacterImage(sanitizedCharacter.id);
             if (customImage) {
-                console.log(`✅ Image personnalisée utilisée pour la fiche de ${character.name}`);
+                console.log(`✅ Image personnalisée utilisée pour la fiche de ${sanitizedCharacter.name}`);
                 return customImage;
             }
 
-            const cacheKey = `character_sheet_${character.id}`;
+            const cacheKey = `character_sheet_${sanitizedCharacter.id}`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            const imagePath = path.join(this.tempPath, `character_sheet_${character.id}.png`);
+            const imagePath = path.join(this.tempPath, `character_sheet_${sanitizedCharacter.id}.png`);
 
             if (this.hasFreepik && this.freepikClient) {
-                console.log(`🎨 Génération fiche personnage pour ${character.name} (vue première personne)...`);
+                console.log(`🎨 Génération fiche personnage pour ${sanitizedCharacter.name} (vue première personne)...`);
 
-                const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
-                const prompt = `Character sheet portrait of ${character.name}, detailed ${genderDesc} from ${character.kingdom} kingdom, level ${character.level}, power level ${character.powerLevel}, fantasy RPG character portrait, detailed armor and equipment, first person POV perspective`;
+                const genderDesc = sanitizedCharacter.gender === 'male' ? 'male warrior' : 'female warrior';
+                const prompt = `Character sheet portrait of ${sanitizedCharacter.name}, detailed ${genderDesc} from ${sanitizedCharacter.kingdom} kingdom, level ${sanitizedCharacter.level}, power level ${sanitizedCharacter.powerLevel}, fantasy RPG character portrait, detailed armor and equipment, first person POV perspective`;
 
                 await this.freepikClient.generateImage(prompt, imagePath, {
                     style: this.defaultStyle,
@@ -478,17 +482,18 @@ class ImageGenerator {
 
     async generateInventoryImage(character) {
         try {
-            const cacheKey = `inventory_${character.id}`;
+            const sanitizedCharacter = CharacterDefaults.sanitizeCharacter(character);
+            const cacheKey = `inventory_${sanitizedCharacter.id}`;
             if (this.imageCache.has(cacheKey)) {
                 return this.imageCache.get(cacheKey);
             }
 
-            const imagePath = path.join(this.tempPath, `inventory_${character.id}_aimlapi.png`);
+            const imagePath = path.join(this.tempPath, `inventory_${sanitizedCharacter.id}_aimlapi.png`);
 
             if (this.hasFreepik && this.freepikClient) {
-                console.log(`🎨 Génération inventaire pour ${character.name} avec Freepik...`);
+                console.log(`🎨 Génération inventaire pour ${sanitizedCharacter.name} avec Freepik...`);
 
-                const prompt = `RPG inventory interface for ${character.name}, fantasy game UI, detailed equipment slots, medieval style inventory screen, character equipment display`;
+                const prompt = `RPG inventory interface for ${sanitizedCharacter.name}, fantasy game UI, detailed equipment slots, medieval style inventory screen, character equipment display`;
 
                 await this.freepikClient.generateImage(prompt, imagePath, {
                     style: this.defaultStyle,

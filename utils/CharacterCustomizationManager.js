@@ -1,4 +1,5 @@
 const ProgressManager = require('./ProgressManager');
+const CharacterDefaults = require('./CharacterDefaults');
 
 class CharacterCustomizationManager {
     constructor(dbManager, imageGenerator, sock) {
@@ -516,27 +517,30 @@ class CharacterCustomizationManager {
     }
 
     buildRenderParameters(selections, isPreview = false) {
+        // Utiliser CharacterDefaults pour assurer des valeurs cohérentes
+        const defaults = CharacterDefaults.getDefaultCharacter();
+        
         return {
-            gender: selections.gender?.key || 'male',
-            face: selections.face?.key || 'oval',
-            skinTone: selections.skinTone?.color || '#FDBCB4',
-            hairStyle: selections.hairStyle?.key || 'medium_straight',
-            hairColor: selections.hairColor?.color || '#8B4513',
-            eyeColor: selections.eyeColor?.color || '#8B4513',
-            bodyType: selections.bodyType?.key || 'athletic',
-            height: selections.height?.key || 'average',
-            clothing: selections.clothing?.key || 'peasant',
+            gender: CharacterDefaults.sanitizeString(selections.gender?.key, defaults.gender),
+            face: CharacterDefaults.sanitizeString(selections.face?.key, defaults.face),
+            skinTone: CharacterDefaults.sanitizeString(selections.skinTone?.color, '#FDBCB4'),
+            hairStyle: CharacterDefaults.sanitizeString(selections.hairStyle?.key, defaults.hairStyle),
+            hairColor: CharacterDefaults.sanitizeString(selections.hairColor?.color, '#8B4513'),
+            eyeColor: CharacterDefaults.sanitizeString(selections.eyeColor?.color, '#8B4513'),
+            bodyType: CharacterDefaults.sanitizeString(selections.bodyType?.key, defaults.bodyType),
+            height: CharacterDefaults.sanitizeString(selections.height?.key, defaults.height),
+            clothing: CharacterDefaults.sanitizeString(selections.clothing?.key, defaults.clothing),
             quality: isPreview ? 'preview' : 'final',
             resolution: isPreview ? '512x512' : '1024x1024'
         };
     }
 
     generateFinalMessage(selections, isModification) {
-        const gender = selections.gender?.label || 'Héros';
-        const face = selections.face?.label || '';
-        const skin = selections.skinTone?.label || '';
-        const hair = selections.hairStyle?.label || '';
-        const eyes = selections.eyeColor?.label || '';
+        const gender = CharacterDefaults.sanitizeString(selections.gender?.label, 'Héros');
+        const face = CharacterDefaults.sanitizeString(selections.face?.label, 'Harmonieux');
+        const skin = CharacterDefaults.sanitizeString(selections.skinTone?.label, 'Claire');
+        const hair = CharacterDefaults.sanitizeString(selections.hairStyle?.label, 'Mi-long Lisse');
+        const eyes = CharacterDefaults.sanitizeString(selections.eyeColor?.label, 'Marron');
         
         return isModification ?
             `🎭 **TRANSFORMATION ACCOMPLIE !** 🎭\n\n` +

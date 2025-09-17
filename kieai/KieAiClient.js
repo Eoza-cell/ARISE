@@ -1,6 +1,7 @@
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
+const CharacterDefaults = require('../utils/CharacterDefaults');
 
 class KieAiClient {
     constructor() {
@@ -135,9 +136,10 @@ class KieAiClient {
 
     // Méthodes spécialisées pour le RPG
     async generateCharacterPortrait(character, outputPath, options = {}) {
-        const gender = character.gender || 'male';
-        const name = character.name || 'character';
-        const kingdom = character.kingdom || 'fantasy';
+        const sanitizedCharacter = CharacterDefaults.sanitizeCharacter(character);
+        const gender = sanitizedCharacter.gender;
+        const name = sanitizedCharacter.name;
+        const kingdom = sanitizedCharacter.kingdom;
         
         const prompt = `portrait of ${gender} character named ${name} from ${kingdom} kingdom, 
                        RPG character, fantasy medieval setting, detailed face, ${gender === 'female' ? 'beautiful woman' : 'handsome man'}`;
