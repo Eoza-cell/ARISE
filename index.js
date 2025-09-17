@@ -11,6 +11,24 @@ const DatabaseManager = require('./database/DatabaseManager');
 const ImageGenerator = require('./utils/ImageGenerator');
 const { initializeGameData } = require('./data/GameData');
 
+// Clients IA et services
+const OpenAIClient = require('./ai/OpenAIClient');
+const GroqClient = require('./groq/GroqClient'); 
+const GeminiClient = require('./gemini/GeminiClient');
+const OllamaClient = require('./ai/OllamaClient');
+
+// Clients de génération d'images
+const PollinationsClient = require('./pollinations/PollinationsClient');
+const RunwareClient = require('./runware/RunwareClient');
+const KieAiClient = require('./kieai/KieAiClient');
+const FreepikClient = require('./freepik/FreepikClient');
+
+// Client audio et vidéo
+const PlayHTClient = require('./playht/PlayHTClient');
+const CambAIClient = require('./camb/CambAIClient');
+const PuterClient = require('./puter/PuterClient');
+const RunwayClient = require('./runway/RunwayClient');
+
 class FrictionUltimateBot {
     constructor() {
         this.sock = null;
@@ -232,7 +250,7 @@ class FrictionUltimateBot {
                 try {
                     const fs = require('fs');
                     let audioBuffer = null;
-                    
+
                     if (Buffer.isBuffer(response.audio)) {
                         audioBuffer = response.audio;
                     } else if (typeof response.audio === 'string') {
@@ -244,7 +262,7 @@ class FrictionUltimateBot {
                             console.log(`⚠️ Audio non trouvé: ${response.audio}`);
                         }
                     }
-                    
+
                     if (audioBuffer && audioBuffer.length > 100) { // Au moins 100 bytes pour être valide
                         await this.sock.sendMessage(chatId, {
                             audio: audioBuffer,
@@ -253,7 +271,7 @@ class FrictionUltimateBot {
                             seconds: Math.min(60, Math.max(5, Math.round(response.text.length / 15)))
                         });
                         console.log(`✅ Audio envoyé (${audioBuffer.length} bytes)`);
-                        
+
                         // Nettoyer le fichier temporaire
                         if (typeof response.audio === 'string') {
                             setTimeout(() => {
@@ -278,7 +296,7 @@ class FrictionUltimateBot {
                             gifPlayback: false
                         });
                         console.log(`✅ Vidéo envoyée: ${response.video}`);
-                        
+
                         setTimeout(() => {
                             fs.unlink(response.video, () => {});
                         }, 5000);

@@ -7,8 +7,16 @@ const ImmersiveNarrationManager = require('../utils/ImmersiveNarrationManager');
 const path = require('path'); // Importer le module path pour gérer les chemins de fichiers
 
 class GameEngine {
-    constructor(dbManager = null) {
+    constructor({ dbManager, imageGenerator, playhtClient, cambAIClient, puterClient, asset3DManager, blenderClient, runwayClient }) {
         this.dbManager = dbManager;
+        this.imageGenerator = imageGenerator;
+        this.playhtClient = playhtClient;
+        this.cambAIClient = cambAIClient;
+        this.puterClient = puterClient;
+        this.asset3DManager = asset3DManager;
+        this.blenderClient = blenderClient;
+        this.runwayClient = runwayClient;
+
         this.openAIClient = new OpenAIClient(this.dbManager);
         this.ollamaClient = new OllamaClient();
         this.groqClient = new GroqClient();
@@ -811,7 +819,9 @@ Règles importantes:
                 actionAudio = mediaResult.audio;
 
                 // Générer une vidéo pour cette action
-                const imagePath = actionImage ? path.join(__dirname, '../temp', `action_temp_${Date.now()}.png`) : null;
+                const actionImageGenerator = require('../utils/ImageGenerator'); // Assurez-vous que le chemin est correct
+                const imagePath = path.join(__dirname, '..', 'temp', `action_temp_${Date.now()}.png`);
+
                 if (actionImage && imagePath) {
                     // Sauvegarder l'image temporairement pour la vidéo
                     const fs = require('fs').promises;
