@@ -142,30 +142,99 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un message vocal avec une API gratuite alternative
+     * Génère un message vocal avec l'API Pollinations simple
      */
     async generateVoice(text, outputPath, options = {}) {
         try {
-            console.log(`🎙️ Génération vocale GRATUITE avec texte: "${text.substring(0, 50)}..."`);
+            console.log(`🎙️ Génération vocale GRATUITE avec Pollinations: "${text.substring(0, 50)}..."`);
 
-            // Essayer d'abord l'API vocale gratuite alternative
-            const voiceResult = await this.generateFreeVoice(text, outputPath, options);
-            if (voiceResult) {
-                return voiceResult;
-            }
-
-            // Fallback vers PlayHT si l'API gratuite échoue
-            console.log('⚠️ API vocale gratuite échouée, utilisation du fallback PlayHT');
-            return await this.generateFallbackVoice(text, outputPath);
+            // Utiliser la nouvelle API simple de Pollinations
+            return await this.generatePollinationsVoice(text, outputPath, options);
 
         } catch (error) {
-            console.error('❌ Erreur génération vocale:', error.message);
+            console.error('❌ Erreur génération vocale Pollinations:', error.message);
+            
+            // Fallback vers les anciennes méthodes si la nouvelle API échoue
+            try {
+                const fallbackResult = await this.generateFallbackVoice(text, outputPath, options);
+                if (fallbackResult) {
+                    return fallbackResult;
+                }
+            } catch (fallbackError) {
+                console.error('❌ Fallback vocal également échoué:', fallbackError.message);
+            }
+            
             throw error;
         }
     }
 
     /**
-     * Génère un message vocal avec Edge-TTS (API gratuite)
+     * Génère un message vocal avec l'API Pollinations simple
+     */
+    async generatePollinationsVoice(text, outputPath, options = {}) {
+        try {
+            // Choisir la voix selon le contexte
+            let voice = 'alloy'; // Voix par défaut OpenAI
+            
+            if (options.gender === 'male') {
+                voice = 'onyx'; // Voix masculine
+            } else if (options.gender === 'female') {
+                voice = 'nova'; // Voix féminine
+            }
+            
+            // Voix spéciales pour les personnages
+            if (options.voice === 'warrior') {
+                voice = options.gender === 'male' ? 'onyx' : 'shimmer';
+            } else if (options.voice === 'merchant') {
+                voice = options.gender === 'male' ? 'echo' : 'alloy';
+            } else if (options.voice === 'noble') {
+                voice = options.gender === 'male' ? 'fable' : 'nova';
+            }
+            
+            console.log(`🎤 Pollinations Audio API - Voix: ${voice}, Texte: "${text.substring(0, 30)}..."`);
+            
+            // Créer le dossier si nécessaire
+            const dir = path.dirname(outputPath);
+            await fs.mkdir(dir, { recursive: true });
+            
+            // Nettoyer et limiter le texte
+            let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
+            if (cleanText.length > 200) {
+                cleanText = cleanText.substring(0, 200) + '...';
+            }
+            
+            // Encoder le texte pour l'URL
+            const encodedText = encodeURIComponent(cleanText);
+            const audioUrl = `https://text.pollinations.ai/${encodedText}?model=openai-audio&voice=${voice}`;
+            
+            console.log(`🔊 Téléchargement audio depuis: ${audioUrl.substring(0, 100)}...`);
+            
+            // Télécharger l'audio directement
+            const response = await axios.get(audioUrl, {
+                responseType: 'arraybuffer',
+                timeout: 30000,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                }
+            });
+
+            if (response.data && response.data.byteLength > 0) {
+                // Sauvegarder l'audio
+                await fs.writeFile(outputPath, Buffer.from(response.data));
+                console.log(`✅ Audio Pollinations généré: ${outputPath}`);
+                return outputPath;
+            } else {
+                throw new Error('Audio vide reçu de Pollinations');
+            }
+            
+        } catch (error) {
+            console.error('❌ Erreur Pollinations Audio API:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Génère un message vocal avec Edge-TTS (API gratuite) - FALLBACK
      */
     async generateFreeVoice(text, outputPath, options = {}) {
         try {
@@ -412,24 +481,27 @@ class PollinationsClient {
         try {
             console.log(`🎭 Génération dialogue vocal pour ${npcName}: "${dialogue.substring(0, 30)}..."`);
             
-            // Utiliser directement PlayHT pour les dialogues
-            if (this.playhtClient && this.playhtClient.hasValidClient()) {
-                return await this.playhtClient.generateDialogueVoice(character, npcName, dialogue, outputPath, options);
-            }
-            
-            // Fallback si PlayHT n'est pas disponible
+            // Utiliser la nouvelle API Pollinations directement
             const voiceOptions = {
-                voice: character.gender === 'male' ? 'warrior' : 'warrior',
+                voice: 'warrior',
                 gender: character.gender || 'male',
-                speed: 0.9,
                 ...options
             };
 
-            const voiceText = `${dialogue}`;
-            return await this.generateFallbackVoice(voiceText, outputPath, voiceOptions);
+            return await this.generatePollinationsVoice(dialogue, outputPath, voiceOptions);
             
         } catch (error) {
             console.error('❌ Erreur génération dialogue vocal:', error.message);
+            
+            // Fallback vers PlayHT ou autres méthodes
+            if (this.playhtClient && this.playhtClient.hasValidClient()) {
+                try {
+                    return await this.playhtClient.generateDialogueVoice(character, npcName, dialogue, outputPath, options);
+                } catch (playhtError) {
+                    console.log('⚠️ Fallback PlayHT échoué aussi');
+                }
+            }
+            
             return null;
         }
     }
@@ -441,32 +513,28 @@ class PollinationsClient {
         try {
             console.log(`📖 Génération narration vocale: "${narration.substring(0, 30)}..."`);
             
-            // Forcer l'utilisation d'Edge-TTS directement
+            // Utiliser la nouvelle API Pollinations directement
             const voiceOptions = {
-                voice: 'fr-FR-HenriNeural', // Voix masculine pour narrateur
+                voice: 'fable', // Voix narrative
                 gender: 'male',
-                speed: 0.9,
                 ...options
             };
 
-            // Essayer Edge-TTS en priorité
-            const edgeResult = await this.generateFreeVoice(narration, outputPath, voiceOptions);
-            if (edgeResult) {
-                console.log('✅ Audio narrateur généré avec Edge-TTS');
-                return edgeResult;
-            }
-
-            // Fallback vers PlayHT uniquement si Edge-TTS échoue
-            if (this.playhtClient && this.playhtClient.hasValidClient()) {
-                console.log('🔄 Fallback vers PlayHT pour narration');
-                return await this.playhtClient.generateNarrationVoice(narration, outputPath, options);
-            }
-            
-            console.log('⚠️ Aucune synthèse vocale disponible pour la narration');
-            return null;
+            return await this.generatePollinationsVoice(narration, outputPath, voiceOptions);
             
         } catch (error) {
             console.error('❌ Erreur génération narration vocale:', error.message);
+            
+            // Fallback vers les anciennes méthodes
+            try {
+                const fallbackResult = await this.generateFallbackVoice(narration, outputPath, options);
+                if (fallbackResult) {
+                    return fallbackResult;
+                }
+            } catch (fallbackError) {
+                console.log('⚠️ Tous les fallbacks vocaux échoués');
+            }
+            
             return null;
         }
     }
