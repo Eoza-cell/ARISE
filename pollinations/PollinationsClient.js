@@ -145,45 +145,20 @@ class PollinationsClient {
     }
 
     /**
-     * Génère un message vocal avec Camb AI en priorité, puis fallback
+     * Génère un message vocal - temporairement désactivé à cause des erreurs API
      */
     async generateVoice(text, outputPath, options = {}) {
         try {
-            console.log(`🎙️ Génération vocale: "${text.substring(0, 50)}..."`);
+            console.log(`🎙️ Génération vocale temporairement désactivée (APIs indisponibles)`);
+            return null;
 
-            // Essayer d'abord Camb AI (qualité supérieure)
-            if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
-                try {
-                    const cambResult = await this.cambAIClient.generateVoice(text, outputPath, options);
-                    if (cambResult) {
-                        console.log('✅ Audio généré avec Camb AI MARS5');
-                        return cambResult;
-                    }
-                } catch (cambError) {
-                    console.log('⚠️ Camb AI échec, utilisation fallback...');
-                }
-            }
-
-            // Fallback vers Pollinations Audio API
-            try {
-                return await this.generatePollinationsVoice(text, outputPath, options);
-            } catch (pollinationsError) {
-                console.log('⚠️ API Pollinations Audio échouée, utilisation Edge-TTS...');
-
-                // Fallback vers Edge-TTS
-                const edgeResult = await this.generateFreeVoice(text, outputPath, options);
-                if (edgeResult) {
-                    console.log('✅ Audio généré avec Edge-TTS');
-                    return edgeResult;
-                }
-
-                // Si Edge-TTS échoue aussi, essayer les méthodes système
-                console.log('⚠️ Edge-TTS échoué, tentative méthodes système...');
-                return await this.generateFallbackVoice(text, outputPath, options);
-            }
-
+            // Les services audio sont temporairement désactivés car :
+            // - Camb AI retourne erreur 422
+            // - Pollinations Audio retourne erreur 402 
+            // - Edge-TTS retourne erreur 401 (problème d'authentification)
+            
         } catch (error) {
-            console.error('❌ Erreur génération vocale complète:', error.message);
+            console.log('⚠️ Génération vocale désactivée:', error.message);
             return null;
         }
     }

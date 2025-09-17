@@ -180,42 +180,9 @@ class FrictionUltimateBot {
                 imageGenerator: this.imageGenerator
             });
 
-            // Envoi de la réponse texte d'abord
+            // Envoi de la réponse unifiée
             setTimeout(async () => {
-                await this.sendResponse(from, {
-                    text: result.text,
-                    image: result.image,
-                    sticker: result.sticker,
-                    isGuide: result.isGuide,
-                    audio: result.audio, // Assurez-vous que le résultat du jeu contient un champ 'audio'
-                    video: result.video
-                });
-
-                // Envoyer la vidéo si générée (avec délai pour éviter les conflits)
-                if (result.video) {
-                    setTimeout(async () => {
-                        try {
-                            const fs = require('fs');
-                            const videoBuffer = await fs.promises.readFile(result.video);
-                            await this.sock.sendMessage(from, {
-                                video: videoBuffer,
-                                caption: `🎬 Vidéo de l'action de ${result.character ? result.character.name : 'votre personnage'}`,
-                                gifPlayback: false
-                            });
-                            console.log(`✅ Vidéo envoyée: ${result.video}`);
-
-                            // Nettoyer le fichier vidéo après envoi
-                            setTimeout(() => {
-                                fs.unlink(result.video, (err) => {
-                                    if (err) console.log('⚠️ Impossible de supprimer la vidéo:', err.message);
-                                    else console.log(`🗑️ Vidéo supprimée: ${result.video}`);
-                                });
-                            }, 5000);
-                        } catch (videoError) {
-                            console.error('❌ Erreur envoi vidéo:', videoError);
-                        }
-                    }, 2000);
-                }
+                await this.sendResponse(from, result);
             }, 100);
 
         } catch (error) {
@@ -250,153 +217,83 @@ class FrictionUltimateBot {
 
     async sendResponse(chatId, response) {
         try {
-
-            // Envoyer la réponse avec support audio amélioré
-            if (response.image && response.video && response.audio) {
-                // Envoyer l'image avec le texte
+            // Envoi unifié : image avec texte complet, puis audio/vidéo si disponibles
+            if (response.image) {
                 await this.sock.sendMessage(chatId, {
                     image: response.image,
-                    caption: response.text
-                });
-
-                // Puis l'audio si disponible
-                try {
-                    await this.sock.sendMessage(chatId, {
-                        audio: response.audio,
-                        mimetype: 'audio/mpeg',
-                        ptt: true, // Voice message
-                        seconds: 10
-                    });
-                    console.log('✅ Message vocal envoyé');
-                } catch (audioError) {
-                    console.log('⚠️ Erreur envoi audio:', audioError.message);
-                }
-
-                // Puis la vidéo
-                await this.sock.sendMessage(chatId, {
-                    video: response.video,
-                    caption: '🎬 Vidéo de l\'action'
-                });
-            } else if (response.image && response.audio) {
-                // Envoyer l'image avec le texte
-                await this.sock.sendMessage(chatId, {
-                    image: response.image,
-                    caption: response.text
-                });
-
-                // Puis l'audio comme message vocal
-                try {
-                    await this.sock.sendMessage(chatId, {
-                        audio: response.audio,
-                        mimetype: 'audio/mpeg',
-                        ptt: true, // Voice message
-                        seconds: 15
-                    });
-                    console.log('✅ Message vocal envoyé');
-                } catch (audioError) {
-                    console.log('⚠️ Erreur envoi message vocal:', audioError.message);
-                }
-            } else if (response.image && response.video) {
-                // Envoyer l'image d'abord
-                await this.sock.sendMessage(chatId, {
-                    image: response.image,
-                    caption: response.text
-                });
-
-                // Puis la vidéo
-                await this.sock.sendMessage(chatId, {
-                    video: response.video,
-                    caption: '🎬 Vidéo de l\'action'
-                });
-            } else if (response.image) {
-                await this.sock.sendMessage(chatId, {
-                    image: response.image,
-                    caption: response.text
-                });
-            } else if (response.audio) {
-                // Envoyer d'abord le texte
-                await this.sock.sendMessage(chatId, { text: response.text });
-
-                // Puis l'audio comme message vocal avec buffer
-                try {
-                    const fs = require('fs');
-                    
-                    let audioBuffer = null;
-                    let audioPath = null;
-                    
-                    // Si response.audio est déjà un buffer
-                    if (Buffer.isBuffer(response.audio)) {
-                        audioBuffer = response.audio;
-                        console.log('✅ Audio reçu comme buffer');
-                    } 
-                    // Si c'est un chemin de fichier
-                    else if (typeof response.audio === 'string') {
-                        audioPath = response.audio;
-                        try {
-                            await fs.promises.access(audioPath);
-                            audioBuffer = await fs.promises.readFile(audioPath);
-                            console.log(`✅ Audio lu depuis fichier: ${audioPath}`);
-                        } catch (fileError) {
-                            console.log(`⚠️ Fichier audio introuvable: ${audioPath}`, fileError.message);
-                            audioBuffer = null;
-                        }
-                    }
-                    
-                    // Envoyer l'audio si on a un buffer valide
-                    if (audioBuffer && audioBuffer.length > 0) {
-                        // Déterminer le mimetype selon l'extension
-                        let mimetype = 'audio/mpeg';
-                        if (audioPath && audioPath.endsWith('.wav')) {
-                            mimetype = 'audio/wav';
-                        } else if (audioPath && audioPath.endsWith('.ogg')) {
-                            mimetype = 'audio/ogg';
-                        }
-                        
-                        await this.sock.sendMessage(chatId, {
-                            audio: audioBuffer,
-                            mimetype: mimetype,
-                            ptt: true, // Voice message
-                            seconds: Math.min(60, Math.max(5, Math.round(response.text.length / 15)))
-                        });
-                        console.log(`✅ Message vocal envoyé (${mimetype}, ${audioBuffer.length} bytes)`);
-                        
-                        // Nettoyer le fichier temporaire si c'était un chemin
-                        if (audioPath) {
-                            setTimeout(() => {
-                                fs.unlink(audioPath, (err) => {
-                                    if (!err) console.log(`🗑️ Fichier audio supprimé: ${audioPath}`);
-                                });
-                            }, 5000);
-                        }
-                    } else {
-                        console.log('⚠️ Aucun audio valide à envoyer - buffer vide ou inexistant');
-                    }
-                    
-                } catch (audioError) {
-                    console.log('⚠️ Erreur envoi audio:', audioError.message);
-                    console.log('Stack trace:', audioError.stack);
-                }
-            } else if (response.video) {
-                await this.sock.sendMessage(chatId, {
-                    video: response.video,
                     caption: response.text
                 });
             } else {
                 await this.sock.sendMessage(chatId, { text: response.text });
             }
-        } catch (error) {
-            console.error('❌ Erreur lors de l\'envoi de la réponse:', error);
 
-            // Fallback en cas d'erreur avec l'image
-            if (response.image && response.text) {
+            // Envoyer l'audio en tant que message vocal uniquement si disponible et valide
+            if (response.audio) {
                 try {
-                    console.log('🔄 Tentative d\'envoi de texte seul...');
-                    await this.sock.sendMessage(chatId, {
-                        text: response.text
-                    });
-                } catch (fallbackError) {
-                    console.error('❌ Erreur fallback:', fallbackError);
+                    const fs = require('fs');
+                    let audioBuffer = null;
+                    
+                    if (Buffer.isBuffer(response.audio)) {
+                        audioBuffer = response.audio;
+                    } else if (typeof response.audio === 'string') {
+                        try {
+                            await fs.promises.access(response.audio);
+                            audioBuffer = await fs.promises.readFile(response.audio);
+                            console.log(`✅ Audio lu: ${response.audio}`);
+                        } catch (fileError) {
+                            console.log(`⚠️ Audio non trouvé: ${response.audio}`);
+                        }
+                    }
+                    
+                    if (audioBuffer && audioBuffer.length > 100) { // Au moins 100 bytes pour être valide
+                        await this.sock.sendMessage(chatId, {
+                            audio: audioBuffer,
+                            mimetype: 'audio/mpeg',
+                            ptt: true,
+                            seconds: Math.min(60, Math.max(5, Math.round(response.text.length / 15)))
+                        });
+                        console.log(`✅ Audio envoyé (${audioBuffer.length} bytes)`);
+                        
+                        // Nettoyer le fichier temporaire
+                        if (typeof response.audio === 'string') {
+                            setTimeout(() => {
+                                fs.unlink(response.audio, () => {});
+                            }, 5000);
+                        }
+                    }
+                } catch (audioError) {
+                    console.log('⚠️ Audio ignoré:', audioError.message);
                 }
+            }
+
+            // Envoyer la vidéo si disponible
+            if (response.video) {
+                setTimeout(async () => {
+                    try {
+                        const fs = require('fs');
+                        const videoBuffer = await fs.promises.readFile(response.video);
+                        await this.sock.sendMessage(chatId, {
+                            video: videoBuffer,
+                            caption: '🎬 Vidéo de l\'action',
+                            gifPlayback: false
+                        });
+                        console.log(`✅ Vidéo envoyée: ${response.video}`);
+                        
+                        setTimeout(() => {
+                            fs.unlink(response.video, () => {});
+                        }, 5000);
+                    } catch (videoError) {
+                        console.log('⚠️ Erreur vidéo:', videoError.message);
+                    }
+                }, 2000);
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur envoi réponse:', error);
+            try {
+                await this.sock.sendMessage(chatId, { text: response.text });
+            } catch (fallbackError) {
+                console.error('❌ Erreur fallback:', fallbackError);
             }
         }
     }

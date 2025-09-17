@@ -326,7 +326,7 @@ Règles importantes:
 - Réponds UNIQUEMENT avec le JSON, rien d'autre`;
 
                 const aiResponse = await this.groqClient.generateNarration(analysisPrompt, 200);
-                
+
                 console.log('🤖 Réponse IA brute:', aiResponse);
 
                 // Extraire le JSON de la réponse
@@ -888,14 +888,6 @@ Règles importantes:
         }
 
         return formatted || '• Aucun équipement';
-    }
-
-    formatTechniques(techniques) {
-        if (!techniques || techniques.length === 0) {
-            return '• Aucune technique apprise';
-        }
-
-        return techniques.map(tech => `• ${tech}`).join('\n');
     }
 
     async handleHelpCommand({ imageGenerator }) {
@@ -1473,69 +1465,60 @@ Règles importantes:
 
             if (hasQuotes) {
                 // Dialogue avec PNJ détecté
-                console.log(`💬 Dialogue PNJ détecté pour ${character.name}: ${message}`);
+                console.log('💬 Dialogue PNJ détecté pour', character.name + ':', message);
 
-                // Extraire le texte entre guillemets
-                const dialogueMatch = message.match(/["""«»]([^"""«»]+)["""«»]/);
-                const playerSpeech = dialogueMatch ? dialogueMatch[1] : message;
-
-                // Générer un PNJ générique pour le dialogue
-                const npcName = "Habitant local";
-                const npcDescription = `Un habitant de ${character.currentLocation} dans le royaume ${character.kingdom}`;
-
-                // Générer la réponse du PNJ avec IA
-                let npcResponse;
                 try {
-                    if (this.groqClient && this.groqClient.hasValidClient()) {
-                        console.log('🎭 Génération réponse PNJ avec Groq...');
-                        npcResponse = await this.groqClient.generateNPCResponse(npcName, npcDescription, playerSpeech, {
+                    // Générer la réponse du PNJ
+                    console.log('🎭 Génération réponse PNJ avec Groq...');
+                    const npcResponse = await this.groqClient.generateNPCResponse(
+                        'Habitant local',
+                        'un habitant du village qui connaît bien la région',
+                        message,
+                        {
                             location: character.currentLocation,
                             kingdom: character.kingdom,
                             playerName: character.name
-                        });
-                    } else if (this.openAIClient && this.openAIClient.hasValidClient()) {
-                        console.log('🎭 Génération réponse PNJ avec OpenAI...');
-                        npcResponse = await this.openAIClient.generateNPCResponse({
-                            name: npcName,
-                            faction: character.kingdom,
-                            personality: "local",
-                            status: "habitant"
-                        }, `Dialogue avec ${character.name} à ${character.currentLocation}`, playerSpeech);
-                    } else {
-                        npcResponse = `"Bonjour ${character.name}, comment puis-je vous aider ?"`;
-                    }
-                } catch (error) {
-                    console.error('❌ Erreur génération réponse PNJ:', error);
-                    npcResponse = `"Je vous écoute, ${character.name}."`;
-                }
+                        }
+                    );
 
-                // Générer l'image et l'audio du dialogue
-                try {
-                    const dialogueResult = await imageGenerator.generateDialogueImage(character, npcName, npcResponse, {
-                        style: '3d',
-                        voice: 'local'
-                    });
+                    // Générer l'image du dialogue
+                    const dialogueResult = await imageGenerator.generateDialogueImage(
+                        character, 
+                        'Habitant local', 
+                        npcResponse,
+                        { style: '3d', nudity: false }
+                    );
 
-                    const dialogueImage = dialogueResult.image;
-                    const dialogueAudio = dialogueResult.audio;
+                    // Texte unifié avec dialogue et contexte narratif
+                    const dialogueText = `💬 **Rencontre avec un habitant local**
 
-                    // Retourner la réponse complète
+Dans ${character.currentLocation}, ${character.name} s'approche d'un habitant du village pour engager la conversation.
+
+🗣️ **${character.name}** : "${message}"
+
+L'habitant local vous regarde attentivement avant de répondre :
+
+👤 **Habitant local** : ${npcResponse}
+
+L'échange se déroule dans l'atmosphère typique de ${character.kingdom}, où les habitants sont habitués aux aventuriers de passage.`;
+
                     return {
-                        text: `🗣️ **Dialogue avec ${npcName}**\n\n` +
-                              `👤 **Vous dites :** "${playerSpeech}"\n\n` +
-                              `🎭 **${npcName} répond :** ${npcResponse}\n\n` +
-                              `📍 **Lieu :** ${character.currentLocation}`,
-                        image: dialogueImage,
-                        audio: dialogueAudio
+                        text: dialogueText,
+                        image: dialogueResult.image,
+                        character: character
                     };
 
-                } catch (imageError) {
-                    console.error('❌ Erreur génération image PNJ:', imageError);
+                } catch (error) {
+                    console.error('❌ Erreur génération dialogue PNJ:', error);
                     return {
-                        text: `🗣️ **Dialogue avec ${npcName}**\n\n` +
-                              `👤 **Vous dites :** "${playerSpeech}"\n\n` +
-                              `🎭 **${npcName} répond :** ${npcResponse}\n\n` +
-                              `📍 **Lieu :** ${character.currentLocation}`
+                        text: `💬 **Dialogue avec un habitant**
+
+${character.name} engage la conversation avec un habitant local dans ${character.currentLocation}.
+
+🗣️ **${character.name}** : "${message}"
+
+👤 **Habitant local** : "Bonjour ${character.name}, que puis-je faire pour vous ?"`,
+                        character: character
                     };
                 }
             }
