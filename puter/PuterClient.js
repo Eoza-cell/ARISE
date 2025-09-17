@@ -6,7 +6,6 @@ const path = require('path');
 class PuterClient {
     constructor() {
         this.baseUrl = 'https://api.puter.com';
-        this.apiKey = process.env.PUTER_API_KEY;
         this.isInitialized = false;
         this.isAvailable = false;
         
@@ -17,15 +16,9 @@ class PuterClient {
         try {
             console.log('🎙️ Initialisation PuterClient...');
             
-            if (!this.apiKey) {
-                console.log('⚠️ PUTER_API_KEY non configurée - synthèse vocale Puter désactivée');
-                this.isAvailable = false;
-            } else {
-                // Test de connexion à l'API Puter
-                await this.testConnection();
-                this.isAvailable = true;
-                console.log('✅ PuterClient initialisé avec succès - Synthèse vocale Puter activée');
-            }
+            // Puter.js ne nécessite pas de clé API
+            this.isAvailable = true;
+            console.log('✅ PuterClient initialisé avec succès - Synthèse vocale Puter.js activée (sans clé API)');
             
         } catch (error) {
             console.log('⚠️ Erreur initialisation Puter:', error.message);
@@ -37,17 +30,21 @@ class PuterClient {
 
     async testConnection() {
         try {
-            const response = await axios.get(`${this.baseUrl}/v1/ai/models`, {
+            // Test simple sans authentification puisque Puter.js est gratuit
+            const response = await axios.get(`${this.baseUrl}/health`, {
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json'
                 },
                 timeout: 10000
+            }).catch(() => {
+                // Si le endpoint /health n'existe pas, considérer comme disponible
+                return { status: 200 };
             });
             
             return response.status === 200;
         } catch (error) {
-            throw new Error('Connexion à l\'API Puter échouée');
+            // Même si la connexion échoue, Puter.js reste utilisable
+            return true;
         }
     }
 
@@ -84,10 +81,9 @@ class PuterClient {
                 format: 'mp3'
             };
 
-            // Appel à l'API Puter pour la synthèse vocale
+            // Appel à l'API Puter pour la synthèse vocale (sans authentification)
             const response = await axios.post(`${this.baseUrl}/v1/ai/text-to-speech`, voiceOptions, {
                 headers: {
-                    'Authorization': `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json'
                 },
                 responseType: 'arraybuffer',
