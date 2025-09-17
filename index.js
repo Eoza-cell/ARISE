@@ -286,13 +286,17 @@ class FrictionUltimateBot {
 
                 // Puis l'audio comme message vocal
                 try {
-                    await this.sock.sendMessage(chatId, {
-                        audio: response.audio,
-                        mimetype: 'audio/mpeg',
-                        ptt: true, // Voice message
-                        seconds: 15
-                    });
-                    console.log('✅ Message vocal envoyé');
+                    if (response.audio && response.audio.length > 0) {
+                        await this.sock.sendMessage(chatId, {
+                            audio: response.audio,
+                            mimetype: 'audio/mpeg',
+                            ptt: true, // Voice message
+                            seconds: Math.max(5, Math.min(30, Math.floor(response.audio.length / 1000)))
+                        });
+                        console.log('✅ Message vocal envoyé');
+                    } else {
+                        console.log('⚠️ Pas d\'audio à envoyer');
+                    }
                 } catch (audioError) {
                     console.log('⚠️ Erreur envoi message vocal:', audioError.message);
                 }

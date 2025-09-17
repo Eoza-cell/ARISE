@@ -211,38 +211,35 @@ class PollinationsClient {
             console.log('🎤 Utilisation Edge-TTS pour synthèse vocale GRATUITE');
             
             // Voix française par défaut
-            const voice = options.voice || 'fr-FR-DeniseNeural';
+            const voice = options.voice || 'fr-FR-HenriNeural';
             const rate = options.rate || '+0%';
             
             // Créer le dossier si nécessaire
             const dir = path.dirname(outputPath);
             await fs.mkdir(dir, { recursive: true });
             
-            // Nettoyer le texte pour éviter les problèmes avec les caractères spéciaux
-            const cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
+            // Nettoyer et raccourcir le texte
+            let cleanText = text.replace(/[""]/g, '"').replace(/'/g, "'").trim();
+            if (cleanText.length > 100) {
+                cleanText = cleanText.substring(0, 100) + '...';
+            }
             
-            // Utiliser Edge-TTS via Python avec arguments sécurisés
+            // Utiliser Edge-TTS directement
             const { spawn } = require('child_process');
             
             return new Promise((resolve, reject) => {
-                console.log(`🔊 Génération vocale avec Edge-TTS - Voix: ${voice}`);
+                console.log(`🔊 Génération vocale Edge-TTS - Voix: ${voice}`);
                 
-                // Arguments séparés pour éviter les problèmes d'échappement
-                const args = ['-m', 'edge_tts', '--voice', voice, '--text', cleanText, '--write-media', outputPath];
-                if (rate !== '+0%') {
-                    args.push('--rate', rate);
-                }
-                
-                const edgeProcess = spawn('python3', args, {
+                const edgeProcess = spawn('edge-tts', [
+                    '--voice', voice,
+                    '--text', cleanText,
+                    '--write-media', outputPath,
+                    '--rate', rate
+                ], {
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
                 
-                let output = '';
                 let errorOutput = '';
-                
-                edgeProcess.stdout.on('data', (data) => {
-                    output += data.toString();
-                });
                 
                 edgeProcess.stderr.on('data', (data) => {
                     errorOutput += data.toString();
@@ -250,17 +247,16 @@ class PollinationsClient {
                 
                 edgeProcess.on('close', async (code) => {
                     if (code === 0) {
-                        // Vérifier si le fichier a été créé
                         try {
                             await fs.access(outputPath);
-                            console.log(`✅ Audio Edge-TTS généré GRATUITEMENT: ${outputPath}`);
+                            console.log(`✅ Audio Edge-TTS généré: ${outputPath}`);
                             resolve(outputPath);
                         } catch (accessError) {
-                            console.log('⚠️ Fichier audio Edge-TTS non créé');
+                            console.log('⚠️ Fichier audio non créé');
                             resolve(null);
                         }
                     } else {
-                        console.log(`⚠️ Edge-TTS terminé avec code ${code}:`, errorOutput);
+                        console.log(`⚠️ Edge-TTS erreur code ${code}: ${errorOutput}`);
                         resolve(null);
                     }
                 });

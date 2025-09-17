@@ -136,7 +136,7 @@ class GroqClient {
                 actionDescription += ` ${combatData.defender} est vaincu.`;
             }
         }
-        
+
         const prompt = `Décris cette action de combat RPG dans un monde médiéval-steampunk :
         Attaquant: ${combatData.attacker} (Niveau ${combatData.attackerLevel})
         Défenseur: ${combatData.defender} (Niveau ${combatData.defenderLevel})
