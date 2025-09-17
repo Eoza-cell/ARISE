@@ -106,12 +106,24 @@ class GroqClient {
                 presence_penalty: 0.4
             });
 
-            const narration = response.choices[0]?.message?.content?.trim();
+            let narration = response.choices[0]?.message?.content?.trim();
             if (!narration) {
                 throw new Error('Réponse vide de Groq');
             }
 
-            console.log('✅ Narration immersive générée avec Groq');
+            // Limiter à 500 caractères sans couper les phrases
+            if (narration.length > 500) {
+                // Trouver la dernière phrase complète avant 500 caractères
+                const lastSentenceEnd = narration.substring(0, 500).lastIndexOf('.');
+                if (lastSentenceEnd > 300) { // Au moins 300 caractères pour avoir du contenu
+                    narration = narration.substring(0, lastSentenceEnd + 1);
+                } else {
+                    // Si pas de point, couper à 497 et ajouter des points
+                    narration = narration.substring(0, 497) + '...';
+                }
+            }
+
+            console.log(`✅ Narration générée (${narration.length}/500 caractères)`);
             return narration;
         } catch (error) {
             console.error('❌ Erreur génération narration Groq:', error.message);
@@ -198,7 +210,21 @@ class GroqClient {
         }
 
         try {
-            const prompt = this.buildDialoguePrompt(character, playerMessage);
+            // Détecter si le message du joueur est un dialogue destiné à un PNJ
+            const isDialogue = playerMessage.startsWith('"') && playerMessage.endsWith('"');
+            let prompt;
+
+            if (isDialogue) {
+                // Utiliser le prompt spécifique pour les dialogues PNJ
+                prompt = this.buildDialoguePrompt(character, playerMessage);
+            } else {
+                // Sinon, utiliser un prompt plus général pour la narration ou l'interaction
+                // Ou gérer les deux cas différemment si nécessaire
+                // Pour l'instant, on assume que tout ce qui n'est pas entre guillemets est une action de narration
+                // Nous allons appeler generateExplorationNarration pour les actions non-dialoguées
+                // Note: Cette logique peut nécessiter une révision en fonction du flux de jeu complet
+                return await this.generateExplorationNarration(character.currentLocation, playerMessage, sessionId, character);
+            }
 
             const messages = this.getRecentMemory(sessionId);
             messages.push({
@@ -217,8 +243,9 @@ class GroqClient {
             const dialogueResponse = completion.choices[0].message.content;
 
             // Sauvegarder la conversation dans la mémoire
-            this.addToMemory(sessionId, "user", prompt); // Sauvegarde le prompt complet pour le contexte
-            this.addToMemory(sessionId, "assistant", dialogueResponse);
+            // Sauvegarder le message du joueur tel qu'il était
+            this.addToMemory(sessionId, "user", playerMessage, character.currentLocation); 
+            this.addToMemory(sessionId, "assistant", dialogueResponse, character.currentLocation);
 
             return dialogueResponse;
         } catch (error) {

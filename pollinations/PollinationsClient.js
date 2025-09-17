@@ -234,7 +234,7 @@ class PollinationsClient {
                     '--voice', voice,
                     '--text', cleanText,
                     '--write-media', outputPath,
-                    '--rate', rate
+                    '--rate=' + rate  // Corriger le format du paramètre rate
                 ], {
                     stdio: ['pipe', 'pipe', 'pipe']
                 });
