@@ -320,22 +320,35 @@ class FrictionUltimateBot {
                 // Puis l'audio comme message vocal avec buffer
                 try {
                     const fs = require('fs');
-                    const audioBuffer = await fs.promises.readFile(response.audio);
                     
-                    await this.sock.sendMessage(chatId, {
-                        audio: audioBuffer,
-                        mimetype: 'audio/mpeg',
-                        ptt: true, // Voice message
-                        seconds: Math.min(60, Math.max(10, Math.round(response.text.length / 10)))
-                    });
-                    console.log('✅ Message vocal envoyé avec buffer');
+                    // Vérifier si le fichier audio existe
+                    const audioExists = await fs.promises.access(response.audio).then(() => true).catch(() => false);
+                    
+                    if (audioExists) {
+                        const audioBuffer = await fs.promises.readFile(response.audio);
+                        
+                        // Vérifier que le buffer n'est pas vide
+                        if (audioBuffer && audioBuffer.length > 0) {
+                            await this.sock.sendMessage(chatId, {
+                                audio: audioBuffer,
+                                mimetype: 'audio/mpeg',
+                                ptt: true, // Voice message
+                                seconds: Math.min(60, Math.max(5, Math.round(response.text.length / 15)))
+                            });
+                            console.log('✅ Message vocal envoyé avec buffer');
+                        } else {
+                            console.log('⚠️ Fichier audio vide, envoi ignoré');
+                        }
+                    } else {
+                        console.log('⚠️ Fichier audio introuvable:', response.audio);
+                    }
                     
                     // Nettoyer le fichier audio temporaire
                     setTimeout(() => {
                         fs.unlink(response.audio, (err) => {
                             if (!err) console.log(`🗑️ Fichier audio supprimé: ${response.audio}`);
                         });
-                    }, 3000);
+                    }, 5000);
                 } catch (audioError) {
                     console.log('⚠️ Erreur envoi audio avec buffer:', audioError.message);
                 }

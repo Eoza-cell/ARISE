@@ -229,6 +229,13 @@ class PollinationsClient {
             
         } catch (error) {
             console.error('❌ Erreur Pollinations Audio API:', error.message);
+            
+            // Si erreur 402 (payment required), essayer le fallback Edge-TTS
+            if (error.response && error.response.status === 402) {
+                console.log('💡 API Pollinations Audio limitée (402), tentative Edge-TTS...');
+                return await this.generateWebSpeechAPI(text, outputPath, options);
+            }
+            
             return null;
         }
     }

@@ -16,11 +16,11 @@ class GroqClient {
             this.sessionMemory.set(sessionId, []);
         }
         const memories = this.sessionMemory.get(sessionId);
-        memories.push({ 
-            role, 
-            content, 
-            location, 
-            timestamp: Date.now() 
+        memories.push({
+            role,
+            content,
+            location,
+            timestamp: Date.now()
         });
 
         // Limiter la taille mémoire
@@ -86,7 +86,7 @@ class GroqClient {
                 messages: [
                     {
                         role: 'system',
-                        content: `Tu es un narrateur RPG immersif et créatif. 
+                        content: `Tu es un narrateur RPG immersif et créatif.
                         Génère 3-4 phrases riches et évocatrices en français.
                         DÉVELOPPE l'ambiance, les réactions des PNJ, l'environnement.
                         ÉVITE seulement les longs inventaires d'objets techniques.
@@ -203,55 +203,62 @@ class GroqClient {
         }
     }
 
-    async generateDialogueResponse(character, playerMessage, sessionId = "default") {
-        if (!this.hasValidClient()) {
-            // Si le client Groq n'est pas disponible, retournez une réponse par défaut.
-            return "Le PNJ vous regarde en silence.";
-        }
-
+    async generateDialogueResponse(character, playerDialogue, sessionId) {
         try {
-            // Détecter si le message du joueur est un dialogue destiné à un PNJ
-            const isDialogue = playerMessage.startsWith('"') && playerMessage.endsWith('"');
-            let prompt;
-
-            if (isDialogue) {
-                // Utiliser le prompt spécifique pour les dialogues PNJ
-                prompt = this.buildDialoguePrompt(character, playerMessage);
-            } else {
-                // Sinon, utiliser un prompt plus général pour la narration ou l'interaction
-                // Ou gérer les deux cas différemment si nécessaire
-                // Pour l'instant, on assume que tout ce qui n'est pas entre guillemets est une action de narration
-                // Nous allons appeler generateExplorationNarration pour les actions non-dialoguées
-                // Note: Cette logique peut nécessiter une révision en fonction du flux de jeu complet
-                return await this.generateExplorationNarration(character.currentLocation, playerMessage, sessionId, character);
+            if (!this.isAvailable) {
+                throw new Error('Groq non disponible');
             }
 
-            const messages = this.getRecentMemory(sessionId);
-            messages.push({
-                role: "user",
-                content: prompt
-            });
+            const prompt = `Tu es un PNJ dans un jeu de rôle médiéval-fantasy. Le joueur ${character.name} te dit: "${playerDialogue}". Réponds de manière immersive et cohérente avec l'univers. Garde ta réponse courte (1-2 phrases max).`;
 
-            // Utiliser le client Groq pour générer la réponse
             const completion = await this.client.chat.completions.create({
-                messages,
-                model: "llama-3.1-70b-versatile", // Ou un autre modèle approprié pour les dialogues
-                max_tokens: 300,
-                temperature: 0.8
+                messages: [{ role: "user", content: prompt }],
+                model: this.model,
+                temperature: 0.8,
+                max_tokens: 100
             });
 
-            const dialogueResponse = completion.choices[0].message.content;
+            return completion.choices[0]?.message?.content || "Le PNJ vous regarde silencieusement.";
 
-            // Sauvegarder la conversation dans la mémoire
-            // Sauvegarder le message du joueur tel qu'il était
-            this.addToMemory(sessionId, "user", playerMessage, character.currentLocation); 
-            this.addToMemory(sessionId, "assistant", dialogueResponse, character.currentLocation);
-
-            return dialogueResponse;
         } catch (error) {
-            console.error('❌ Erreur génération dialogue Groq:', error);
-            // Fournir une réponse de repli en cas d'erreur
-            return "Le PNJ semble distrait et ne répond pas clairement.";
+            console.error('❌ Erreur génération dialogue Groq:', error.message);
+            throw error;
+        }
+    }
+
+    async generateNPCResponse(npcName, npcDescription, playerSpeech, context) {
+        try {
+            if (!this.isAvailable) {
+                throw new Error('Groq non disponible');
+            }
+
+            const prompt = `Tu es ${npcName}, ${npcDescription}.
+            Localisation: ${context.location}
+            Royaume: ${context.kingdom}
+
+            Le joueur ${context.playerName} te dit: "${playerSpeech}"
+
+            Réponds de manière immersive et cohérente avec ton rôle. Garde ta réponse entre guillemets et courte (1-2 phrases max).`;
+
+            const completion = await this.client.chat.completions.create({
+                messages: [{ role: "user", content: prompt }],
+                model: this.model,
+                temperature: 0.8,
+                max_tokens: 150
+            });
+
+            const response = completion.choices[0]?.message?.content || `"Bonjour ${context.playerName}."`;
+
+            // S'assurer que la réponse est entre guillemets
+            if (!response.startsWith('"')) {
+                return `"${response.replace(/"/g, '')}"`;
+            }
+
+            return response;
+
+        } catch (error) {
+            console.error('❌ Erreur génération réponse PNJ Groq:', error.message);
+            return `"Je vous écoute, ${context.playerName}."`;
         }
     }
 
