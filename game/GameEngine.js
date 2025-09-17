@@ -1333,7 +1333,6 @@ class GameEngine {
             // mais on force la narration et l'audio du PNJ.
 
             // Récupérer l'analyse d'action (nécessaire pour les dégâts, etc.)
-            const sessionId = `player_${player.id}`;
             const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
                 character: character,
                 location: character.currentLocation,
