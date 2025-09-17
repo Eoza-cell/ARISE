@@ -286,17 +286,13 @@ class FrictionUltimateBot {
 
                 // Puis l'audio comme message vocal
                 try {
-                    if (response.audio && response.audio.length > 0) {
-                        await this.sock.sendMessage(chatId, {
-                            audio: response.audio,
-                            mimetype: 'audio/mpeg',
-                            ptt: true, // Voice message
-                            seconds: Math.max(5, Math.min(30, Math.floor(response.audio.length / 1000)))
-                        });
-                        console.log('✅ Message vocal envoyé');
-                    } else {
-                        console.log('⚠️ Pas d\'audio à envoyer');
-                    }
+                    await this.sock.sendMessage(chatId, {
+                        audio: response.audio,
+                        mimetype: 'audio/mpeg',
+                        ptt: true, // Voice message
+                        seconds: 15
+                    });
+                    console.log('✅ Message vocal envoyé');
                 } catch (audioError) {
                     console.log('⚠️ Erreur envoi message vocal:', audioError.message);
                 }
@@ -321,17 +317,27 @@ class FrictionUltimateBot {
                 // Envoyer d'abord le texte
                 await this.sock.sendMessage(chatId, { text: response.text });
 
-                // Puis l'audio comme message vocal
+                // Puis l'audio comme message vocal avec buffer
                 try {
+                    const fs = require('fs');
+                    const audioBuffer = await fs.promises.readFile(response.audio);
+                    
                     await this.sock.sendMessage(chatId, {
-                        audio: response.audio,
+                        audio: audioBuffer,
                         mimetype: 'audio/mpeg',
                         ptt: true, // Voice message
-                        seconds: 20
+                        seconds: Math.min(60, Math.max(10, Math.round(response.text.length / 10)))
                     });
-                    console.log('✅ Message vocal envoyé');
+                    console.log('✅ Message vocal envoyé avec buffer');
+                    
+                    // Nettoyer le fichier audio temporaire
+                    setTimeout(() => {
+                        fs.unlink(response.audio, (err) => {
+                            if (!err) console.log(`🗑️ Fichier audio supprimé: ${response.audio}`);
+                        });
+                    }, 3000);
                 } catch (audioError) {
-                    console.log('⚠️ Erreur envoi audio seul:', audioError.message);
+                    console.log('⚠️ Erreur envoi audio avec buffer:', audioError.message);
                 }
             } else if (response.video) {
                 await this.sock.sendMessage(chatId, {
