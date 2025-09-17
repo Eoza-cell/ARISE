@@ -83,6 +83,14 @@ class GameEngine {
                 }
             }
 
+            // Vérifier si le joueur est en cours de création par description
+            const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
+            const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
+
+            if (creationMode === 'description' && creationStarted && message && !this.commandHandlers[command]) {
+                return await this.handleDescriptionCreation({ player, description: message, dbManager, imageGenerator });
+            }
+
             if (this.commandHandlers[command]) {
                 response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock });
             }
@@ -177,38 +185,31 @@ class GameEngine {
                 text: `👤 Tu as déjà un personnage : **${existingCharacter.name}**\n\n` +
                       `🏰 Royaume : ${existingCharacter.kingdom}\n` +
                       `⚔️ Ordre : ${existingCharacter.order || 'Aucun'}\n\n` +
-                      `🎨 Pour créer un nouveau personnage avec notre système 3D avancé,\n` +
+                      `🎨 Pour créer un nouveau personnage,\n` +
                       `tu dois d'abord supprimer l'actuel.\n\n` +
-                      `✨ **Nouveau système de création :**\n` +
-                      `• Personnalisation 3D réaliste comme Skyrim\n` +
-                      `• 9 étapes de customisation détaillée\n` +
-                      `• Aperçus en temps réel\n` +
-                      `• Rendu haute qualité final\n\n` +
-                      `Écris "SUPPRIMER_PERSONNAGE" pour confirmer la suppression et accéder au nouveau système.`,
+                      `Écris "SUPPRIMER_PERSONNAGE" pour confirmer la suppression.`,
                 image: await imageGenerator.generateCharacterImage(existingCharacter)
             };
         }
 
-        // Utiliser le nouveau système de personnalisation sophistiqué
-        if (this.characterCustomization) {
-            const success = await this.characterCustomization.startCharacterCustomization(
-                player.whatsappNumber, 
-                chatId, 
-                false // isModification = false
-            );
+        // Démarrer le processus de création par description
+        await dbManager.setTemporaryData(player.id, 'creation_started', true);
+        await dbManager.setTemporaryData(player.id, 'creation_mode', 'description');
 
-            if (success) {
-                return { text: '' }; // Le système de personnalisation gère l'envoi des messages
-            } else {
-                return {
-                    text: '❌ Impossible de démarrer le système de personnalisation. Une personnalisation est peut-être déjà en cours.\n\n' +
-                          'Tapez "annuler" si vous avez un processus en cours, puis réessayez /créer.'
-                };
-            }
-        } else {
-            // Fallback vers l'ancien système si le nouveau n'est pas disponible
-            return await this.startCharacterCreation({ player, dbManager, imageGenerator });
-        }
+        return {
+            text: `🎭 **CRÉATION DE PERSONNAGE IA** 🎭\n\n` +
+                  `✨ Décris ton personnage idéal en quelques phrases et l'IA le créera pour toi !\n\n` +
+                  `📝 **Exemple de description :**\n` +
+                  `"Un guerrier elfe aux cheveux argentés, grand et musclé, avec des yeux verts perçants. Il porte une armure de cuir sombre et vient des forêts mystérieuses."\n\n` +
+                  `💡 **Tu peux mentionner :**\n` +
+                  `• Apparence physique (taille, couleur des yeux/cheveux)\n` +
+                  `• Style vestimentaire\n` +
+                  `• Origine/royaume\n` +
+                  `• Personnalité\n` +
+                  `• Classe/profession\n\n` +
+                  `🚀 **Écris ta description maintenant !**`,
+            image: await imageGenerator.generateMenuImage()
+        };
     }
 
     async startCharacterCreation({ player, dbManager, imageGenerator }) {
@@ -232,6 +233,178 @@ class GameEngine {
             text: creationText,
             image: await imageGenerator.generateMenuImage()
         };
+    }
+
+    async handleDescriptionCreation({ player, description, dbManager, imageGenerator }) {
+        try {
+            console.log(`🎭 Création par IA pour ${player.whatsappNumber}: ${description}`);
+
+            // Utiliser l'IA pour analyser la description et générer le personnage
+            const characterData = await this.generateCharacterFromDescription(description, player);
+
+            // Créer le personnage dans la base de données
+            const newCharacter = await dbManager.createCharacter(characterData);
+
+            // Nettoyer les données temporaires
+            await dbManager.clearTemporaryData(player.id, 'creation_started');
+            await dbManager.clearTemporaryData(player.id, 'creation_mode');
+
+            // Générer l'image du personnage
+            let characterImage = null;
+            try {
+                characterImage = await imageGenerator.generateCharacterImage(newCharacter, {
+                    style: '3d',
+                    perspective: 'first_person',
+                    nudity: false
+                });
+            } catch (imageError) {
+                console.error('⚠️ Erreur génération image personnage:', imageError);
+            }
+
+            return {
+                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !** 🎉\n\n` +
+                      `👤 **Nom :** ${newCharacter.name}\n` +
+                      `⚧️ **Sexe :** ${newCharacter.gender === 'male' ? 'Homme' : 'Femme'}\n` +
+                      `🏰 **Royaume :** ${newCharacter.kingdom}\n` +
+                      `📊 **Niveau :** ${newCharacter.level} (${newCharacter.powerLevel})\n` +
+                      `📍 **Localisation :** ${newCharacter.currentLocation}\n` +
+                      `💰 **Pièces :** ${newCharacter.coins}\n\n` +
+                      `✨ **Description générée par l'IA :**\n` +
+                      `"${description}"\n\n` +
+                      `🎮 **Tapez /jouer pour commencer l'aventure !**\n` +
+                      `📋 **Tapez /fiche pour voir tous les détails**`,
+                image: characterImage
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur création personnage par IA:', error);
+
+            // Nettoyer en cas d'erreur
+            await dbManager.clearTemporaryData(player.id, 'creation_started');
+            await dbManager.clearTemporaryData(player.id, 'creation_mode');
+
+            return {
+                text: `❌ **Erreur lors de la création**\n\n` +
+                      `Une erreur s'est produite lors de l'analyse de votre description.\n` +
+                      `Veuillez réessayer avec /créer.\n\n` +
+                      `💡 **Conseil :** Soyez plus précis dans votre description.`
+            };
+        }
+    }
+
+    async generateCharacterFromDescription(description, player) {
+        try {
+            // Utiliser Groq pour analyser la description et extraire les caractéristiques
+            if (this.groqClient && this.groqClient.hasValidClient()) {
+                const analysisPrompt = `Analyse cette description de personnage RPG et extrait les informations suivantes au format JSON strict:
+
+DESCRIPTION: "${description}"
+
+Tu dois retourner UNIQUEMENT un JSON valide avec cette structure exacte:
+{
+  "name": "nom du personnage (si pas mentionné, crée un nom approprié)",
+  "gender": "male ou female (déduis du contexte)",
+  "kingdom": "l'un de ces royaumes selon la description: AEGYRIA, SOMBRENUIT, KHELOS, ABRANTIS, VARHA, SYLVARIA, ECLYPSIA, TERRE_DESOLE, DRAK_TARR, URVALA, OMBREFIEL, KHALDAR",
+  "level": 1,
+  "powerLevel": "G",
+  "frictionLevel": "G",
+  "coins": 100
+}
+
+Règles importantes:
+- Si le royaume n'est pas clair, choisis AEGYRIA par défaut
+- Le nom doit être unique et approprié au style medieval-fantasy
+- Réponds UNIQUEMENT avec le JSON, rien d'autre`;
+
+                const aiResponse = await this.groqClient.generateNarration(analysisPrompt, 200);
+                
+                console.log('🤖 Réponse IA brute:', aiResponse);
+
+                // Extraire le JSON de la réponse
+                let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    throw new Error('Pas de JSON trouvé dans la réponse IA');
+                }
+
+                const characterInfo = JSON.parse(jsonMatch[0]);
+                console.log('📊 Données personnage extraites:', characterInfo);
+
+                // Générer les données complètes du personnage
+                return {
+                    playerId: player.id,
+                    name: characterInfo.name || `Héros_${player.whatsappNumber.slice(-4)}`,
+                    gender: characterInfo.gender === 'female' ? 'female' : 'male',
+                    kingdom: this.validateKingdom(characterInfo.kingdom),
+                    order: null,
+                    level: 1,
+                    experience: 0,
+                    powerLevel: 'G',
+                    frictionLevel: 'G',
+                    currentLife: 100,
+                    maxLife: 100,
+                    currentEnergy: 100,
+                    maxEnergy: 100,
+                    currentLocation: this.getStartingLocation(characterInfo.kingdom),
+                    position: { x: 0, y: 0, z: 0 },
+                    equipment: {},
+                    learnedTechniques: [],
+                    coins: 100,
+                    inventory: []
+                };
+
+            } else {
+                throw new Error('IA Groq non disponible');
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur analyse IA:', error);
+
+            // Fallback - création de personnage de base
+            return {
+                playerId: player.id,
+                name: `Héros_${player.whatsappNumber.slice(-4)}`,
+                gender: 'male',
+                kingdom: 'AEGYRIA',
+                order: null,
+                level: 1,
+                experience: 0,
+                powerLevel: 'G',
+                frictionLevel: 'G',
+                currentLife: 100,
+                maxLife: 100,
+                currentEnergy: 100,
+                maxEnergy: 100,
+                currentLocation: 'Grande Plaine d\'Honneur - Village de Valorhall',
+                position: { x: 0, y: 0, z: 0 },
+                equipment: {},
+                learnedTechniques: [],
+                coins: 100,
+                inventory: []
+            };
+        }
+    }
+
+    validateKingdom(kingdom) {
+        const validKingdoms = ['AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS', 'VARHA', 'SYLVARIA', 'ECLYPSIA', 'TERRE_DESOLE', 'DRAK_TARR', 'URVALA', 'OMBREFIEL', 'KHALDAR'];
+        return validKingdoms.includes(kingdom) ? kingdom : 'AEGYRIA';
+    }
+
+    getStartingLocation(kingdom) {
+        const locations = {
+            'AEGYRIA': 'Grande Plaine d\'Honneur - Village de Valorhall',
+            'SOMBRENUIT': 'Forêt des Murmures - Clairière de Lunelame',
+            'KHELOS': 'Oasis du Mirage - Campement de Sablesang',
+            'ABRANTIS': 'Port de Marée-Haute - Taverne du Kraken',
+            'VARHA': 'Pic des Loups - Village de Glacierre',
+            'SYLVARIA': 'Bosquet Éternel - Cercle des Anciens',
+            'ECLYPSIA': 'Terre d\'Ombre - Temple de l\'Éclipse',
+            'TERRE_DESOLE': 'Wasteland Central - Campement des Survivants',
+            'DRAK_TARR': 'Cratère de Feu - Forge Volcanique',
+            'URVALA': 'Marais Maudit - Laboratoire des Morts',
+            'OMBREFIEL': 'Plaine Grise - Citadelle des Exilés',
+            'KHALDAR': 'Jungle Tropicale - Village sur Pilotis'
+        };
+        return locations[kingdom] || locations['AEGYRIA'];
     }
 
     async handleCharacterSheetCommand({ player, dbManager, imageGenerator }) {
