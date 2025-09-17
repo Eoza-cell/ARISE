@@ -479,31 +479,36 @@ class GameEngine {
             // Appliquer le système de combat Dark Souls strict
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
 
-            // Système de dégâts CONTRÔLÉ - seulement dans certaines situations
+            // Système de dégâts ÉQUILIBRÉ - seulement en vrai combat
             let damageText = '';
             let shouldTakeDamage = false;
 
-            // Dégâts seulement si :
-            // 1. Action explicitement dangereuse (combat, escalade, etc.)
-            // 2. OU contre-attaque
-            // 3. OU énergie à zéro (épuisement)
-            const dangerousKeywords = ['attaque', 'combat', 'frappe', 'escalade', 'saute', 'courir', 'fonce'];
-            const isDangerousAction = dangerousKeywords.some(keyword => 
+            // Dégâts seulement pour les vrais actions de COMBAT agressif
+            const realCombatKeywords = ['attaque', 'combat', 'frappe', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite'];
+            const isRealCombat = realCombatKeywords.some(keyword => 
                 message.toLowerCase().includes(keyword)
             );
 
-            if (isDangerousAction && actionAnalysis.combatAdvantage === 'counter_attacked') {
+            // Dégâts uniquement si :
+            // 1. Action de combat réel ET contre-attaque réussie
+            // 2. OU action de combat avec haut risque (rare)
+            if (isRealCombat && actionAnalysis.combatAdvantage === 'counter_attacked') {
                 shouldTakeDamage = true;
-            } else if (character.currentEnergy <= 0) {
-                shouldTakeDamage = true; // Épuisement = vulnérabilité
+            } else if (isRealCombat && actionAnalysis.riskLevel === 'extreme' && Math.random() < 0.3) {
+                shouldTakeDamage = true; // 30% de chance de dégâts sur action très risquée
+            }
+
+            // Pas de dégâts automatiques par épuisement - juste efficacité réduite
+            if (character.currentEnergy <= 0) {
+                damageText = `\n⚡ **ÉPUISEMENT** - Vous êtes trop fatigué pour être efficace`;
             }
 
             if (shouldTakeDamage && actionAnalysis.potentialDamage > 0) {
-                // Dégâts réduits et plafonnés
-                const baseDamage = Math.max(1, Math.min(15, actionAnalysis.potentialDamage || 5));
+                // Dégâts réduits et plus équilibrés
+                const baseDamage = Math.max(1, Math.min(8, actionAnalysis.potentialDamage || 3));
                 const damage = Math.min(baseDamage, character.currentLife);
                 character.currentLife = Math.max(0, character.currentLife - damage);
-                damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV (action risquée)`;
+                damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV (combat risqué)`;
 
                 console.log(`⚔️ Dégâts appliqués: ${damage} PV (action: ${message}, situation: ${actionAnalysis.combatAdvantage})`);
             }
