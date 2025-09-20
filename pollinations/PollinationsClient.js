@@ -154,7 +154,18 @@ class PollinationsClient {
 
     async generateActionImage(character, action, narration, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male' : 'female';
-        const prompt = `${character.name}, ${genderDesc} warrior, ${action}, ${narration}, epic fantasy scene, first person POV`;
+        
+        // Construire le prompt avec la description physique du personnage
+        let prompt = `${character.name}, ${genderDesc}`;
+        
+        // Ajouter l'apparence physique si disponible
+        if (character.appearance) {
+            prompt += `, ${character.appearance}`;
+        } else {
+            prompt += ` warrior`;
+        }
+        
+        prompt += `, ${action}, ${narration}, epic fantasy scene, first person POV`;
 
         return await this.generateImage(prompt, outputPath, {
             style: options.style || '3d',
