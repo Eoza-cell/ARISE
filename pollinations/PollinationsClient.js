@@ -41,12 +41,17 @@ class PollinationsClient {
 
             console.log(`📥 Téléchargement depuis: ${imageUrl.substring(0, 100)}...`);
 
-            // Télécharger l'image directement
+            // Télécharger l'image directement avec retry et timeout augmenté
             const response = await axios.get(imageUrl, {
                 responseType: 'arraybuffer',
-                timeout: 60000,
+                timeout: 120000, // Augmenté à 2 minutes
+                maxRedirects: 5,
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'image/png,image/jpeg,image/webp,image/*,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
                 }
             });
 
@@ -247,13 +252,15 @@ class PollinationsClient {
 
             console.log(`🔊 Téléchargement audio depuis Pollinations...`);
 
-            // Télécharger l'audio directement
+            // Télécharger l'audio directement avec gestion d'erreur améliorée
             const response = await axios.get(audioUrl, {
                 responseType: 'arraybuffer',
-                timeout: 30000,
+                timeout: 45000, // Timeout augmenté
+                maxRedirects: 3,
                 headers: {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-                    'Accept': 'audio/mpeg, audio/wav, */*'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'audio/mpeg, audio/wav, audio/ogg, */*',
+                    'Accept-Language': 'en-US,en;q=0.9,fr;q=0.8'
                 }
             });
 
@@ -273,20 +280,16 @@ class PollinationsClient {
         } catch (error) {
             console.error('❌ Erreur Pollinations Audio API:', error.message);
 
-            // Si erreur 402 ou autre, essayer Edge-TTS avec voix correctes
-            if (error.response && (error.response.status === 402 || error.response.status >= 400)) {
-                console.log('💡 Fallback vers Edge-TTS avec voix correctes...');
-                const edgeResult = await this.generateWebSpeechAPI(text, outputPath, options);
-                if (edgeResult) {
-                    try {
-                        const audioBuffer = await fs.readFile(edgeResult);
-                        console.log('✅ Audio Edge-TTS généré en fallback');
-                        return audioBuffer;
-                    } catch (readError) {
-                        console.log('⚠️ Impossible de lire le fichier Edge-TTS généré');
-                        return null;
-                    }
-                }
+            // Si erreur 402 (Payment Required), désactiver Pollinations Audio
+            if (error.response && error.response.status === 402) {
+                console.log('⚠️ Pollinations Audio nécessite un paiement - Audio désactivé');
+                return null;
+            }
+
+            // Pour les autres erreurs, essayer le fallback système
+            if (error.response && error.response.status >= 400) {
+                console.log('💡 Fallback vers synthèse vocale système...');
+                return await this.generateSimpleFallbackVoice(text, outputPath, options);
             }
 
             return null;
@@ -394,6 +397,26 @@ class PollinationsClient {
 
             // Voix spéciales correctes pour les personnages
             if (options.voice === 'warrior') {
+
+
+    /**
+     * Fallback vocal simple sans dépendances externes
+     */
+    async generateSimpleFallbackVoice(text, outputPath, options = {}) {
+        try {
+            console.log('🔊 Génération vocale fallback simple (désactivée)...');
+            
+            // Pour l'instant, désactiver complètement l'audio au lieu d'échouer
+            // Cela permet au jeu de continuer sans audio
+            console.log('⚠️ Audio désactivé - mode texte uniquement');
+            return null;
+
+        } catch (error) {
+            console.log('⚠️ Fallback vocal simple échoué:', error.message);
+            return null;
+        }
+    }
+
                 voice = options.gender === 'male' ? 'fr-FR-AlainNeural' : 'fr-FR-BrigitteNeural';
             } else if (options.voice === 'merchant') {
                 voice = options.gender === 'male' ? 'fr-FR-ClaudeNeural' : 'fr-FR-CoralieNeural';

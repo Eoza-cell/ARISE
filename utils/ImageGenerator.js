@@ -209,7 +209,11 @@ class ImageGenerator {
                         return imageBuffer;
                     }
                 } catch (pollinationsError) {
-                    console.log('⚠️ Erreur Pollinations menu, fallback vers Runware:', pollinationsError.message);
+                    if (pollinationsError.message.includes('timeout')) {
+                        console.log('⚠️ Timeout Pollinations menu (>2min), fallback vers Freepik:', pollinationsError.message);
+                    } else {
+                        console.log('⚠️ Erreur Pollinations menu, fallback vers Freepik:', pollinationsError.message);
+                    }
                 }
             }
 
@@ -292,7 +296,11 @@ class ImageGenerator {
                         return imageBuffer;
                     }
                 } catch (pollinationsError) {
-                    console.log('⚠️ Erreur Pollinations action, fallback vers Runware:', pollinationsError.message);
+                    if (pollinationsError.message.includes('timeout')) {
+                        console.log('⚠️ Timeout Pollinations (>2min), fallback vers Freepik:', pollinationsError.message);
+                    } else {
+                        console.log('⚠️ Erreur Pollinations action, fallback vers Freepik:', pollinationsError.message);
+                    }
                 }
             }
 
