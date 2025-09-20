@@ -388,25 +388,35 @@ class ImageGenerator {
             if (this.hasPollinations && this.pollinationsClient) {
                 try {
                     console.log(`🎨 Génération image personnage ${sanitizedCharacter.name} avec Pollinations GRATUIT (vue première personne)...`);
-                    // Construire le prompt détaillé avec toutes les caractéristiques
-                    const genderDesc = sanitizedCharacter.gender === 'male' ? 'male' : 'female';
-                    let prompt = `detailed fantasy ${genderDesc} character named ${sanitizedCharacter.name}`;
 
-                    // Ajouter les caractéristiques physiques si disponibles
-                    if (sanitizedCharacter.appearance) {
-                        // Si le personnage a une description personnalisée, l'utiliser prioritairement
-                        prompt += `, appearance: ${sanitizedCharacter.appearance}`;
+                    // Construire le prompt en PRIORISANT la description personnalisée
+                    let prompt = '';
+
+                    if (sanitizedCharacter.appearance && sanitizedCharacter.appearance.trim().length > 0) {
+                        // PRIORITÉ ABSOLUE à la description personnalisée
+                        console.log(`🎯 Description personnalisée détectée: "${sanitizedCharacter.appearance}"`);
+                        const genderDesc = sanitizedCharacter.gender === 'male' ? 'male' : 'female';
+                        prompt = `${sanitizedCharacter.appearance}, ${genderDesc} fantasy character named ${sanitizedCharacter.name}`;
+
+                        if (sanitizedCharacter.kingdom) {
+                            prompt += `, from ${sanitizedCharacter.kingdom} kingdom`;
+                        }
+
+                        prompt += ', detailed fantasy RPG character art, high quality, medieval fantasy style, first person POV';
                     } else {
-                        // Sinon utiliser les caractéristiques par défaut du royaume
+                        // Fallback vers description par défaut du royaume
+                        const genderDesc = sanitizedCharacter.gender === 'male' ? 'male' : 'female';
                         const kingdomDesc = this.getDetailedKingdomAppearance(sanitizedCharacter.kingdom);
-                        prompt += `, ${kingdomDesc}`;
+                        prompt = `detailed fantasy ${genderDesc} character named ${sanitizedCharacter.name}, ${kingdomDesc}`;
+
+                        if (sanitizedCharacter.kingdom) {
+                            prompt += `, from ${sanitizedCharacter.kingdom} kingdom`;
+                        }
+
+                        prompt += ', detailed fantasy RPG character art, high quality, medieval fantasy style';
                     }
 
-                    if (sanitizedCharacter.kingdom) {
-                        prompt += `, from ${sanitizedCharacter.kingdom} kingdom`;
-                    }
-
-                    prompt += ', detailed fantasy RPG character art, high quality, medieval fantasy style';
+                    console.log(`🎨 Prompt final personnage: "${prompt}"`);
                     await this.pollinationsClient.generateImage(prompt, imagePath, imageOptions);
                     const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
