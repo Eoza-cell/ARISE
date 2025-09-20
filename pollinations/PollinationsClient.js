@@ -397,26 +397,6 @@ class PollinationsClient {
 
             // Voix spéciales correctes pour les personnages
             if (options.voice === 'warrior') {
-
-
-    /**
-     * Fallback vocal simple sans dépendances externes
-     */
-    async generateSimpleFallbackVoice(text, outputPath, options = {}) {
-        try {
-            console.log('🔊 Génération vocale fallback simple (désactivée)...');
-            
-            // Pour l'instant, désactiver complètement l'audio au lieu d'échouer
-            // Cela permet au jeu de continuer sans audio
-            console.log('⚠️ Audio désactivé - mode texte uniquement');
-            return null;
-
-        } catch (error) {
-            console.log('⚠️ Fallback vocal simple échoué:', error.message);
-            return null;
-        }
-    }
-
                 voice = options.gender === 'male' ? 'fr-FR-AlainNeural' : 'fr-FR-BrigitteNeural';
             } else if (options.voice === 'merchant') {
                 voice = options.gender === 'male' ? 'fr-FR-ClaudeNeural' : 'fr-FR-CoralieNeural';
@@ -481,6 +461,24 @@ class PollinationsClient {
 
         } catch (error) {
             console.log('⚠️ Erreur Edge-TTS:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Fallback vocal simple sans dépendances externes
+     */
+    async generateSimpleFallbackVoice(text, outputPath, options = {}) {
+        try {
+            console.log('🔊 Génération vocale fallback simple (désactivée)...');
+            
+            // Pour l'instant, désactiver complètement l'audio au lieu d'échouer
+            // Cela permet au jeu de continuer sans audio
+            console.log('⚠️ Audio désactivé - mode texte uniquement');
+            return null;
+
+        } catch (error) {
+            console.log('⚠️ Fallback vocal simple échoué:', error.message);
             return null;
         }
     }
