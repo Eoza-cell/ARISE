@@ -117,19 +117,23 @@ class ImmersiveNarrationManager {
     }
 
     /**
-     * Génère une narration de combat challenging et réaliste
+     * Génère une narration de combat HARDCORE et brutalement réaliste
      */
     async generateCombatNarration(context) {
         const { character, action, enemies, powerLevel } = context;
         
-        // Créer des adversaires adaptatés au niveau du joueur
-        const adaptedEnemies = this.adaptEnemyDifficulty(character, enemies);
+        // Créer des adversaires SUPÉRIEURS et impitoyables
+        const adaptedEnemies = this.createDeadlyEnemies(character, enemies);
         
-        let narration = `⚔️ **Combat Engagé !**\n\n`;
+        let narration = `💀 **COMBAT MORTEL ENGAGÉ !**\n\n`;
         
-        // Description de l'environnement de combat
-        narration += `L'air se charge de tension dans ${context.location.toLowerCase()}. `;
-        narration += `${character.name}, ${powerLevel.difficulty}, s'apprête à affronter un défi à sa mesure.\n\n`;
+        // Description d'un environnement de combat HOSTILE
+        narration += `Le danger rôde dans chaque ombre de ${context.location.toLowerCase()}. `;
+        narration += `${character.name}, simple ${powerLevel.difficulty}, face à des adversaires qui ne montrent AUCUNE pitié.\n\n`;
+        
+        // Ajout de complications environnementales
+        const environmentalHazards = this.generateEnvironmentalHazards(context.location);
+        narration += `🌪️ **DANGERS ENVIRONNEMENTAUX :**\n${environmentalHazards}\n\n`;
         
         // Analyse des adversaires
         adaptedEnemies.forEach(enemy => {
@@ -393,6 +397,153 @@ class ImmersiveNarrationManager {
      * Description détaillée des lieux
      */
     getDetailedLocationDescription(location, character) {
+
+
+    /**
+     * Créé des ennemis SUPÉRIEURS et impitoyables
+     */
+    createDeadlyEnemies(character, baseEnemies) {
+        const playerLevel = this.powerLevels[character.powerLevel];
+        
+        return baseEnemies.map(enemy => {
+            // Les ennemis sont TOUJOURS plus forts que le joueur
+            const enemyPowerLevel = this.getSupériorEnemyLevel(character.powerLevel);
+            const enemyStats = this.powerLevels[enemyPowerLevel];
+            
+            return {
+                ...enemy,
+                powerLevel: enemyPowerLevel,
+                health: Math.floor(enemyStats.base * 1.2 + (Math.random() * 0.5 * enemyStats.base)), // +20% base + bonus
+                energy: Math.floor(enemyStats.base * 1.0 + (Math.random() * 0.8 * enemyStats.base)),
+                abilities: this.generateDeadlyAbilities(enemyPowerLevel),
+                tactics: this.generateIntelligentTactics(),
+                description: `Un adversaire ${enemyStats.difficulty} EXPÉRIMENTÉ qui exploite chaque faiblesse`
+            };
+        });
+    }
+
+    /**
+     * Détermine un niveau d'ennemi SUPÉRIEUR (toujours challenging)
+     */
+    getSupériorEnemyLevel(playerLevel) {
+        const levels = ['G', 'F', 'E', 'D', 'C', 'B', 'A'];
+        const playerIndex = levels.indexOf(playerLevel);
+        
+        // Les ennemis sont 1-2 niveaux au-dessus du joueur minimum
+        const enemyIndex = Math.min(levels.length - 1, playerIndex + 1 + Math.floor(Math.random() * 2));
+        
+        return levels[enemyIndex];
+    }
+
+    /**
+     * Génère des capacités mortelles pour l'ennemi
+     */
+    generateDeadlyAbilities(powerLevel) {
+        const deadlyAbilities = {
+            'G': ['Attaque sournoise', 'Parade brutale', 'Morsure empoisonnée'],
+            'F': ['Combo mortel', 'Esquive fatale', 'Contre-attaque dévastatrice', 'Cri de guerre'],
+            'E': ['Arts martiaux létaux', 'Feinte mortelle', 'Attaque en série', 'Charge destructrice'],
+            'D': ['Tactiques de guerre', 'Maîtrise des armes fatales', 'Anticipation parfaite', 'Embuscade'],
+            'C': ['Techniques interdites', 'Combat à mort', 'Stratégie impitoyable', 'Exécution rapide'],
+            'B': ['Maîtrise ultime', 'Techniques secrètes mortelles', 'Leadership tyrannique', 'Domination'],
+            'A': ['Techniques légendaires de destruction', 'Omniscience martiale', 'Présence terrifiante', 'Pouvoir divin']
+        };
+        
+        return deadlyAbilities[powerLevel] || deadlyAbilities['G'];
+    }
+
+    /**
+     * Génère des tactiques intelligentes pour les ennemis
+     */
+    generateIntelligentTactics() {
+        const tactics = [
+            'Encerclement coordonné',
+            'Attaque surprise depuis les flancs',
+            'Exploitation des faiblesses détectées',
+            'Feinte puis attaque mortelle',
+            'Utilisation de l\'environnement comme arme',
+            'Coordination d\'équipe létale',
+            'Pression psychologique constante',
+            'Adaptation en temps réel aux mouvements'
+        ];
+        
+        return tactics[Math.floor(Math.random() * tactics.length)];
+    }
+
+    /**
+     * Génère des dangers environnementaux selon le lieu
+     */
+    generateEnvironmentalHazards(location) {
+        const hazards = {
+            'Valorhall': [
+                'Pavés glissants par la pluie récente',
+                'Gardes en patrouille qui approchent',
+                'Toits instables prêts à s\'effondrer',
+                'Foule paniquée qui fuit le combat'
+            ],
+            'Forêt Sombre': [
+                'Racines traîtresses qui font trébucher',
+                'Branches basses qui obstruent la vue',
+                'Animaux sauvages attirés par le bruit',
+                'Brouillard épais qui réduit la visibilité',
+                'Sol marécageux qui aspire les pieds'
+            ],
+            'Montagnes du Nord': [
+                'Vent glacial qui engourdit les membres',
+                'Rochers instables prêts à dévaler',
+                'Altitude qui coupe le souffle',
+                'Précipices mortels à chaque pas',
+                'Tempête de neige qui approche'
+            ],
+            'default': [
+                'Terrain instable sous les pieds',
+                'Visibilité réduite par la poussière',
+                'Échos qui révèlent la position',
+                'Température extrême qui épuise'
+            ]
+        };
+        
+        const locationHazards = hazards[location] || hazards['default'];
+        const selectedHazard = locationHazards[Math.floor(Math.random() * locationHazards.length)];
+        
+        return `• ${selectedHazard}\n• Équipement qui se dégrade rapidement\n• Épuisement qui s'accumule dangereusement`;
+    }
+
+    /**
+     * Système de survie - Gestion des ressources vitales
+     */
+    async applySurvivalMechanics(character, action, timeElapsed) {
+        const survivalFactors = {
+            hunger: Math.floor(timeElapsed / 4), // Faim toutes les 4h
+            thirst: Math.floor(timeElapsed / 2), // Soif toutes les 2h
+            fatigue: Math.floor(timeElapsed / 1), // Fatigue chaque heure
+            equipment_degradation: Math.floor(timeElapsed / 8) // Dégradation toutes les 8h
+        };
+
+        let survivalText = '\n🔥 **SURVIE HARDCORE :**\n';
+        
+        if (survivalFactors.thirst > 0) {
+            survivalText += `• Soif croissante (-${survivalFactors.thirst * 2} énergie)\n`;
+            character.currentEnergy = Math.max(0, character.currentEnergy - (survivalFactors.thirst * 2));
+        }
+        
+        if (survivalFactors.hunger > 0) {
+            survivalText += `• Faim dévorante (-${survivalFactors.hunger} PV)\n`;
+            character.currentLife = Math.max(1, character.currentLife - survivalFactors.hunger);
+        }
+        
+        if (survivalFactors.fatigue > 0) {
+            survivalText += `• Épuisement accumulé (-${survivalFactors.fatigue * 3} énergie max)\n`;
+            character.maxEnergy = Math.max(20, character.maxEnergy - survivalFactors.fatigue);
+        }
+
+        if (survivalFactors.equipment_degradation > 0) {
+            survivalText += `• Équipement qui se dégrade (réparations nécessaires)\n`;
+        }
+
+        return survivalText;
+    }
+
         const descriptions = {
             'Valorhall': `Dans les rues pavées de Valorhall, capitale d'AEGYRIA, l'air résonne des marteaux des forgerons et du cliquetis des armures. Les bannières dorées flottent au vent, témoins de la grandeur militaire du royaume.`,
             'Forêt Sombre': `Les arbres centenaires de la Forêt Sombre projettent leurs ombres menaçantes. Chaque bruissement dans les feuillages pourrait signaler un danger. L'odeur de mousse humide et de décomposition emplit vos narines.`,

@@ -86,12 +86,25 @@ class GroqClient {
                 messages: [
                     {
                         role: 'system',
-                        content: `Tu es un narrateur RPG immersif et créatif.
-                        Génère 3-4 phrases riches et évocatrices en français.
-                        DÉVELOPPE l'ambiance, les réactions des PNJ, l'environnement.
-                        ÉVITE seulement les longs inventaires d'objets techniques.
-                        Style: Action du joueur → conséquences vivantes → ambiance du lieu → réaction des personnages.
-                        Sois créatif et immersif, pas juste descriptif.`
+                        content: `Tu es un narrateur RPG HARDCORE et impitoyable comme Dark Souls.
+                        
+                        RÈGLES DE DIFFICULTÉ ABSOLUES:
+                        - Chaque action a des CONSÉQUENCES RÉELLES et dangereuses
+                        - Les ennemis sont INTELLIGENTS et adaptent leurs stratégies
+                        - L'environnement est HOSTILE : pièges, embuscades, dangers naturels
+                        - Les ressources sont RARES : nourriture, eau, équipement se dégradent
+                        - Les erreurs sont PUNIES : mauvaises décisions = blessures/mort
+                        - Pas de "chance du débutant" : le monde ne fait pas de cadeaux
+                        
+                        STYLE NARRATIF IMMERSIF:
+                        1. Action du joueur → Réaction HOSTILE du monde
+                        2. Dangers immédiats et conséquences graves
+                        3. Ambiance oppressante et menaçante
+                        4. PNJ méfiants, animaux agressifs, nature impitoyable
+                        5. Chaque pas peut être le dernier
+                        
+                        Génère 3-4 phrases INTENSES en français.
+                        Le monde de Friction Ultimate ne pardonne JAMAIS.`
                     },
                     {
                         role: 'user',
@@ -172,22 +185,36 @@ class GroqClient {
     async generateExplorationNarration(location, action, sessionId = "default", character = null, maxTokens = 250) {
         const locationContinuity = this.getLocationContinuity(sessionId, location);
 
-        const prompt = `Raconte cette scène RPG de façon immersive et vivante:
-        Personnage: ${character ? character.name : 'Le héros'}
-        Lieu: ${location}
-        Action du joueur: ${action}
+        const prompt = `NARRATION HARDCORE - Mode Survie Extrême:
+        Personnage: ${character ? character.name : 'Le héros'} (Niveau ${character ? character.powerLevel : 'G'})
+        Lieu DANGEREUX: ${location}
+        Action risquée: ${action}
 
         ${locationContinuity}
 
-        CRÉÉ UNE NARRATION RICHE:
-        1. Commence par l'action du personnage
-        2. Décris les réactions de l'environnement et des PNJ
-        3. Ajoute l'ambiance du lieu (sons, odeurs, lumière)
-        4. Termine par les conséquences ou nouvelles possibilités
-        5. 3-4 phrases évocatrices et immersives
-        6. Évite seulement les longs détails techniques répétitifs
-
-        Sois créatif et captivant:`;
+        SYSTÈME DE SURVIE IMPITOYABLE:
+        🎯 DANGERS IMMÉDIATS à intégrer:
+        - Prédateurs/Ennemis cachés qui observent
+        - Pièges naturels/artificiels dans l'environnement
+        - Conditions météo hostiles (froid/chaleur/tempête)
+        - Équipement qui se dégrade/casse
+        - Fatigue/faim/soif qui s'accumulent
+        - Terrain instable/effondrement/glissade
+        
+        🔥 CONSÉQUENCES RÉELLES:
+        - Chaque mouvement révèle la position aux ennemis
+        - Les bruits attirent des créatures dangereuses
+        - L'environnement réagit agressivement
+        - Les PNJ sont méfiants/hostiles par défaut
+        - Ressources limitées s'épuisent rapidement
+        
+        NARRATION INTENSE (3-4 phrases):
+        1. Action + Danger immédiat révélé
+        2. Réaction hostile de l'environnement/créatures
+        3. Menace grandissante + conséquences visibles
+        4. Nouvelle complication/choix difficile imposé
+        
+        Le monde de Friction Ultimate veut la MORT du héros !`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);
