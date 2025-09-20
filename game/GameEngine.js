@@ -459,9 +459,21 @@ Règles importantes:
                          `🎯 **Techniques apprises :**\n` +
                          `${this.formatTechniques(character.learnedTechniques)}`;
 
+        // Générer l'image du personnage de façon sécurisée
+        let characterImage = null;
+        try {
+            characterImage = await imageGenerator.generateCharacterImage(character, {
+                style: '3d',
+                perspective: 'first_person',
+                nudity: false
+            });
+        } catch (imageError) {
+            console.log('⚠️ Impossible de générer l\'image pour la fiche, continuons sans image:', imageError.message);
+        }
+
         return {
             text: sheetText,
-            image: await imageGenerator.generateCharacterSheet(character)
+            image: characterImage
         };
     }
 
