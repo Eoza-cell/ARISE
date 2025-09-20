@@ -237,7 +237,22 @@ class FreepikClient {
 
     async generateCharacterImage(character, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
-        const prompt = `Detailed ${genderDesc} from ${character.kingdom} kingdom, power level ${character.powerLevel}, fantasy RPG character, detailed armor and weapons`;
+        
+        // Construire le prompt en PRIORISANT la description personnalisée
+        let prompt = '';
+        
+        if (character.appearance && character.appearance.trim().length > 0) {
+            // PRIORITÉ ABSOLUE à la description personnalisée
+            console.log(`🎯 Freepik personnage avec description personnalisée: "${character.appearance}"`);
+            prompt = `${character.appearance}, ${genderDesc} from ${character.kingdom} kingdom, power level ${character.powerLevel}`;
+        } else {
+            // Fallback vers description générique
+            prompt = `Detailed ${genderDesc} from ${character.kingdom} kingdom, power level ${character.powerLevel}`;
+        }
+        
+        prompt += ', fantasy RPG character, detailed armor and weapons';
+        
+        console.log(`🎨 Prompt Freepik personnage: "${prompt}"`);
 
         return await this.generateImage(prompt, outputPath, {
             style: options.style || '3d',
@@ -248,7 +263,22 @@ class FreepikClient {
 
     async generateActionImage(character, action, narration, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male' : 'female';
-        const prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom, performing: ${action}. ${narration}. Epic fantasy scene, detailed environment, first person POV perspective`;
+        
+        // Construire le prompt en PRIORISANT la description personnalisée
+        let prompt = '';
+        
+        if (character.appearance && character.appearance.trim().length > 0) {
+            // PRIORITÉ ABSOLUE à la description personnalisée du joueur
+            console.log(`🎯 Freepik action avec description personnalisée: "${character.appearance}"`);
+            prompt = `${character.appearance}, ${genderDesc} character named ${character.name}, performing: ${action}. ${narration}`;
+        } else {
+            // Fallback vers description générique
+            prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom, performing: ${action}. ${narration}`;
+        }
+        
+        prompt += '. Epic fantasy scene, detailed environment, first person POV perspective';
+        
+        console.log(`🎨 Prompt Freepik action avec apparence: "${prompt}"`);
 
         return await this.generateImage(prompt, outputPath, {
             style: options.style || '3d',
