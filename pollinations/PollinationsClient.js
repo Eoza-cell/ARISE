@@ -72,37 +72,37 @@ class PollinationsClient {
         // Nettoyer le prompt
         optimized = optimized.trim();
 
-        // Styles améliorés avec focus SKYRIM
+        // Styles améliorés avec focus STEAMPUNK 3D
         if (style === '3d') {
-            optimized = `Skyrim style, Elder Scrolls aesthetic, 3D render, unreal engine 5, photorealistic, detailed medieval fantasy, ${optimized}`;
+            optimized = `steampunk 3D render, steampunk aesthetic, 3D rendered scene, unreal engine 5, photorealistic, detailed steampunk fantasy, ${optimized}`;
         } else {
-            optimized = `Elder Scrolls concept art, Skyrim style, digital art, medieval fantasy illustration, ${optimized}`;
+            optimized = `steampunk concept art, steampunk style, digital art, steampunk fantasy illustration, ${optimized}`;
         }
 
-        // Perspectives FORCÉES vue première personne style Skyrim
+        // Perspectives FORCÉES vue steampunk 3D
         const perspectiveMap = {
-            'first_person': 'first person POV, immersive first-person view, Skyrim gameplay perspective, hands visible holding weapon, immersive camera angle',
-            'second_person': 'close-up portrait, face focus, detailed Skyrim character features, Elder Scrolls style face',
-            'third_person': 'full body, dynamic pose, action shot, Skyrim character model'
+            'first_person': 'first person POV, immersive first-person view, steampunk gameplay perspective, hands visible holding steampunk weapon, immersive camera angle',
+            'second_person': 'close-up portrait, face focus, detailed steampunk character features, steampunk style face',
+            'third_person': 'full body, dynamic pose, action shot, steampunk character model'
         };
 
         optimized = `${optimized}, ${perspectiveMap[perspective]}`;
 
-        // Environnement et atmosphère Skyrim
-        optimized = `${optimized}, Nordic architecture, medieval fantasy environment, stone walls, torches, atmospheric lighting, cinematic depth of field`;
+        // Environnement et atmosphère steampunk
+        optimized = `${optimized}, steampunk architecture, steampunk fantasy environment, brass and copper details, steam pipes, gears, atmospheric lighting, cinematic depth of field`;
 
-        // Gestion nudité avec style médiéval
+        // Gestion nudité avec style steampunk
         if (nudity) {
-            optimized = `${optimized}, detailed anatomy, medieval clothing`;
+            optimized = `${optimized}, detailed anatomy, steampunk clothing`;
         } else {
-            optimized = `${optimized}, full medieval armor, detailed chainmail, leather armor, iron armor, steel armor, fantasy weapons`;
+            optimized = `${optimized}, full steampunk armor, detailed brass armor, leather and metal armor, copper armor, steel and brass armor, steampunk weapons`;
         }
 
-        // Qualité et style spécifique Skyrim
-        optimized = `${optimized}, masterpiece, high quality, 8K, vibrant colors, sharp focus, realistic textures, volumetric lighting, Skyrim graphics mod quality, photorealistic rendering`;
+        // Qualité et style spécifique steampunk 3D
+        optimized = `${optimized}, masterpiece, high quality, 8K, vibrant colors, sharp focus, realistic textures, volumetric lighting, steampunk 3D quality, photorealistic rendering`;
 
-        // Éléments visuels Skyrim signature
-        optimized = `${optimized}, Nordic runes, ancient stone textures, medieval fantasy atmosphere`;
+        // Éléments visuels steampunk signature
+        optimized = `${optimized}, steampunk gears, brass mechanical parts, copper pipes, steam-powered machinery, steampunk fantasy atmosphere`;
 
         // Limiter la longueur pour l'URL
         if (optimized.length > 400) {
@@ -114,7 +114,7 @@ class PollinationsClient {
 
     optimizePromptForPollinations(prompt) {
         // Ajouter des mots-clés spécifiques à Pollinations pour améliorer la qualité et la précision
-        const qualityKeywords = "Skyrim style, Elder Scrolls aesthetic, 3D render, unreal engine 5, photorealistic, detailed medieval fantasy";
+        const qualityKeywords = "steampunk style, steampunk aesthetic, 3D render, unreal engine 5, photorealistic, detailed steampunk fantasy";
         const precisionKeywords = "accurate to description, exactly as described, precise details";
 
         // Nettoyer le prompt et optimiser pour Pollinations
