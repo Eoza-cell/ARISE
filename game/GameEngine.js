@@ -95,11 +95,22 @@ class GameEngine {
                 }
             }
 
-            // Vérifier si le joueur est en cours de création par description
+            // Gérer la création avec photo d'abord
+            if (imageMessage) {
+                const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
+                const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
+                
+                if (creationMode === 'description' && creationStarted) {
+                    return await this.handlePhotoReceived({ player, imageMessage, sock, dbManager, imageGenerator });
+                }
+            }
+
+            // Vérifier si le joueur est en cours de création par description (après photo)
             const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
             const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
+            const photoReceived = await dbManager.getTemporaryData(player.id, 'photo_received');
 
-            if (creationMode === 'description' && creationStarted && message && !this.commandHandlers[command]) {
+            if (creationMode === 'description' && creationStarted && photoReceived && message && !this.commandHandlers[command]) {
                 return await this.handleDescriptionCreation({ player, description: message, dbManager, imageGenerator });
             }
 
@@ -215,16 +226,18 @@ class GameEngine {
 
         return {
             text: `🎭 **CRÉATION DE PERSONNAGE IA** 🎭\n\n` +
-                  `✨ Décris ton personnage idéal en quelques phrases et l'IA le créera pour toi !\n\n` +
-                  `📝 **Exemple de description :**\n` +
-                  `"Un guerrier elfe aux cheveux argentés, grand et musclé, avec des yeux verts perçants. Il porte une armure de cuir sombre et vient des forêts mystérieuses."\n\n` +
-                  `💡 **Tu peux mentionner :**\n` +
-                  `• Apparence physique (taille, couleur des yeux/cheveux)\n` +
-                  `• Style vestimentaire\n` +
-                  `• Origine/royaume\n` +
-                  `• Personnalité\n` +
-                  `• Classe/profession\n\n` +
-                  `🚀 **Écris ta description maintenant !**`,
+                  `✨ Pour créer ton personnage idéal, l'IA a besoin de ton aide !\n\n` +
+                  `📸 **ÉTAPE 1 - ENVOIE TA PHOTO**\n` +
+                  `Envoie une photo de ton visage pour que l'IA Pollination puisse créer un personnage qui te ressemble !\n\n` +
+                  `📝 **ÉTAPE 2 - DÉCRIS TON PERSONNAGE**\n` +
+                  `Après ta photo, décris ton personnage idéal :\n` +
+                  `• Classe/profession (guerrier, mage, assassin...)\n` +
+                  `• Style vestimentaire et armure\n` +
+                  `• Origine/royaume préféré\n` +
+                  `• Personnalité et histoire\n\n` +
+                  `💡 **Exemple de description :**\n` +
+                  `"Un guerrier noble avec une armure dorée, venant des plaines d'honneur d'AEGYRIA. Il est courageux et loyal."\n\n` +
+                  `📸 **Commence par envoyer ta photo maintenant !**`,
             image: await imageGenerator.generateMenuImage()
         };
     }
@@ -250,6 +263,54 @@ class GameEngine {
             text: creationText,
             image: await imageGenerator.generateMenuImage()
         };
+    }
+
+    async handlePhotoReceived({ player, imageMessage, sock, dbManager, imageGenerator }) {
+        try {
+            console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
+            
+            // Télécharger et sauvegarder la photo
+            const imageBuffer = await sock.downloadMediaMessage(imageMessage);
+            
+            if (imageBuffer && imageBuffer.length > 0) {
+                // Sauvegarder l'image temporairement
+                await imageGenerator.saveCustomCharacterImage(player.id, imageBuffer);
+                
+                // Marquer que la photo a été reçue
+                await dbManager.setTemporaryData(player.id, 'photo_received', true);
+                
+                console.log(`✅ Photo sauvegardée pour ${player.whatsappNumber}`);
+                
+                return {
+                    text: `📸 **PHOTO REÇUE AVEC SUCCÈS !** 📸\n\n` +
+                          `✅ Ton visage a été enregistré pour la création du personnage.\n\n` +
+                          `📝 **MAINTENANT, DÉCRIS TON PERSONNAGE :**\n\n` +
+                          `Décris le personnage que tu veux incarner :\n\n` +
+                          `💡 **Exemple :**\n` +
+                          `"Un guerrier noble d'AEGYRIA avec une armure dorée et une épée lumineuse. Il est courageux, loyal et protège les innocents. Il vient des plaines d'honneur et rêve de devenir un paladin légendaire."\n\n` +
+                          `🎭 **Inclus :**\n` +
+                          `• Classe/profession\n` +
+                          `• Style d'armure/vêtements\n` +
+                          `• Royaume d'origine\n` +
+                          `• Personnalité\n` +
+                          `• Histoire/objectifs\n\n` +
+                          `🚀 **Écris ta description maintenant !**`
+                };
+            } else {
+                return {
+                    text: `❌ **Erreur de téléchargement de photo**\n\n` +
+                          `La photo n'a pas pu être traitée.\n` +
+                          `📸 Réessaie d'envoyer une photo claire de ton visage.`
+                };
+            }
+        } catch (error) {
+            console.error('❌ Erreur traitement photo:', error);
+            return {
+                text: `❌ **Erreur lors du traitement de la photo**\n\n` +
+                      `Une erreur s'est produite. Réessaie d'envoyer ta photo.\n` +
+                      `💡 Assure-toi que l'image est claire et bien éclairée.`
+            };
+        }
     }
 
     async handleDescriptionCreation({ player, description, dbManager, imageGenerator }) {

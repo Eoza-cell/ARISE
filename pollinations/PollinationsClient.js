@@ -167,21 +167,21 @@ class PollinationsClient {
     async generateActionImage(character, action, narration, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male' : 'female';
         
-        // Construire le prompt en PRIORISANT ABSOLUMENT la description personnalisée
+        // Construire le prompt en PRIORISANT la photo du joueur ET sa description
         let prompt = '';
         
         if (character.appearance && character.appearance.trim().length > 0) {
-            // PRIORITÉ MAXIMALE à la description personnalisée - la mettre EN PREMIER
-            console.log(`🎯 PRIORITÉ DESCRIPTION PERSONNALISÉE: "${character.appearance}"`);
-            prompt = `MUST SHOW EXACTLY: ${character.appearance}, this ${genderDesc} character is performing: ${action}. ${narration}`;
+            // PRIORITÉ MAXIMALE : Combiner les traits du visage du joueur avec sa description
+            console.log(`🎯 CRÉATION AVEC PHOTO + DESCRIPTION: "${character.appearance}"`);
+            prompt = `MUST SHOW EXACTLY: ${genderDesc} person with the facial features from the provided reference photo, embodying this character: ${character.appearance}. This character is performing: ${action}. ${narration}`;
         } else {
-            // Fallback vers description générique seulement si pas d'apparence personnalisée
-            prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom, performing: ${action}. ${narration}`;
+            // Fallback si pas de description mais potentiellement une photo
+            prompt = `MUST SHOW EXACTLY: ${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom with realistic facial features, performing: ${action}. ${narration}`;
         }
         
-        prompt += ', epic fantasy scene, first person POV perspective';
+        prompt += ', epic fantasy scene, first person POV perspective, photorealistic facial features, detailed character design based on real person appearance';
         
-        console.log(`🎨 PROMPT FINAL AVEC PRIORITÉ APPARENCE: "${prompt}"`);
+        console.log(`🎨 PROMPT FINAL AVEC PHOTO + APPARENCE: "${prompt}"`);
 
         return await this.generateImage(prompt, outputPath, {
             style: options.style || '3d',

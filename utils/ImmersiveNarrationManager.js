@@ -397,7 +397,14 @@ class ImmersiveNarrationManager {
      * Description détaillée des lieux
      */
     getDetailedLocationDescription(location, character) {
-
+        const descriptions = {
+            'Valorhall': `Dans les rues pavées de Valorhall, capitale d'AEGYRIA, l'air résonne des marteaux des forgerons et du cliquetis des armures. Les bannières dorées flottent au vent, témoins de la grandeur militaire du royaume.`,
+            'Forêt Sombre': `Les arbres centenaires de la Forêt Sombre projettent leurs ombres menaçantes. Chaque bruissement dans les feuillages pourrait signaler un danger. L'odeur de mousse humide et de décomposition emplit vos narines.`,
+            'Montagnes du Nord': `Les pics escarpés s'élèvent vers un ciel plombé. Le vent glacial siffle entre les rochers, et chaque pas sur les éboulis demande concentration et équilibre.`
+        };
+        
+        return descriptions[location] || `${character.name} évolue dans ${location}, un lieu chargé d'histoire et de mystères.`;
+    }
 
     /**
      * Créé des ennemis SUPÉRIEURS et impitoyables
