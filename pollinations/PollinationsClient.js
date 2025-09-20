@@ -120,7 +120,7 @@ class PollinationsClient {
     optimizePromptForPollinations(prompt) {
         // Ajouter des mots-clés spécifiques à Pollinations pour améliorer la qualité et la précision
         const qualityKeywords = "steampunk style, steampunk aesthetic, 3D render, unreal engine 5, photorealistic, detailed steampunk fantasy";
-        const precisionKeywords = "accurate to description, exactly as described, precise details";
+        const precisionKeywords = "accurate to description, exactly as described, precise details, follow description perfectly";
 
         // Nettoyer le prompt et optimiser pour Pollinations
         let optimizedPrompt = prompt
@@ -128,8 +128,15 @@ class PollinationsClient {
             .replace(/\s+/g, ' ')
             .trim();
 
-        // Si le prompt contient "MUST SHOW EXACTLY", le prioriser
+        // Si le prompt contient "MUST SHOW EXACTLY", le prioriser ABSOLUMENT
         if (optimizedPrompt.includes("MUST SHOW EXACTLY")) {
+            // Extraire la description après "MUST SHOW EXACTLY:"
+            const mustShowMatch = optimizedPrompt.match(/MUST SHOW EXACTLY:\s*([^,]+)/);
+            if (mustShowMatch) {
+                const exactDescription = mustShowMatch[1].trim();
+                console.log(`🎯 DESCRIPTION EXACTE EXTRAITE: "${exactDescription}"`);
+                return `${exactDescription}, ${precisionKeywords}, ${qualityKeywords}, ${optimizedPrompt}`;
+            }
             return `${precisionKeywords}, ${qualityKeywords}, ${optimizedPrompt}`;
         }
 
@@ -160,21 +167,21 @@ class PollinationsClient {
     async generateActionImage(character, action, narration, outputPath, options = {}) {
         const genderDesc = character.gender === 'male' ? 'male' : 'female';
         
-        // Construire le prompt en PRIORISANT la description personnalisée
+        // Construire le prompt en PRIORISANT ABSOLUMENT la description personnalisée
         let prompt = '';
         
         if (character.appearance && character.appearance.trim().length > 0) {
-            // PRIORITÉ ABSOLUE à la description personnalisée du joueur
-            console.log(`🎯 Action avec description personnalisée: "${character.appearance}"`);
-            prompt = `${character.appearance}, ${genderDesc} character named ${character.name}, ${action}, ${narration}`;
+            // PRIORITÉ MAXIMALE à la description personnalisée - la mettre EN PREMIER
+            console.log(`🎯 PRIORITÉ DESCRIPTION PERSONNALISÉE: "${character.appearance}"`);
+            prompt = `MUST SHOW EXACTLY: ${character.appearance}, this ${genderDesc} character is performing: ${action}. ${narration}`;
         } else {
-            // Fallback vers description générique
-            prompt = `${character.name}, ${genderDesc} warrior, ${action}, ${narration}`;
+            // Fallback vers description générique seulement si pas d'apparence personnalisée
+            prompt = `${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom, performing: ${action}. ${narration}`;
         }
         
-        prompt += ', epic fantasy scene, first person POV';
+        prompt += ', epic fantasy scene, first person POV perspective';
         
-        console.log(`🎨 Prompt action avec apparence: "${prompt}"`);
+        console.log(`🎨 PROMPT FINAL AVEC PRIORITÉ APPARENCE: "${prompt}"`);
 
         return await this.generateImage(prompt, outputPath, {
             style: options.style || '3d',
