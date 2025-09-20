@@ -17,6 +17,7 @@ export const characters = pgTable('characters', {
   name: text('name').notNull(),
   gender: text('gender').notNull(), // 'male' ou 'female'
   kingdom: text('kingdom').notNull(),
+  appearance: text('appearance'), // Description physique du personnage
   order: text('order'),
   level: integer('level').default(1).notNull(),
   experience: integer('experience').default(0).notNull(),
