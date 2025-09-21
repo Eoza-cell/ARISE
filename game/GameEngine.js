@@ -272,7 +272,10 @@ class GameEngine {
             console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
 
             // Télécharger et sauvegarder la photo
-            const imageBuffer = await sock.downloadMediaMessage(imageMessage);
+            const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+            const imageBuffer = await downloadMediaMessage(imageMessage, 'buffer', {}, { 
+                logger: require('pino')({ level: 'silent' }) 
+            });
 
             if (imageBuffer && imageBuffer.length > 0) {
                 // Sauvegarder l'image temporairement
@@ -552,7 +555,10 @@ Règles importantes:
                 console.log('🔄 Tentative de téléchargement de l\'image...');
 
                 // Télécharger l'image
-                const imageBuffer = await sock.downloadMediaMessage(imageMessage);
+                const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+                const imageBuffer = await downloadMediaMessage(imageMessage, 'buffer', {}, { 
+                    logger: require('pino')({ level: 'silent' }) 
+                });
 
                 if (imageBuffer && imageBuffer.length > 0) {
                     console.log(`✅ Image téléchargée avec succès: ${imageBuffer.length} bytes`);

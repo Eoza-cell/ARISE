@@ -246,9 +246,12 @@ class FrictionUltimateBot {
             }
             
             if (imageMessage) {
-                // Télécharger l'image
+                // Télécharger l'image avec la bonne méthode
                 console.log('📥 Téléchargement de l\'image...');
-                const buffer = await this.sock.downloadMediaMessage(message);
+                const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+                const buffer = await downloadMediaMessage(message, 'buffer', {}, { 
+                    logger: require('pino')({ level: 'silent' }) 
+                });
                 
                 if (buffer) {
                     console.log(`✅ Image téléchargée: ${buffer.length} bytes`);
