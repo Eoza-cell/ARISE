@@ -122,14 +122,21 @@ class ImmersiveNarrationManager {
     async generateCombatNarration(context) {
         const { character, action, enemies, powerLevel } = context;
         
+        // Récupérer l'image du personnage pour la description
+        let characterImageDesc = '';
+        if (character.appearance && character.appearance.trim().length > 0) {
+            characterImageDesc = `${character.appearance} - `;
+        }
+        
         // Créer des adversaires SUPÉRIEURS et impitoyables
         const adaptedEnemies = this.createDeadlyEnemies(character, enemies);
         
         let narration = `💀 **COMBAT MORTEL ENGAGÉ !**\n\n`;
         
-        // Description d'un environnement de combat HOSTILE
-        narration += `Le danger rôde dans chaque ombre de ${context.location.toLowerCase()}. `;
-        narration += `${character.name}, simple ${powerLevel.difficulty}, face à des adversaires qui ne montrent AUCUNE pitié.\n\n`;
+        // Description physique du combattant avec son apparence
+        narration += `${characterImageDesc}${character.name}, ${powerLevel.difficulty} du royaume ${character.kingdom}, `;
+        narration += `se dresse face aux ombres menaçantes de ${context.location.toLowerCase()}. `;
+        narration += `Chaque muscle tendu, chaque regard déterminé, le combat qui s'annonce ne laissera AUCUNE place à l'erreur.\n\n`;
         
         // Ajout de complications environnementales
         const environmentalHazards = this.generateEnvironmentalHazards(context.location);
