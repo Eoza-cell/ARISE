@@ -113,7 +113,7 @@ class GroqClient {
                 ],
                 model: this.model,
                 max_tokens: maxTokens,
-                temperature: 0.8,
+                temperature: 1.7,
                 top_p: 0.9,
                 frequency_penalty: 0.3,
                 presence_penalty: 0.4
@@ -125,10 +125,10 @@ class GroqClient {
             }
 
             // Limiter à 500 caractères sans couper les phrases
-            if (narration.length > 500) {
+            if (narration.length > 1000) {
                 // Trouver la dernière phrase complète avant 500 caractères
                 const lastSentenceEnd = narration.substring(0, 500).lastIndexOf('.');
-                if (lastSentenceEnd > 300) { // Au moins 300 caractères pour avoir du contenu
+                if (lastSentenceEnd > 600) { // Au moins 300 caractères pour avoir du contenu
                     narration = narration.substring(0, lastSentenceEnd + 1);
                 } else {
                     // Si pas de point, couper à 497 et ajouter des points
