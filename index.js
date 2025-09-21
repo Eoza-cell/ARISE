@@ -9,6 +9,7 @@ const path = require('path');
 const GameEngine = require('./game/GameEngine');
 const DatabaseManager = require('./database/DatabaseManager');
 const ImageGenerator = require('./utils/ImageGenerator');
+const WhatsAppButtonManager = require('./utils/WhatsAppButtonManager');
 const { initializeGameData } = require('./data/GameData');
 
 // Clients IA et services
@@ -36,6 +37,7 @@ class FrictionUltimateBot {
         this.dbManager = new DatabaseManager();
         this.gameEngine = new GameEngine(this.dbManager);
         this.imageGenerator = new ImageGenerator();
+        this.buttonManager = null; // Sera initialisé après la connexion
         this.isConnected = false;
         this.processedMessages = new Set(); // Système de déduplication
 
@@ -100,6 +102,11 @@ class FrictionUltimateBot {
             } else if (connection === 'open') {
                 console.log('✅ Connexion WhatsApp établie !');
                 this.isConnected = true;
+                
+                // Initialiser le gestionnaire de boutons
+                this.buttonManager = new WhatsAppButtonManager(this.sock);
+                console.log('🔘 Gestionnaire de boutons interactifs initialisé');
+                
                 await this.sendWelcomeMessage();
             }
         });
@@ -111,7 +118,12 @@ class FrictionUltimateBot {
         this.sock.ev.on('messages.upsert', async (m) => {
             const message = m.messages[0];
             if (!message.key.fromMe && message.message) {
-                await this.handleIncomingMessage(message);
+                // Vérifier si c'est un vote de sondage (bouton simulé)
+                if (message.message.pollUpdateMessage) {
+                    await this.handlePollVote(message);
+                } else {
+                    await this.handleIncomingMessage(message);
+                }
             }
         });
     }
@@ -313,6 +325,50 @@ class FrictionUltimateBot {
             } catch (fallbackError) {
                 console.error('❌ Erreur fallback:', fallbackError);
             }
+        }
+    }
+
+    async handlePollVote(message) {
+        try {
+            const from = message.key.remoteJid;
+            const voter = message.key.participant || from;
+            
+            console.log(`🗳️ Vote de sondage reçu de ${voter}`);
+            
+            // Pour l'instant, juste loguer le vote - vous pouvez ajouter la logique spécifique plus tard
+            console.log('📊 Vote sondage détecté - Action bouton simulé');
+            
+            // Optionnel: envoyer une confirmation
+            await this.sock.sendMessage(from, { 
+                text: '✅ Action reçue! (Bouton simulé activé)' 
+            });
+            
+        } catch (error) {
+            console.error('❌ Erreur traitement vote sondage:', error);
+        }
+    }
+
+    // Méthode de démonstration pour tester les boutons
+    async demonstrateButtons(chatId) {
+        if (!this.buttonManager) {
+            console.log('⚠️ Gestionnaire de boutons non initialisé');
+            return;
+        }
+
+        try {
+            // Envoyer un message d'introduction
+            await this.sock.sendMessage(chatId, { 
+                text: '🎮 Démonstration des boutons interactifs!\nVoici un menu simulé avec des sondages:' 
+            });
+            
+            // Attendre un peu
+            await new Promise(resolve => setTimeout(resolve, 1000));
+            
+            // Créer le menu principal du jeu
+            await this.buttonManager.sendMainGameMenu(chatId);
+            
+        } catch (error) {
+            console.error('❌ Erreur démonstration boutons:', error);
         }
     }
 }

@@ -42,7 +42,9 @@ class GameEngine {
             '/ordres': this.handleOrdersCommand.bind(this),
             '/combat': this.handleCombatCommand.bind(this),
             '/inventaire': this.handleInventoryCommand.bind(this),
-            '/carte': this.handleMapCommand.bind(this)
+            '/carte': this.handleMapCommand.bind(this),
+            '/boutons': this.handleButtonsTestCommand.bind(this),
+            '/buttons': this.handleButtonsTestCommand.bind(this)
         };
     }
 
@@ -1044,6 +1046,65 @@ Règles importantes:
             text: ordersText,
             image: await imageGenerator.generateOrdersOverview()
         };
+    }
+
+    async handleButtonsTestCommand({ player, chatId, dbManager, sock }) {
+        try {
+            // Vérifier qu'on a accès au socket
+            if (!sock || !sock.buttonManager) {
+                return {
+                    text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
+                          `⚠️ Système de boutons non initialisé.\n\n` +
+                          `Les boutons simulés avec des sondages WhatsApp permettent de créer des interfaces interactives sans API officielle !\n\n` +
+                          `🎮 Chaque sondage = un bouton\n` +
+                          `📊 Cliquer sur le sondage = activer l'action\n\n` +
+                          `Cette fonctionnalité sera bientôt disponible !`
+                };
+            }
+
+            // Obtenir le personnage pour personnaliser l'affichage
+            const character = await dbManager.getCharacterByPlayer(player.id);
+
+            // Utiliser le buttonManager depuis le socket principal
+            const buttonManager = sock.buttonManager;
+
+            // Envoyer un message d'introduction
+            await sock.sendMessage(chatId, { 
+                text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
+                      `🎮 Voici comment fonctionne le système de boutons simulés avec des sondages WhatsApp !\n\n` +
+                      `✨ Chaque "bouton" est en fait un sondage avec une seule option\n` +
+                      `📊 Cliquer dessus équivaut à appuyer sur un bouton\n\n` +
+                      `**Menu de test :**`
+            });
+
+            // Attendre un peu puis envoyer les boutons
+            setTimeout(async () => {
+                await buttonManager.sendMainGameMenu(chatId, character);
+                
+                // Après 2 secondes, envoyer un menu d'actions
+                setTimeout(async () => {
+                    await buttonManager.sendActionMenu(chatId);
+                    
+                    // Après 2 secondes, envoyer un menu de confirmation
+                    setTimeout(async () => {
+                        await buttonManager.sendConfirmationMenu(chatId, "Voulez-vous continuer le test ?");
+                    }, 2000);
+                }, 2000);
+            }, 1000);
+
+            return {
+                text: '', // Le texte est déjà envoyé via sock.sendMessage
+                skipResponse: true // Indiquer qu'on gère l'envoi nous-mêmes
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur démonstration boutons:', error);
+            return {
+                text: `❌ **Erreur lors de la démonstration des boutons**\n\n` +
+                      `Le système rencontre un problème technique.\n\n` +
+                      `Veuillez réessayer plus tard ou contactez l'administrateur.`
+            };
+        }
     }
 
     async handleCombatCommand({ imageGenerator }) {
