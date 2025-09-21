@@ -101,7 +101,7 @@ class GameEngine {
             if (imageMessage) {
                 const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
                 const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
-                
+
                 if (creationMode === 'description' && creationStarted) {
                     return await this.handlePhotoReceived({ player, imageMessage, sock, dbManager, imageGenerator });
                 }
@@ -270,19 +270,19 @@ class GameEngine {
     async handlePhotoReceived({ player, imageMessage, sock, dbManager, imageGenerator }) {
         try {
             console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
-            
+
             // Télécharger et sauvegarder la photo
             const imageBuffer = await sock.downloadMediaMessage(imageMessage);
-            
+
             if (imageBuffer && imageBuffer.length > 0) {
                 // Sauvegarder l'image temporairement
                 await imageGenerator.saveCustomCharacterImage(player.id, imageBuffer);
-                
+
                 // Marquer que la photo a été reçue
                 await dbManager.setTemporaryData(player.id, 'photo_received', true);
-                
+
                 console.log(`✅ Photo sauvegardée pour ${player.whatsappNumber}`);
-                
+
                 return {
                     text: `📸 **PHOTO REÇUE AVEC SUCCÈS !** 📸\n\n` +
                           `✅ Ton visage a été enregistré pour la création du personnage.\n\n` +
@@ -377,7 +377,7 @@ class GameEngine {
 
     async generateCharacterFromDescription(description, player) {
         try {
-            // Utiliser Groq pour analyser la description et extraire les caractéristiques
+            // Utiliser Groq pour analyser la description et extraire les informations
             if (this.groqClient && this.groqClient.hasValidClient()) {
                 const analysisPrompt = `Analyse cette description de personnage RPG et extrait les informations suivantes au format JSON strict:
 
@@ -587,7 +587,7 @@ Règles importantes:
                 text: `📸 Image reçue, mais aucune action prévue pour les images pour le moment.`
             };
         }
-        
+
         // D'abord traiter les actions de création de personnage (avant de vérifier si personnage existe)
 
         // Traitement des actions de création de personnage en cours (seulement si création initiée)
@@ -1076,11 +1076,11 @@ Règles importantes:
             // Attendre un peu puis envoyer les boutons
             setTimeout(async () => {
                 await buttonManager.sendMainGameMenu(chatId, character);
-                
+
                 // Après 2 secondes, envoyer un menu d'actions
                 setTimeout(async () => {
                     await buttonManager.sendActionMenu(chatId);
-                    
+
                     // Après 2 secondes, envoyer un menu de confirmation
                     setTimeout(async () => {
                         await buttonManager.sendConfirmationMenu(chatId, "Voulez-vous continuer le test ?");
