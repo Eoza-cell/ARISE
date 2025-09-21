@@ -541,80 +541,44 @@ Règles importantes:
     }
 
     async handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
-        // Gestion des images pour la création de personnage
-        if (imageMessage && imageMessage.buffer) {
-            console.log('📸 Image reçue - vérification du contexte de création...');
-            const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
-            const tempName = await dbManager.getTemporaryData(player.id, 'temp_character_name');
-            
-            if (creationStarted === 'true' && tempName) {
-                console.log(`🎨 Photo reçue pour personnage: ${tempName}`);
-                
-                try {
-                    // Sauvegarder l'image du joueur
-                    const imagePath = await imageGenerator.saveCustomCharacterImage(player.id, imageMessage.buffer);
-                    console.log(`✅ Photo du joueur sauvegardée: ${imagePath}`);
-                    
-                    // Marquer que l'image a été reçue
-                    await dbManager.setTemporaryData(player.id, 'player_photo_received', 'true');
-                    
-                    return {
-                        text: `📸 **PHOTO REÇUE !**\n\n` +
-                              `✨ Votre photo a été enregistrée avec succès !\n` +
-                              `🎨 Elle sera utilisée comme référence pour créer votre personnage avec Pollinations.\n\n` +
-                              `📝 Maintenant, décrivez votre personnage (apparence, style, traits particuliers):\n` +
-                              `*Exemple: "Grand guerrier aux yeux bleus, cheveux bruns, cicatrice sur la joue droite, armure de chevalier"*`
-                    };
-                } catch (error) {
-                    console.error('❌ Erreur sauvegarde photo:', error);
-                    return {
-                        text: '❌ Erreur lors de la sauvegarde de votre photo. Réessayez.'
-                    };
-                }
-            } else {
-                return {
-                    text: '⚠️ Aucune création de personnage en cours. Tapez "/créer" d\'abord.'
-                };
-            }
-        }
-
-        // Vérifier si le joueur est en cours de finalisation avec nom
+        // Vérifier si une création est en cours
+        const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
         const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
 
-        console.log(`🔍 Contexte création: started=${!!creationStarted}, name=${!!tempName}`);
+        // Gestion des images pour la création de personnage
+        if (imageMessage && creationStarted && tempName) {
+            try {
+                console.log('📸 Réception d\'une image pour la création de personnage...');
+                console.log('🔄 Tentative de téléchargement de l\'image...');
 
-            if (creationStarted && tempName) {
-                try {
-                    console.log('📸 Réception d\'une image pour la création de personnage...');
-                    console.log('🔄 Tentative de téléchargement de l\'image...');
+                // Télécharger l'image
+                const imageBuffer = await sock.downloadMediaMessage(imageMessage);
 
-                    // Télécharger l'image
-                    const imageBuffer = await sock.downloadMediaMessage(imageMessage);
-
-                    if (imageBuffer && imageBuffer.length > 0) {
-                        console.log(`✅ Image téléchargée avec succès: ${imageBuffer.length} bytes`);
-                        return await this.finalizeCharacterCreation({
-                            player,
-                            dbManager,
-                            imageGenerator,
-                            hasCustomImage: true,
-                            imageBuffer
-                        });
-                    } else {
-                        console.log('❌ Échec du téléchargement - buffer vide ou null');
-                        return {
-                            text: `❌ Erreur lors du téléchargement de l'image. Réessaie ou écris "SANS_PHOTO".`
-                        };
-                    }
-                } catch (error) {
-                    console.error('❌ Erreur traitement image:', error.message, error.stack);
+                if (imageBuffer && imageBuffer.length > 0) {
+                    console.log(`✅ Image téléchargée avec succès: ${imageBuffer.length} bytes`);
+                    return await this.finalizeCharacterCreation({
+                        player,
+                        dbManager,
+                        imageGenerator,
+                        hasCustomImage: true,
+                        imageBuffer
+                    });
+                } else {
+                    console.log('❌ Échec du téléchargement - buffer vide ou null');
                     return {
-                        text: `❌ Erreur lors du traitement de l'image (${error.message}). Réessaie ou écris "SANS_PHOTO".`
+                        text: `❌ Erreur lors du téléchargement de l'image. Réessaie ou écris "SANS_PHOTO".`
                     };
                 }
-            } else {
-                console.log('📸 Image reçue mais pas en cours de création de personnage');
+            } catch (error) {
+                console.error('❌ Erreur traitement image:', error.message, error.stack);
+                return {
+                    text: `❌ Erreur lors du traitement de l'image (${error.message}). Réessaie ou écris "SANS_PHOTO".`
+                };
             }
+        } else if (imageMessage && !creationStarted) {
+            return {
+                text: '⚠️ Aucune création de personnage en cours. Tapez "/créer" d\'abord.'
+            };
         }
 
         // Si on a une image mais qu'on n'est pas en création, ignorer
@@ -623,6 +587,7 @@ Règles importantes:
                 text: `📸 Image reçue, mais aucune action prévue pour les images pour le moment.`
             };
         }
+        
         // D'abord traiter les actions de création de personnage (avant de vérifier si personnage existe)
 
         // Vérifier si une création est en cours
