@@ -48,7 +48,7 @@ class GameEngine {
         };
     }
 
-    async processPlayerMessage({ playerNumber, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
+    async processPlayerMessage({ playerNumber, chatId, message, imageMessage, originalMessage, sock, dbManager, imageGenerator }) {
         try {
             // Initialiser le système de personnalisation si pas déjà fait
             if (!this.characterCustomization && sock) {
@@ -87,7 +87,7 @@ class GameEngine {
                 // Si on est en mode création par description et qu'on attend une photo
                 if (creationMode === 'description' && creationStarted && !photoReceived) {
                     console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
-                    return await this.handlePhotoReceived({ player, imageMessage, sock, dbManager, imageGenerator });
+                    return await this.handlePhotoReceived({ player, imageMessage, originalMessage: arguments[0].originalMessage, sock, dbManager, imageGenerator });
                 } else {
                     return {
                         text: "🖼️ J'ai reçu votre image ! Cependant, je ne peux traiter que les commandes textuelles.\n\n" +
@@ -120,7 +120,7 @@ class GameEngine {
                 const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
 
                 if (creationMode === 'description' && creationStarted) {
-                    return await this.handlePhotoReceived({ player, imageMessage, sock, dbManager, imageGenerator });
+                    return await this.handlePhotoReceived({ player, imageMessage, originalMessage, sock, dbManager, imageGenerator });
                 }
             }
 
@@ -284,13 +284,13 @@ class GameEngine {
         };
     }
 
-    async handlePhotoReceived({ player, imageMessage, sock, dbManager, imageGenerator }) {
+    async handlePhotoReceived({ player, imageMessage, originalMessage, sock, dbManager, imageGenerator }) {
         try {
             console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
 
             // Télécharger et sauvegarder la photo
             const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-            const imageBuffer = await downloadMediaMessage(imageMessage, 'buffer', {}, { 
+            const imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, { 
                 logger: require('pino')({ level: 'silent' }) 
             });
 

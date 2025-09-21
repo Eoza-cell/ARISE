@@ -205,6 +205,7 @@ class FrictionUltimateBot {
                 chatId: from,
                 message: messageText ? messageText.trim() : null,
                 imageMessage: messageImage,
+                originalMessage: message,
                 sock: this.sock,
                 dbManager: this.dbManager,
                 imageGenerator: this.imageGenerator
