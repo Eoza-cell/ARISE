@@ -576,9 +576,12 @@ Règles importantes:
                     text: '⚠️ Aucune création de personnage en cours. Tapez "/créer" d\'abord.'
                 };
             }
-        }d, 'creation_name');
+        }
 
-            console.log(`🔍 Contexte création: started=${!!creationStarted}, name=${!!tempName}`);
+        // Vérifier si le joueur est en cours de finalisation avec nom
+        const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
+
+        console.log(`🔍 Contexte création: started=${!!creationStarted}, name=${!!tempName}`);
 
             if (creationStarted && tempName) {
                 try {
