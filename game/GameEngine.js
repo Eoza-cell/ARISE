@@ -78,11 +78,28 @@ class GameEngine {
             // Mise à jour de l'activité du joueur
             await dbManager.updatePlayerActivity(player.id);
 
-            // Traitement des commandes - gérer les cas où message est null (ex: images)
+            // Gestion des images pour la création de personnage
+            if (!message && imageMessage) {
+                const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
+                const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
+                const photoReceived = await dbManager.getTemporaryData(player.id, 'photo_received');
+
+                // Si on est en mode création par description et qu'on attend une photo
+                if (creationMode === 'description' && creationStarted && !photoReceived) {
+                    console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
+                    return await this.handlePhotoReceived({ player, imageMessage, sock, dbManager, imageGenerator });
+                } else {
+                    return {
+                        text: "🖼️ J'ai reçu votre image ! Cependant, je ne peux traiter que les commandes textuelles.\n\n" +
+                              "💬 Utilisez `/menu` pour voir les commandes disponibles."
+                    };
+                }
+            }
+
+            // Traitement des commandes - gérer les cas où message est null (ex: autres cas)
             if (!message) {
                 return {
-                    text: "🖼️ J'ai reçu votre image ! Cependant, je ne peux traiter que les commandes textuelles.\n\n" +
-                          "💬 Utilisez `/menu` pour voir les commandes disponibles."
+                    text: "💬 Utilisez `/menu` pour voir les commandes disponibles."
                 };
             }
 
