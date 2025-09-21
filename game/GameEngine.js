@@ -543,10 +543,10 @@ Règles importantes:
     async handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
         // Vérifier si une création est en cours
         const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
-        const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
+        const savedCharacterName = await dbManager.getTemporaryData(player.id, 'creation_name');
 
         // Gestion des images pour la création de personnage
-        if (imageMessage && creationStarted && tempName) {
+        if (imageMessage && creationStarted && savedCharacterName) {
             try {
                 console.log('📸 Réception d\'une image pour la création de personnage...');
                 console.log('🔄 Tentative de téléchargement de l\'image...');
@@ -605,15 +605,15 @@ Règles importantes:
 
         // Gestion du nom de personnage (si en cours de création)
         const tempKingdom = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
-        const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
+        const existingName = await dbManager.getTemporaryData(player.id, 'creation_name');
 
-        if (creationStarted && tempGender && tempKingdom && !tempName) {
+        if (creationStarted && tempGender && tempKingdom && !existingName) {
             // Le joueur est en train de donner le nom de son personnage
             return await this.handleCharacterNameInput({ player, name: message, dbManager, imageGenerator });
         }
 
         // Gestion de la finalisation de création (après nom, en attente d'image ou "SANS_PHOTO")
-        if (creationStarted && tempGender && tempKingdom && tempName) {
+        if (creationStarted && tempGender && tempKingdom && existingName) {
             if (message.toUpperCase() === 'SANS_PHOTO') {
                 return await this.finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage: false });
             }
