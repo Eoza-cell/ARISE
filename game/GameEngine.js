@@ -590,9 +590,6 @@ Règles importantes:
         
         // D'abord traiter les actions de création de personnage (avant de vérifier si personnage existe)
 
-        // Vérifier si une création est en cours
-        const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
-
         // Traitement des actions de création de personnage en cours (seulement si création initiée)
         const input = message.toUpperCase().trim();
         if (creationStarted && (input === 'HOMME' || input === 'H' || input === 'FEMME' || input === 'F' || input === '1' || input === '2')) {
