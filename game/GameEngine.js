@@ -290,8 +290,8 @@ class GameEngine {
 
             // Télécharger et sauvegarder la photo
             const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-            const imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, {
-                logger: require('pino')({ level: 'silent' })
+            const imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, { 
+                logger: require('pino')({ level: 'silent' }) 
             });
 
             if (imageBuffer && imageBuffer.length > 0) {
@@ -573,8 +573,8 @@ Règles importantes:
 
                 // Télécharger l'image
                 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-                const imageBuffer = await downloadMediaMessage(imageMessage, 'buffer', {}, {
-                    logger: require('pino')({ level: 'silent' })
+                const imageBuffer = await downloadMediaMessage(imageMessage, 'buffer', {}, { 
+                    logger: require('pino')({ level: 'silent' }) 
                 });
 
                 if (imageBuffer && imageBuffer.length > 0) {
@@ -694,140 +694,127 @@ Règles importantes:
 
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
-            console.log(`🎮 Action de jeu: ${character.name} - "${message}"`);
+            const sessionId = `player_${player.id}`; // Session unique par joueur
 
-            // Session ID unique pour la continuité narrative
-            const sessionId = `game_${player.id}`;
-
-            // Récupérer l'image personnalisée du personnage si elle existe
-            let characterImageDescription = '';
-            try {
-                const customImage = await imageGenerator.getCustomCharacterImage(character.id);
-                if (customImage) {
-                    console.log('📸 Utilisation de l\'image personnalisée pour la narration');
-                    characterImageDescription = `Le personnage ${character.name} a l'apparence physique décrite dans son image personnalisée. `;
-
-                    // Si le personnage a une description d'apparence, l'utiliser aussi
-                    if (character.appearance && character.appearance.trim().length > 0) {
-                        characterImageDescription += `Description physique détaillée: ${character.appearance}. `;
-                    }
-                }
-            } catch (imageError) {
-                console.log('⚠️ Pas d\'image personnalisée trouvée');
-            }
-
-            // Construire le contexte enrichi pour l'IA
-            const context = {
-                character: character,
-                action: message,
-                location: character.currentLocation,
-                characterImage: characterImageDescription,
-                gameState: {
-                    time: new Date().toISOString(),
-                    weather: 'Variable selon la région',
-                    playerLevel: character.level,
-                    powerLevel: character.powerLevel
-                }
-            };
-
-            // Générer la narration avec Groq (ultra-rapide) mais plus longue
-            let narration;
-            try {
-                console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
-                const prompt = this.buildGameActionPrompt(context, sessionId);
-                narration = await this.groqClient.generateNarration(prompt, 300); // Augmenté de 150 à 300 tokens
-                console.log('✅ Narration générée avec Groq');
-            } catch (groqError) {
-                console.log('⚠️ Erreur Groq, fallback vers Gemini:', groqError.message);
-                narration = await this.geminiClient.generateNarration(context, sessionId);
-            }
-
-            // ANALYSE DES ACTIONS DE COMBAT ET DES CONSÉQUENCES POTENTIELLES
-            // Ici, nous allons simuler une analyse plus poussée pour les combats difficiles et fluides.
-            // Nous allons utiliser OpenAI pour analyser l'intention du joueur et estimer les risques/récompenses.
-
-            // Analyse de l'action du joueur avec OpenAI
+            // Analyser l'action du joueur avec OpenAI
             const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
                 character: character,
                 location: character.currentLocation,
-                kingdom: character.kingdom,
-                narrationContext: narration // Utiliser la narration générée pour un contexte plus riche
+                kingdom: character.kingdom
             }, sessionId);
 
-            // CLAMPING SERVER-SIDE STRICT - Sécuriser toutes les valeurs de l'IA pour la fluidité et la difficulté
+            // Générer la narration: Ollama > Gemini > OpenAI
+            let narration;
+            try {
+                // Priorité absolue à Groq pour la vitesse et qualité
+                if (this.groqClient && this.groqClient.hasValidClient()) {
+                    console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
+                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId, character);
+                    console.log('✅ Narration générée avec Groq');
+                } else {
+                    throw new Error('Groq non disponible, essai Ollama');
+                }
+            } catch (groqError) {
+                try {
+                    if (this.ollamaClient.hasValidClient()) {
+                        narration = await this.ollamaClient.generateNarration({}, message, character);
+                        console.log('✅ Narration générée avec Ollama');
+                    } else {
+                        throw new Error('Ollama non disponible, essai Gemini');
+                    }
+                } catch (ollamaError) {
+                    try {
+                        console.log('🎭 Génération narration avec Gemini...');
+                        const context = {
+                            character: character,
+                            location: character.currentLocation,
+                            action: message,
+                            gameState: {
+                                life: character.currentLife,
+                                energy: character.currentEnergy,
+                                powerLevel: character.powerLevel,
+                                kingdom: character.kingdom
+                            }
+                        };
+                        narration = await this.geminiClient.generateNarration(context, sessionId);
+                        console.log('✅ Narration générée avec Gemini');
+                    } catch (geminiError) {
+                        console.log('⚠️ Fallback OpenAI pour narration:', geminiError.message);
+                        narration = await this.openAIClient.generateNarration({
+                            character: character,
+                            location: character.currentLocation,
+                            action: message,
+                            gameState: {
+                                life: character.currentLife,
+                                energy: character.currentEnergy,
+                                powerLevel: character.powerLevel
+                            }
+                        }, sessionId);
+                    }
+                }
+            }
+
+            // CLAMPING SERVER-SIDE STRICT - Sécuriser toutes les valeurs de l'IA
             const energyCost = Math.max(0, Math.min(character.currentEnergy, actionAnalysis.energyCost || 10));
-            const staminaRecovery = Math.max(-15, Math.min(3, actionAnalysis.staminaRecovery || 0)); // Permet aussi de réduire la stamina
+            const staminaRecovery = Math.max(-15, Math.min(3, actionAnalysis.staminaRecovery || 0));
             const equipmentStress = Math.max(-3, Math.min(0, actionAnalysis.equipmentStress || 0));
 
-            // Valider combatAdvantage dans une liste sécurisée pour éviter les injections
+            // Valider combatAdvantage dans une liste sécurisée
             const validCombatAdvantages = ['critical_hit', 'normal_hit', 'glancing_blow', 'miss', 'counter_attacked'];
             actionAnalysis.combatAdvantage = validCombatAdvantages.includes(actionAnalysis.combatAdvantage)
                 ? actionAnalysis.combatAdvantage
-                : 'miss'; // Défaut à 'miss' si la valeur n'est pas valide
+                : 'miss';
 
-            // Appliquer le système de combat Dark Souls strict pour la gestion de l'énergie et des dégâts
+            // Appliquer le système de combat Dark Souls strict
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
 
-            // Système de dégâts ÉQUILIBRÉ et difficile
+            // Système de dégâts ÉQUILIBRÉ - seulement en vrai combat
             let damageText = '';
             let shouldTakeDamage = false;
 
-            // Les dégâts ne sont appliqués que lors d'actions de combat directes ou de risques extrêmes
-            const realCombatKeywords = ['attaque', 'combat', 'frappe', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite', 'affrontement', 'duel'];
+            // Dégâts seulement pour les vrais actions de COMBAT agressif
+            const realCombatKeywords = ['attaque', 'combat', 'frappe', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite'];
             const isRealCombat = realCombatKeywords.some(keyword =>
                 message.toLowerCase().includes(keyword)
             );
 
-            // Logique de dégâts : plus complexe et moins prévisible
-            if (isRealCombat) {
-                // Récompenser la précision, pénaliser l'imprudence
-                if (actionAnalysis.combatAdvantage === 'critical_hit') {
-                    // Coup critique réussi, pas de dégâts subis par le joueur
-                } else if (actionAnalysis.combatAdvantage === 'counter_attacked') {
-                    shouldTakeDamage = true; // L'ennemi a contré, le joueur subit des dégâts
-                } else if (actionAnalysis.combatAdvantage === 'glancing_blow') {
-                    // Coup faible, peu d'impact, pas de dégâts importants
-                } else if (actionAnalysis.combatAdvantage === 'miss') {
-                    // Échec de l'attaque, possibilité de contre-attaque si l'ennemi est plus rapide
-                    if (Math.random() < 0.2) { // 20% de chance de contre-attaque sur un échec
-                        shouldTakeDamage = true;
-                    }
-                }
-            }
-            // Gestion des dégâts suite à une action imprudente (même hors combat direct)
-            if (actionAnalysis.riskLevel === 'extreme' && Math.random() < 0.4) { // Augmentation de la chance de dégâts sur risque extrême
+            // Dégâts uniquement si :
+            // 1. Action de combat réel ET contre-attaque réussie
+            // 2. OU action de combat avec haut risque (rare)
+            if (isRealCombat && actionAnalysis.combatAdvantage === 'counter_attacked') {
                 shouldTakeDamage = true;
+            } else if (isRealCombat && actionAnalysis.riskLevel === 'extreme' && Math.random() < 0.3) {
+                shouldTakeDamage = true; // 30% de chance de dégâts sur action très risquée
             }
 
-            // Pas de dégâts automatiques par épuisement - juste efficacité réduite et vulnérabilité accrue
+            // Pas de dégâts automatiques par épuisement - juste efficacité réduite
             if (character.currentEnergy <= 0) {
-                damageText = `\n⚡ **ÉPUISEMENT** - Vous êtes trop fatigué pour agir efficacement. Votre garde est ouverte.`;
-                // Augmente la probabilité de subir des dégâts si l'énergie est nulle
-                if (Math.random() < 0.5) {
-                    shouldTakeDamage = true;
-                }
+                damageText = `\n⚡ **ÉPUISEMENT** - Vous êtes trop fatigué pour être efficace`;
             }
 
-            // Application des dégâts si nécessaire
             if (shouldTakeDamage && actionAnalysis.potentialDamage > 0) {
-                // Dégâts plus réalistes et potentiellement plus élevés
-                const baseDamage = Math.max(1, Math.min(12, actionAnalysis.potentialDamage || 3)); // Augmentation du potentiel de dégâts max
+                // Dégâts réduits et plus équilibrés
+                const baseDamage = Math.max(1, Math.min(8, actionAnalysis.potentialDamage || 3));
                 const damage = Math.min(baseDamage, character.currentLife);
                 character.currentLife = Math.max(0, character.currentLife - damage);
-                damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV (action risquée / parade manquée)`;
+                damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV (combat risqué)`;
 
-                console.log(`⚔️ Dégâts appliqués: ${damage} PV (action: ${message}, situation: ${actionAnalysis.combatAdvantage}, risque: ${actionAnalysis.riskLevel})`);
+                console.log(`⚔️ Dégâts appliqués: ${damage} PV (action: ${message}, situation: ${actionAnalysis.combatAdvantage})`);
             }
 
-            // Récupération de stamina (gérée par staminaRecovery clampé)
+            // Récupération de stamina (utiliser la valeur clampée)
             if (staminaRecovery !== 0) {
-                character.currentEnergy = Math.min(character.maxEnergy, Math.max(0, character.currentEnergy + staminaRecovery));
+                if (staminaRecovery > 0) {
+                    character.currentEnergy = Math.min(character.maxEnergy, character.currentEnergy + staminaRecovery);
+                } else {
+                    character.currentEnergy = Math.max(0, character.currentEnergy + staminaRecovery); // Soustraction supplémentaire
+                }
             }
 
-            // Usure d'équipement (gérée par equipmentStress clampé)
+            // Usure d'équipement (utiliser la valeur clampée)
             let equipmentWarning = '';
             if (equipmentStress < 0) {
-                equipmentWarning = `\n⚔️ **USURE ÉQUIPEMENT :** Votre équipement montre des signes de fatigue (${Math.abs(equipmentStress)} points d'usure).`;
+                equipmentWarning = `\n⚔️ **USURE ÉQUIPEMENT :** Votre équipement s'abîme (${Math.abs(equipmentStress)})`;
             }
 
             // Vérifier si le personnage est mort (gestion Dark Souls)
@@ -838,21 +825,21 @@ Règles importantes:
 
                 // Calculer les pertes AVANT modification
                 const coinsBefore = character.coins;
-                const coinsLost = Math.floor(coinsBefore * 0.15); // Augmentation de la perte de pièces à 15%
+                const coinsLost = Math.floor(coinsBefore * 0.1);
 
-                // Appliquer les pénalités de mort plus strictes
-                character.currentLife = Math.ceil(character.maxLife * 0.25); // Respawn avec 25% de vie
-                character.currentEnergy = Math.floor(character.maxEnergy * 0.4); // 40% d'énergie au respawn
-                character.coins = Math.max(0, coinsBefore - coinsLost); // Réduction correcte des pièces
-                character.currentLocation = 'Lieu de Respawn - Sanctuaire des Âmes Perdues'; // Nouveau lieu de respawn
+                // Appliquer les pénalités de mort
+                character.currentLife = Math.ceil(character.maxLife * 0.3); // Respawn avec 30% de vie
+                character.currentEnergy = Math.floor(character.maxEnergy * 0.5); // 50% d'énergie
+                character.coins = Math.max(0, coinsBefore - coinsLost); // Réduction correcte
+                character.currentLocation = 'Lieu de Respawn - Sanctuaire des Âmes Perdues';
 
-                deathText = `\n💀 **MORT** - Votre voyage a pris fin dans cet endroit sinistre...\n` +
-                           `🕊️ **RESPAWN** - Votre esprit fragmenté trouve refuge au Sanctuaire des Âmes Perdues.\n` +
-                           `💰 **PERTE DE MÉMOIRE :** ${coinsLost} pièces d'or perdues dans le néant.\n` +
-                           `❤️ **RENNAISSANCE :** Vous renaissez avec ${character.currentLife} PV et une nouvelle détermination.`;
+                deathText = `\n💀 **MORT** - Vous avez succombé à vos blessures...\n` +
+                           `🕊️ **RESPAWN** - Votre âme trouve refuge au Sanctuaire\n` +
+                           `💰 **PERTE** - ${coinsLost} pièces perdues dans la mort\n` +
+                           `❤️ **RÉSURRECTION** - Vous renaissez avec ${character.currentLife} PV`;
             }
 
-            // Sauvegarder les changements de l'état du personnage
+            // Sauvegarder les changements (avec position de respawn si mort)
             await dbManager.updateCharacter(character.id, {
                 currentEnergy: character.currentEnergy,
                 currentLife: character.currentLife,
@@ -860,7 +847,6 @@ Règles importantes:
                 currentLocation: character.currentLocation
             });
 
-            // Préparation des indicateurs visuels pour le retour du joueur
             const riskEmoji = {
                 'low': '🟢',
                 'medium': '🟡',
@@ -868,11 +854,11 @@ Règles importantes:
                 'extreme': '🔴'
             }[actionAnalysis.riskLevel] || '⚪';
 
-            // Générer les barres de vie et d'énergie comme dans Dark Souls pour une meilleure lisibilité
+            // Générer les barres de vie et d'énergie comme dans Dark Souls
             const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
             const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
 
-            // Indicateur d'avantage de combat pour un retour visuel clair
+            // Indicateur d'avantage de combat
             const combatEmoji = {
                 'critical_hit': '🎯',
                 'normal_hit': '⚔️',
@@ -881,82 +867,90 @@ Règles importantes:
                 'counter_attacked': '💀'
             }[actionAnalysis.combatAdvantage] || '⚪';
 
-            // Messages d'alerte pour détection et conséquences spécifiques
+            // Messages d'alerte pour détection et conséquences
             let detectionWarning = '';
             if (actionAnalysis.detectionRisk) {
-                detectionWarning = `\n👁️ **DÉTECTION** - Vos mouvements ont attiré l'attention ! Vos actions futures pourraient être observées.`;
+                detectionWarning = `\n👁️ **DÉTECTION** - Vos mouvements ont pu être repérés !`;
             }
 
             let consequencesText = '';
             if (actionAnalysis.consequences && actionAnalysis.consequences.length > 0) {
                 const mainConsequence = actionAnalysis.consequences[0];
-                if (mainConsequence && !mainConsequence.includes('Erreur')) { // Ignorer les erreurs de l'IA ici
-                    consequencesText = `\n⚠️ **CONSÉQUENCES IMMÉDIATES :** ${mainConsequence}`;
+                if (mainConsequence && !mainConsequence.includes('Erreur')) {
+                    consequencesText = `\n⚠️ **CONSÉQUENCES :** ${mainConsequence}`;
                 }
             }
 
-            // Indicateur de précision de l'action du joueur
+            // Feedback complet des métriques Dark Souls
             const precisionEmoji = {
                 'high': '🎯',
                 'medium': '⚪',
                 'low': '❌'
             }[actionAnalysis.precision] || '❓';
 
-            // Affichage du feedback sur la gestion de la stamina
             const staminaText = staminaRecovery !== 0
-                ? `\n⚡ **GESTION ENDURANCE :** ${staminaRecovery > 0 ? '+' : ''}${staminaRecovery} point(s) d'énergie`
+                ? `\n⚡ **RÉCUP. ENDURANCE :** ${staminaRecovery > 0 ? '+' : ''}${staminaRecovery}`
                 : '';
 
-            // Feedback complet avec toutes les métriques Dark Souls pour une immersion maximale
+            // Préparer la réponse avec toutes les métriques Dark Souls
             const responseText = `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
                                `📖 **Narration :** ${narration}\n\n` +
                                `❤️ **Vie :** ${lifeBar}${damageText}${deathText}\n` +
-                               `⚡ **Énergie :** ${energyBar} (-${energyCost} utilisé)${staminaText}\n` +
+                               `⚡ **Énergie :** ${energyBar} (-${energyCost})${staminaText}\n` +
                                `💰 **Argent :** ${character.coins} pièces d'or\n\n` +
-                               `${precisionEmoji} **Précision de l'action :** ${actionAnalysis.precision.toUpperCase()}\n` +
-                               `${riskEmoji} **Niveau de risque global :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
-                               `🎯 **Type d'action IA :** ${actionAnalysis.actionType}\n` +
-                               `${combatEmoji} **Résultat du combat :** ${actionAnalysis.combatAdvantage?.replace('_', ' ') || 'N/A'}` +
+                               `${precisionEmoji} **Précision :** ${actionAnalysis.precision.toUpperCase()}\n` +
+                               `${riskEmoji} **Niveau de risque :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
+                               `🎯 **Type d'action :** ${actionAnalysis.actionType}\n` +
+                               `${combatEmoji} **Résultat combat :** ${actionAnalysis.combatAdvantage?.replace('_', ' ') || 'N/A'}` +
                                `${equipmentWarning}${detectionWarning}${consequencesText}\n\n` +
-                               `💭 ${isAlive ? '*Que décidez-vous de faire ensuite dans ce monde hostile ?*' : '*Vous vous relevez, marqué par l\'épreuve. Que faites-vous ?*'}`;
+                               `💭 ${isAlive ? '*Que fais-tu ensuite ?*' : '*Vous renaissez au Sanctuaire... Que faites-vous ?*'}`;
 
-            // Essayer de générer l'image et l'audio pour enrichir l'expérience, mais sans bloquer la réponse principale
+            // Essayer de générer l'image, l'audio et la vidéo, mais ne pas bloquer l'envoi si ça échoue
             let actionImage = null;
             let actionAudio = null;
-            // let actionVideo = null; // La génération vidéo est mise en pause pour l'instant
+            let actionVideo = null;
             try {
-                // Générer une image représentant l'action avec potentiellement le personnage
+                // Générer image avec audio (style Skyrim)
                 const mediaResult = await imageGenerator.generateCharacterActionImageWithVoice(character, message, narration);
                 actionImage = mediaResult.image;
                 actionAudio = mediaResult.audio;
 
-                // La génération vidéo est complexe et peut ralentir, on la laisse désactivée pour l'instant
-                // const actionImageGenerator = require('../utils/ImageGenerator');
-                // const imagePath = path.join(__dirname, '..', 'temp', `action_temp_${Date.now()}.png`);
-                // if (actionImage && imagePath) {
-                //     const fs = require('fs').promises;
-                //     await fs.writeFile(imagePath, actionImage);
-                // }
-                // actionVideo = await imageGenerator.generateActionVideo(character, message, narration, imagePath);
-                // if (imagePath) {
-                //     const fs = require('fs').promises;
-                //     await fs.unlink(imagePath);
-                // }
+                // Générer une vidéo pour cette action
+                const actionImageGenerator = require('../utils/ImageGenerator'); // Assurez-vous que le chemin est correct
+                const imagePath = path.join(__dirname, '..', 'temp', `action_temp_${Date.now()}.png`);
+
+                if (actionImage && imagePath) {
+                    // Sauvegarder l'image temporairement pour la vidéo
+                    const fs = require('fs').promises;
+                    await fs.writeFile(imagePath, actionImage);
+                }
+
+                actionVideo = await imageGenerator.generateActionVideo(character, message, narration, imagePath);
+
+                // Nettoyer l'image temporaire
+                if (imagePath) {
+                    try {
+                        const fs = require('fs').promises;
+                        await fs.unlink(imagePath);
+                    } catch (err) {
+                        console.log('⚠️ Impossible de supprimer le fichier temporaire:', err.message);
+                    }
+                }
             } catch (mediaError) {
-                console.error('❌ Erreur génération média pour l\'action:', mediaError.message);
+                console.error('❌ Erreur génération média:', mediaError.message);
             }
 
             return {
                 text: responseText,
                 image: actionImage,
                 audio: actionAudio,
-                // video: actionVideo // Inclure la vidéo si elle est générée
+                video: actionVideo
             };
 
         } catch (error) {
-            console.error('❌ Erreur fatale lors du traitement IA de l\'action de jeu:', error);
+            console.error('❌ Erreur lors du traitement IA:', error);
 
-            // En cas d'erreur majeure, appliquer une pénalité minimale pour la survie du joueur
+            // Appliquer au moins une réduction d'énergie de base
             const energyCost = 10;
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
 
@@ -971,10 +965,10 @@ Règles importantes:
                 text: `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
                       `📖 **Action :** "${message}"\n\n` +
                       `❤️ **Vie :** ${lifeBar}\n` +
-                      `⚡ **Énergie :** ${energyBar} (-${energyCost} utilisé)\n` +
+                      `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
                       `💰 **Argent :** ${character.coins} pièces d'or\n\n` +
-                      `⚠️ **ERREUR SYSTÈME** - Le monde de Friction est instable. Votre action n'a pas pu être entièrement interprétée.\n\n` +
-                      `💭 *Le danger rôde toujours. Soyez prudent.*`
+                      `⚠️ Le narrateur analyse ton action... Les systèmes IA sont temporairement instables.\n\n` +
+                      `💭 *Continue ton aventure...*`
             };
         }
     }
@@ -1094,7 +1088,7 @@ Règles importantes:
             const buttonManager = sock.buttonManager;
 
             // Envoyer un message d'introduction
-            await sock.sendMessage(chatId, {
+            await sock.sendMessage(chatId, { 
                 text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
                       `🎮 Voici comment fonctionne le système de boutons simulés avec des sondages WhatsApp !\n\n` +
                       `✨ Chaque "bouton" est en fait un sondage avec une seule option\n` +
@@ -1758,38 +1752,6 @@ Règles importantes:
             console.error('❌ Erreur génération réponse PNJ:', error);
             return "Le PNJ semble perplexe et ne sait pas quoi répondre.";
         }
-    }
-
-    buildGameActionPrompt(context, sessionId) {
-        const { character, action, location, characterImage, gameState } = context;
-
-        return `CONTEXTE DU JEU - FRICTION ULTIMATE:
-
-Personnage: ${character.name} (${character.gender === 'male' ? 'Homme' : 'Femme'})
-${characterImage}Royaume: ${character.kingdom}
-Ordre: ${character.order || 'Aucun'}
-Niveau: ${character.level} (Puissance ${character.powerLevel})
-Localisation actuelle: ${character.currentLocation}
-Vie: ${character.currentLife}/${character.maxLife}
-Énergie: ${character.currentEnergy}/${character.maxEnergy}
-Temps: ${gameState.time}
-Météo: ${gameState.weather}
-Niveau du joueur: ${gameState.playerLevel}
-
-Action du joueur: "${action}"
-
-Tu dois générer une narration HARDCORE et immersive en français qui décrit les conséquences de cette action dans ce monde impitoyable. La narration doit être:
-- Réaliste et dangereuse (comme Dark Souls)
-- Immersive avec des détails sensoriels précis
-- Cohérente avec le lore du royaume ${character.kingdom}
-- **UTILISE l'apparence physique du personnage dans la description.** Si une image personnalisée est fournie, intègre ses détails.
-- **Entre 5-7 phrases pour une narration plus riche et détaillée.**
-- Style narratif à la 2ème personne ("Tu...")
-- Inclut des conséquences physiques et émotionnelles claires pour le personnage.
-- Décrit l'environnement immédiat, les réactions des PNJ/créatures présentes, et l'impact de l'action sur le joueur.
-- **MAINTIENS une difficulté ÉLEVÉE et une ambiance sombre.**
-
-Génère la narration détaillée:`;
     }
 }
 

@@ -144,49 +144,33 @@ class GroqClient {
         }
     }
 
-    async generateCombatNarration(combatData, maxTokens = 200) {
+    async generateCombatNarration(combatData, maxTokens = 100) {
         // Logique pour la continuité des actions et la gestion des PV en combat
-        let actionDescription = `Le combat intense entre ${combatData.attacker} et ${combatData.defender} se poursuit.`;
+        let actionDescription = `Le combat entre ${combatData.attacker} et ${combatData.defender} continue.`;
         if (combatData.action) {
-            actionDescription = `Action de combat de ${combatData.attacker} : ${combatData.action}.`;
+            actionDescription = `Action de ${combatData.attacker} : ${combatData.action}.`;
         }
 
         let damageInfo = '';
         if (combatData.damage !== undefined && combatData.damage !== null) {
-            damageInfo = `Dégâts infligés : ${combatData.damage} points.`;
+            damageInfo = `Dégâts infligés : ${combatData.damage}.`;
             // Vérifier si la mort survient sans combat explicite
             if (combatData.attacker === combatData.defender && combatData.damage > 0 && combatData.result === 'mort' && !combatData.action) {
-                 actionDescription += " Une force inexpliquée semble drainer la vie du combattant.";
+                 actionDescription += " La mort semble survenir de manière inexpliquée sans action directe.";
             } else if (combatData.result === 'mort') {
-                actionDescription += ` ${combatData.defender} succombe à ses blessures.`;
+                actionDescription += ` ${combatData.defender} est vaincu.`;
             }
         }
 
-        // Inclure l'apparence du personnage si disponible
-        let characterDescription = '';
-        if (combatData.characterImage) {
-            characterDescription = `Apparence du combattant: ${combatData.characterImage}`;
-        }
-
-        const prompt = `Décris cette séquence de combat RPG HARDCORE dans un monde médiéval-steampunk impitoyable :
-        
-        ${characterDescription}
+        const prompt = `Décris cette action de combat RPG dans un monde médiéval-steampunk :
         Attaquant: ${combatData.attacker} (Niveau ${combatData.attackerLevel})
         Défenseur: ${combatData.defender} (Niveau ${combatData.defenderLevel})
         ${actionDescription}
         ${damageInfo}
-        Résultat: ${combatData.result || 'Combat en cours'}
+        Résultat général: ${combatData.result || 'Aucun résultat spécifié'}
 
-        EXIGENCES NARRATIVES:
-        - Combat FLUIDE et RÉALISTE comme Dark Souls
-        - Décris les mouvements, feintes, parades en détail
-        - Utilise l'apparence physique du combattant
-        - Ambiance steampunk avec engrenages, vapeur, métal
-        - Conséquences physiques précises (sang, fatigue, douleur)
-        - 4-6 phrases pour une narration immersive
-        - Style cinématographique et brutal
-
-        Génère la narration de combat détaillée:`;
+        Contexte: Combat rapide dans un monde médiéval-steampunk.
+        Style: Court et direct, 2 phrases maximum.`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);
