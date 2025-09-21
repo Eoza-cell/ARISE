@@ -170,18 +170,32 @@ class PollinationsClient {
         // Construire le prompt en PRIORISANT la photo du joueur ET sa description
         let prompt = '';
         
+        // Vérifier s'il y a une image de référence sauvegardée
+        const hasCustomImage = character.customImagePath || character.playerImageBuffer;
+        
         if (character.appearance && character.appearance.trim().length > 0) {
             // PRIORITÉ MAXIMALE : Combiner les traits du visage du joueur avec sa description
-            console.log(`🎯 CRÉATION AVEC PHOTO + DESCRIPTION: "${character.appearance}"`);
-            prompt = `MUST SHOW EXACTLY: ${genderDesc} person with the facial features from the provided reference photo, embodying this character: ${character.appearance}. This character is performing: ${action}. ${narration}`;
+            console.log(`🎯 CRÉATION AVEC DESCRIPTION: "${character.appearance}"`);
+            
+            if (hasCustomImage) {
+                console.log('📸 + Photo de référence disponible');
+                prompt = `MUST SHOW EXACTLY: ${genderDesc} person matching the exact facial features and appearance described as: ${character.appearance}. This character is performing: ${action}. ${narration}`;
+            } else {
+                prompt = `MUST SHOW EXACTLY: ${genderDesc} character with this exact appearance: ${character.appearance}. This character is performing: ${action}. ${narration}`;
+            }
         } else {
             // Fallback si pas de description mais potentiellement une photo
-            prompt = `MUST SHOW EXACTLY: ${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom with realistic facial features, performing: ${action}. ${narration}`;
+            if (hasCustomImage) {
+                console.log('📸 Photo de référence sans description');
+                prompt = `MUST SHOW EXACTLY: ${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom with realistic human facial features based on reference photo, performing: ${action}. ${narration}`;
+            } else {
+                prompt = `MUST SHOW EXACTLY: ${character.name}, ${genderDesc} warrior from ${character.kingdom} kingdom, performing: ${action}. ${narration}`;
+            }
         }
         
-        prompt += ', epic fantasy scene, first person POV perspective, photorealistic facial features, detailed character design based on real person appearance';
+        prompt += ', epic fantasy scene, first person POV perspective, photorealistic character, detailed fantasy RPG style, cinematic quality';
         
-        console.log(`🎨 PROMPT FINAL AVEC PHOTO + APPARENCE: "${prompt}"`);
+        console.log(`🎨 PROMPT FINAL POLLINATIONS: "${prompt}"`);
 
         return await this.generateImage(prompt, outputPath, {
             style: options.style || '3d',

@@ -154,11 +154,27 @@ class ImageGenerator {
         }
     }
 
-    async saveCustomCharacterImage(characterId, imageBuffer) {
+    async saveCustomCharacterImage(characterId, imageBuffer, metadata = {}) {
         try {
-            const imagePath = path.join(this.assetsPath, 'custom_images', `character_${characterId}.png`);
+            // Créer le dossier si nécessaire
+            const customImagesDir = path.join(this.assetsPath, 'custom_images');
+            await fs.mkdir(customImagesDir, { recursive: true });
+            
+            const imagePath = path.join(customImagesDir, `character_${characterId}.png`);
             await fs.writeFile(imagePath, imageBuffer);
-            console.log(`✅ Image personnalisée sauvegardée: ${imagePath}`);
+            
+            // Sauvegarder aussi les métadonnées si fournies
+            if (metadata && Object.keys(metadata).length > 0) {
+                const metadataPath = path.join(customImagesDir, `character_${characterId}_metadata.json`);
+                await fs.writeFile(metadataPath, JSON.stringify({
+                    ...metadata,
+                    savedAt: new Date().toISOString(),
+                    imageSize: imageBuffer.length
+                }, null, 2));
+                console.log(`✅ Métadonnées image sauvegardées: ${metadataPath}`);
+            }
+            
+            console.log(`✅ Image personnalisée sauvegardée: ${imagePath} (${imageBuffer.length} bytes)`);
             return imagePath;
         } catch (error) {
             console.error('❌ Erreur sauvegarde image personnalisée:', error);

@@ -542,10 +542,41 @@ Règles importantes:
 
     async handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
         // Gestion des images pour la création de personnage
-        if (imageMessage) {
+        if (imageMessage && imageMessage.buffer) {
             console.log('📸 Image reçue - vérification du contexte de création...');
             const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
-            const tempName = await dbManager.getTemporaryData(player.id, 'creation_name');
+            const tempName = await dbManager.getTemporaryData(player.id, 'temp_character_name');
+            
+            if (creationStarted === 'true' && tempName) {
+                console.log(`🎨 Photo reçue pour personnage: ${tempName}`);
+                
+                try {
+                    // Sauvegarder l'image du joueur
+                    const imagePath = await imageGenerator.saveCustomCharacterImage(player.id, imageMessage.buffer);
+                    console.log(`✅ Photo du joueur sauvegardée: ${imagePath}`);
+                    
+                    // Marquer que l'image a été reçue
+                    await dbManager.setTemporaryData(player.id, 'player_photo_received', 'true');
+                    
+                    return {
+                        text: `📸 **PHOTO REÇUE !**\n\n` +
+                              `✨ Votre photo a été enregistrée avec succès !\n` +
+                              `🎨 Elle sera utilisée comme référence pour créer votre personnage avec Pollinations.\n\n` +
+                              `📝 Maintenant, décrivez votre personnage (apparence, style, traits particuliers):\n` +
+                              `*Exemple: "Grand guerrier aux yeux bleus, cheveux bruns, cicatrice sur la joue droite, armure de chevalier"*`
+                    };
+                } catch (error) {
+                    console.error('❌ Erreur sauvegarde photo:', error);
+                    return {
+                        text: '❌ Erreur lors de la sauvegarde de votre photo. Réessayez.'
+                    };
+                }
+            } else {
+                return {
+                    text: '⚠️ Aucune création de personnage en cours. Tapez "/créer" d\'abord.'
+                };
+            }
+        }d, 'creation_name');
 
             console.log(`🔍 Contexte création: started=${!!creationStarted}, name=${!!tempName}`);
 

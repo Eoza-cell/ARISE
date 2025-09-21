@@ -137,7 +137,7 @@ class FrictionUltimateBot {
         try {
             const from = message.key.remoteJid;
             const messageText = this.extractMessageText(message);
-            const messageImage = this.extractMessageImage(message);
+            const messageImage = await this.extractMessageImage(message);
             const messageId = message.key.id;
 
             // Si pas de texte ni d'image, ignorer
@@ -233,16 +233,40 @@ class FrictionUltimateBot {
         return null;
     }
 
-    extractMessageImage(message) {
-        if (message.message?.imageMessage) {
-            console.log('📸 Image détectée dans le message');
-            return message.message.imageMessage;
+    async extractMessageImage(message) {
+        try {
+            let imageMessage = null;
+            
+            if (message.message?.imageMessage) {
+                console.log('📸 Image détectée dans le message');
+                imageMessage = message.message.imageMessage;
+            } else if (message.message?.viewOnceMessage?.message?.imageMessage) {
+                console.log('📸 Image view-once détectée');
+                imageMessage = message.message.viewOnceMessage.message.imageMessage;
+            }
+            
+            if (imageMessage) {
+                // Télécharger l'image
+                console.log('📥 Téléchargement de l\'image...');
+                const buffer = await this.sock.downloadMediaMessage(message);
+                
+                if (buffer) {
+                    console.log(`✅ Image téléchargée: ${buffer.length} bytes`);
+                    return {
+                        buffer: buffer,
+                        mimetype: imageMessage.mimetype || 'image/jpeg',
+                        caption: imageMessage.caption || '',
+                        width: imageMessage.width || 0,
+                        height: imageMessage.height || 0
+                    };
+                }
+            }
+            
+            return null;
+        } catch (error) {
+            console.error('❌ Erreur téléchargement image:', error);
+            return null;
         }
-        if (message.message?.viewOnceMessage?.message?.imageMessage) {
-            console.log('📸 Image view-once détectée');
-            return message.message.viewOnceMessage.message.imageMessage;
-        }
-        return null;
     }
 
     async sendResponse(chatId, response) {
