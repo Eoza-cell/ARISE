@@ -850,6 +850,9 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
                 // Générer la vidéo d'action avec HuggingFace en priorité
                 actionVideo = await imageGenerator.generateActionVideo(character, message, narration);
+                if (actionVideo) {
+                    console.log('✅ Vidéo d\'action prête pour envoi:', actionVideo);
+                }
 
             } catch (mediaError) {
                 console.error('❌ Erreur génération média:', mediaError.message);

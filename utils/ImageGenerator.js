@@ -849,7 +849,7 @@ class ImageGenerator {
                     
                     if (result && result.success) {
                         console.log('✅ Vidéo d\'action générée par HuggingFace GRATUIT');
-                        return await fs.readFile(result.videoPath).catch(() => null);
+                        return result.videoPath; // Retourner le chemin au lieu du buffer
                     }
                 } catch (hfError) {
                     console.log('⚠️ Erreur HuggingFace vidéo action, fallback vers RunwayML:', hfError.message);
@@ -862,7 +862,7 @@ class ImageGenerator {
                     console.log('🎬 Génération vidéo d\'action avec RunwayML...');
                     const videoPrompt = `${character.name} performing: ${action}. Medieval fantasy setting, cinematic movement, epic fantasy atmosphere`;
                     const videoPath = await this.runwayClient.generateVideo(videoPrompt, imagePath);
-                    return await fs.readFile(videoPath).catch(() => null);
+                    return videoPath; // Retourner le chemin directement
                 } catch (runwayError) {
                     console.log('⚠️ Erreur RunwayML vidéo action:', runwayError.message);
                 }

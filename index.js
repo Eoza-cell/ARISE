@@ -330,21 +330,42 @@ class FrictionUltimateBot {
                 setTimeout(async () => {
                     try {
                         const fs = require('fs');
-                        const videoBuffer = await fs.promises.readFile(response.video);
+                        console.log('🎬 Envoi vidéo - Type:', typeof response.video);
+                        console.log('🎬 Envoi vidéo - Valeur:', response.video);
+                        
+                        let videoBuffer;
+                        
+                        if (typeof response.video === 'string') {
+                            // C'est un chemin de fichier
+                            await fs.promises.access(response.video);
+                            videoBuffer = await fs.promises.readFile(response.video);
+                            console.log(`✅ Vidéo lue depuis: ${response.video} (${videoBuffer.length} bytes)`);
+                        } else if (Buffer.isBuffer(response.video)) {
+                            // C'est déjà un buffer
+                            videoBuffer = response.video;
+                            console.log(`✅ Vidéo buffer directe (${videoBuffer.length} bytes)`);
+                        } else {
+                            throw new Error('Format de vidéo non supporté');
+                        }
+
                         await this.sock.sendMessage(chatId, {
                             video: videoBuffer,
                             caption: '🎬 Vidéo de l\'action',
                             gifPlayback: false
                         });
-                        console.log(`✅ Vidéo envoyée: ${response.video}`);
+                        console.log(`✅ Vidéo envoyée avec succès (${videoBuffer.length} bytes)`);
 
-                        setTimeout(() => {
-                            fs.unlink(response.video, () => {});
-                        }, 5000);
+                        // Nettoyer le fichier temporaire si c'est un chemin
+                        if (typeof response.video === 'string') {
+                            setTimeout(() => {
+                                fs.unlink(response.video, () => {});
+                            }, 5000);
+                        }
                     } catch (videoError) {
-                        console.log('⚠️ Erreur vidéo:', videoError.message);
+                        console.error('❌ Erreur vidéo détaillée:', videoError.message);
+                        console.error('❌ Stack vidéo:', videoError.stack);
                     }
-                }, 2000);
+                }, 1000); // Réduire le délai à 1 seconde
             }
 
         } catch (error) {
