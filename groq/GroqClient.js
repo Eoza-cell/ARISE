@@ -76,70 +76,23 @@ class GroqClient {
         return this.isAvailable && this.client;
     }
 
-    async generateNarration(prompt, maxTokens = 120) {
-        if (!this.hasValidClient()) {
-            throw new Error('Client Groq non disponible');
-        }
-
+    async generateNarration(prompt, maxTokens = 600) {
         try {
+            if (!this.hasValidClient()) {
+                throw new Error('Client Groq non disponible');
+            }
+
             const response = await this.client.chat.completions.create({
-                messages: [
-                    {
-                        role: 'system',
-                        content: `Tu es un narrateur RPG HARDCORE et impitoyable comme Dark Souls.
-                        
-                        RÈGLES DE DIFFICULTÉ ABSOLUES:
-                        - Chaque action a des CONSÉQUENCES RÉELLES et dangereuses
-                        - Les ennemis sont INTELLIGENTS et adaptent leurs stratégies
-                        - L'environnement est HOSTILE : pièges, embuscades, dangers naturels
-                        - Les ressources sont RARES : nourriture, eau, équipement se dégradent
-                        - Les erreurs sont PUNIES : mauvaises décisions = blessures/mort
-                        - Pas de "chance du débutant" : le monde ne fait pas de cadeaux
-                        
-                        STYLE NARRATIF IMMERSIF:
-                        1. Action du joueur → Réaction HOSTILE du monde
-                        2. Dangers immédiats et conséquences graves
-                        3. Ambiance oppressante et menaçante
-                        4. PNJ méfiants, animaux agressifs, nature impitoyable
-                        5. Chaque pas peut être le dernier
-                        
-                        Génère 3-4 phrases INTENSES en français.
-                        Le monde de Friction Ultimate ne pardonne JAMAIS.`
-                    },
-                    {
-                        role: 'user',
-                        content: prompt
-                    }
-                ],
+                messages: [{ role: 'user', content: prompt }],
                 model: this.model,
                 max_tokens: maxTokens,
-                temperature: 1.7,
-                top_p: 0.9,
-                frequency_penalty: 0.3,
-                presence_penalty: 0.4
+                temperature: 0.8
             });
 
-            let narration = response.choices[0]?.message?.content?.trim();
-            if (!narration) {
-                throw new Error('Réponse vide de Groq');
-            }
+            return response.choices[0]?.message?.content?.trim() || '';
 
-            // Limiter à 500 caractères sans couper les phrases
-            if (narration.length > 1000) {
-                // Trouver la dernière phrase complète avant 500 caractères
-                const lastSentenceEnd = narration.substring(0, 500).lastIndexOf('.');
-                if (lastSentenceEnd > 600) { // Au moins 300 caractères pour avoir du contenu
-                    narration = narration.substring(0, lastSentenceEnd + 1);
-                } else {
-                    // Si pas de point, couper à 497 et ajouter des points
-                    narration = narration.substring(0, 497) + '...';
-                }
-            }
-
-            console.log(`✅ Narration générée (${narration.length}/500 caractères)`);
-            return narration;
         } catch (error) {
-            console.error('❌ Erreur génération narration Groq:', error.message);
+            console.error('❌ Erreur Groq narration:', error.message);
             throw error;
         }
     }
@@ -182,50 +135,49 @@ class GroqClient {
         }
     }
 
-    async generateExplorationNarration(location, action, sessionId = "default", character = null, maxTokens = 250) {
-        const locationContinuity = this.getLocationContinuity(sessionId, location);
-
-        const prompt = `NARRATION HARDCORE - Mode Survie Extrême:
-        Personnage: ${character ? character.name : 'Le héros'} (Niveau ${character ? character.powerLevel : 'G'})
-        Lieu DANGEREUX: ${location}
-        Action risquée: ${action}
-
-        ${locationContinuity}
-
-        SYSTÈME DE SURVIE IMPITOYABLE:
-        🎯 DANGERS IMMÉDIATS à intégrer:
-        - Prédateurs/Ennemis cachés qui observent
-        - Pièges naturels/artificiels dans l'environnement
-        - Conditions météo hostiles (froid/chaleur/tempête)
-        - Équipement qui se dégrade/casse
-        - Fatigue/faim/soif qui s'accumulent
-        - Terrain instable/effondrement/glissade
-        
-        🔥 CONSÉQUENCES RÉELLES:
-        - Chaque mouvement révèle la position aux ennemis
-        - Les bruits attirent des créatures dangereuses
-        - L'environnement réagit agressivement
-        - Les PNJ sont méfiants/hostiles par défaut
-        - Ressources limitées s'épuisent rapidement
-        
-        NARRATION INTENSE (3-4 phrases):
-        1. Action + Danger immédiat révélé
-        2. Réaction hostile de l'environnement/créatures
-        3. Menace grandissante + conséquences visibles
-        4. Nouvelle complication/choix difficile imposé
-        
-        Le monde de Friction Ultimate veut la MORT du héros !`;
-
+    async generateExplorationNarration(location, action, sessionId, character) {
         try {
-            const narration = await this.generateNarration(prompt, maxTokens);
+            if (!this.hasValidClient()) {
+                throw new Error('Client Groq non disponible');
+            }
 
-            // Ajouter à la mémoire
-            this.addToMemory(sessionId, "user", `Action: ${action}`, location);
-            this.addToMemory(sessionId, "assistant", narration, location);
+            console.log(`🗺️ Génération narration exploration avec Groq pour: ${action}`);
 
+            const prompt = `Tu es un narrateur immersif pour un RPG médiéval-technologique. 
+
+CONTEXTE:
+- Personnage: ${character.name} (Niveau ${character.powerLevel})
+- Lieu: ${location}
+- Action: "${action}"
+- Royaume: ${character.kingdom}
+
+Génère une narration immersive et captivante en français qui:
+1. Décrit l'environnement avec des détails sensoriels
+2. Raconte les conséquences de l'action du joueur
+3. Crée du suspense pour la suite
+4. Reste cohérent avec l'univers fantasy steampunk
+
+Développe bien le récit pour une expérience immersive complète. Sois créatif et détaillé.`;
+
+            const response = await this.client.chat.completions.create({
+                messages: [{ role: 'user', content: prompt }],
+                model: this.model,
+                max_tokens: 800, // Augmenté pour narration complète
+                temperature: 0.8
+            });
+
+            let narration = response.choices[0]?.message?.content?.trim();
+
+            if (!narration) {
+                throw new Error('Réponse Groq vide');
+            }
+
+            // Supprimer la limitation - laisser la narration complète
+            console.log(`✅ Narration complète générée (${narration.length} caractères)`);
             return narration;
+
         } catch (error) {
-            console.error('❌ Erreur génération exploration Groq:', error.message);
+            console.error('❌ Erreur Groq narration exploration:', error.message);
             throw error;
         }
     }

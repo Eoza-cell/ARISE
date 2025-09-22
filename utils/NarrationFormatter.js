@@ -27,7 +27,7 @@ class NarrationFormatter {
 
     formatNarration(text, style = 'simple') {
         const border = this.borders[style] || this.borders.simple;
-        const maxWidth = 31; // Largeur des bordures
+        const maxWidth = 50; // Largeur augmentée pour plus de texte
         
         // Diviser le texte en lignes
         const words = text.split(' ');
@@ -48,7 +48,7 @@ class NarrationFormatter {
         let formatted = border.top + '\n';
         
         for (const line of lines) {
-            const padding = ' '.repeat(maxWidth - 2 - line.length);
+            const padding = ' '.repeat(Math.max(0, maxWidth - 2 - line.length));
             formatted += border.middle + ' ' + line + padding + border.middle + '\n';
         }
         

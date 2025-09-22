@@ -1089,6 +1089,14 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         return inventory.map(item => `• ${item.itemId} (x${item.quantity})`).join('\n');
     }
 
+    formatTechniques(techniques) {
+        if (!techniques || techniques.length === 0) {
+            return '• Aucune technique apprise';
+        }
+
+        return techniques.map(technique => `• ${technique}`).join('\n');
+    }
+
     async handleMapCommand({ imageGenerator }) {
         return {
             text: `🗺️ **CARTE DU MONDE - FRICTION ULTIMATE**\n\n` +
