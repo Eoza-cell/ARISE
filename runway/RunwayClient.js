@@ -247,18 +247,27 @@ class RunwayClient {
     }
 
     async generateCharacterActionVideo(character, action, imagePath, outputPath) {
-        const prompt = `${character.name} performing action: ${action}, fantasy RPG character, ${character.kingdom} kingdom style, cinematic movement, detailed animation`;
-        
-        if (imagePath && await fs.access(imagePath).then(() => true).catch(() => false)) {
-            return await this.generateVideoFromImage(imagePath, prompt, outputPath, {
-                duration: 4,
-                motionScore: 18
-            });
-        } else {
-            return await this.generateVideoFromText(prompt, outputPath, {
-                duration: 4,
-                motionScore: 18
-            });
+        try {
+            const prompt = `${character.name} performing action: ${action}, fantasy RPG character, ${character.kingdom} kingdom style, cinematic movement, detailed animation`;
+            
+            if (imagePath && await fs.access(imagePath).then(() => true).catch(() => false)) {
+                return await this.generateVideoFromImage(imagePath, prompt, outputPath, {
+                    duration: 4,
+                    motionScore: 18
+                });
+            } else {
+                return await this.generateVideoFromText(prompt, outputPath, {
+                    duration: 4,
+                    motionScore: 18
+                });
+            }
+        } catch (error) {
+            if (error.message.includes('401') || error.message.includes('unauthorized')) {
+                console.log('⚠️ RunwayML : Clé API invalide ou expirée - Vidéos désactivées');
+                this.isAvailable = false;
+            }
+            console.log('❌ Vidéo non générée :', error.message);
+            return null;
         }
     }
 

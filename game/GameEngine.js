@@ -4,7 +4,8 @@ const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
 const CharacterCustomizationManager = require('../utils/CharacterCustomizationManager');
 const ImmersiveNarrationManager = require('../utils/ImmersiveNarrationManager');
-const path = require('path'); // Importer le module path pour gérer les chemins de fichiers
+const path = require('path');
+const NarrationFormatter = require('../utils/NarrationFormatter');
 
 class GameEngine {
     constructor({ dbManager, imageGenerator, playhtClient, cambAIClient, puterClient, asset3DManager, blenderClient, runwayClient }) {
@@ -22,10 +23,9 @@ class GameEngine {
         this.groqClient = new GroqClient();
         this.geminiClient = new GeminiClient();
 
-        // Système de narration immersive avec chronologie réaliste
         this.narrationManager = new ImmersiveNarrationManager(this.dbManager);
+        this.narrationFormatter = new NarrationFormatter();
 
-        // Sera initialisé dans setWhatsAppSocket une fois que sock est disponible
         this.characterCustomization = null;
 
         this.commandHandlers = {
@@ -50,15 +50,12 @@ class GameEngine {
 
     async processPlayerMessage({ playerNumber, chatId, message, imageMessage, originalMessage, sock, dbManager, imageGenerator }) {
         try {
-            // Initialiser le système de personnalisation si pas déjà fait
             if (!this.characterCustomization && sock) {
                 this.characterCustomization = new CharacterCustomizationManager(dbManager, imageGenerator, sock);
             }
 
-            // Récupération ou création du joueur
             let player = await dbManager.getPlayerByWhatsApp(playerNumber);
             if (!player) {
-                // Nouveau joueur - créer avec nom temporaire
                 const username = `Joueur_${playerNumber.slice(-4)}`;
                 player = await dbManager.createPlayer(playerNumber, username);
 
@@ -75,16 +72,13 @@ class GameEngine {
                 };
             }
 
-            // Mise à jour de l'activité du joueur
             await dbManager.updatePlayerActivity(player.id);
 
-            // Gestion des images pour la création de personnage
             if (!message && imageMessage) {
                 const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
                 const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
                 const photoReceived = await dbManager.getTemporaryData(player.id, 'photo_received');
 
-                // Si on est en mode création par description et qu'on attend une photo
                 if (creationMode === 'description' && creationStarted && !photoReceived) {
                     console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
                     return await this.handlePhotoReceived({ player, imageMessage, originalMessage: arguments[0].originalMessage, sock, dbManager, imageGenerator });
@@ -96,7 +90,6 @@ class GameEngine {
                 }
             }
 
-            // Traitement des commandes - gérer les cas où message est null (ex: autres cas)
             if (!message) {
                 return {
                     text: "💬 Utilisez `/menu` pour voir les commandes disponibles."
@@ -106,15 +99,13 @@ class GameEngine {
             const command = message.toLowerCase().trim();
             let response = null;
 
-            // Vérifier d'abord si le joueur est en cours de personnalisation
             if (this.characterCustomization && this.characterCustomization.activeCustomizations.has(playerNumber)) {
                 const handled = await this.characterCustomization.handleCustomizationResponse(playerNumber, chatId, message);
                 if (handled) {
-                    return { text: '' }; // Le système de personnalisation gère déjà l'envoi des messages
+                    return { text: '' };
                 }
             }
 
-            // Gérer la création avec photo d'abord
             if (imageMessage) {
                 const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
                 const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
@@ -124,7 +115,6 @@ class GameEngine {
                 }
             }
 
-            // Vérifier si le joueur est en cours de création par description (après photo)
             const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
             const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
             const photoReceived = await dbManager.getTemporaryData(player.id, 'photo_received');
@@ -133,7 +123,6 @@ class GameEngine {
                 return await this.handleDescriptionCreation({ player, description: message, dbManager, imageGenerator });
             }
 
-            // Gestion de la suppression de personnage
             if (message && message.toUpperCase().trim() === 'SUPPRIMER_PERSONNAGE') {
                 return await this.handleDeleteCharacter({ player, dbManager, imageGenerator });
             }
@@ -146,9 +135,7 @@ class GameEngine {
             const normalizedMessage = message.toLowerCase().trim();
 
 
-            // Si aucune commande reconnue, traiter comme action de jeu
             if (!response) {
-                // Récupérer le personnage du joueur pour les actions de jeu
                 const character = await dbManager.getCharacterByPlayer(player.id);
 
                 if (!character) {
@@ -158,7 +145,6 @@ class GameEngine {
                     };
                 }
 
-                // Détecter si c'est un dialogue avec un PNJ
                 const dialogueKeywords = ['parle', 'dis', 'demande', 'salue', 'bonjour', 'bonsoir', 'hey', '"'];
                 const isDialogue = dialogueKeywords.some(keyword =>
                     message.toLowerCase().includes(keyword)
@@ -168,7 +154,6 @@ class GameEngine {
                     return await this.processDialogueAction({ player, character, message, dbManager, imageGenerator });
                 }
 
-                // Traitement des actions de jeu avec système immersif et chronologie réaliste
                 return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
             }
 
@@ -183,7 +168,6 @@ class GameEngine {
     }
 
     async handleMenuCommand({ player, dbManager, imageGenerator }) {
-        // Désactiver le mode jeu quand on accède au menu
         await dbManager.clearTemporaryData(player.id, 'game_mode');
 
         const character = await dbManager.getCharacterByPlayer(player.id);
@@ -239,7 +223,6 @@ class GameEngine {
             };
         }
 
-        // Démarrer le processus de création par description
         await dbManager.setTemporaryData(player.id, 'creation_started', true);
         await dbManager.setTemporaryData(player.id, 'creation_mode', 'description');
 
@@ -262,10 +245,8 @@ class GameEngine {
     }
 
     async startCharacterCreation({ player, dbManager, imageGenerator }) {
-        // Marquer le début de la création pour sécuriser le processus
         await dbManager.setTemporaryData(player.id, 'creation_started', true);
 
-        // Processus simplifié en 3 étapes courtes - ÉTAPE 1 seulement
         let creationText = `⚔️ **CRÉATION DE PERSONNAGE**\n\n` +
                           `🎯 **Étape 1/3 - Choix du sexe**\n\n` +
                           `👤 Choisis le sexe de ton personnage :\n\n` +
@@ -288,17 +269,14 @@ class GameEngine {
         try {
             console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
 
-            // Télécharger et sauvegarder la photo
             const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-            const imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, { 
-                logger: require('pino')({ level: 'silent' }) 
+            const imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, {
+                logger: require('pino')({ level: 'silent' })
             });
 
             if (imageBuffer && imageBuffer.length > 0) {
-                // Sauvegarder l'image temporairement
                 await imageGenerator.saveCustomCharacterImage(player.id, imageBuffer);
 
-                // Marquer que la photo a été reçue
                 await dbManager.setTemporaryData(player.id, 'photo_received', true);
 
                 console.log(`✅ Photo sauvegardée pour ${player.whatsappNumber}`);
@@ -339,20 +317,16 @@ class GameEngine {
         try {
             console.log(`🎭 Création par IA pour ${player.whatsappNumber}: ${description}`);
 
-            // Utiliser l'IA pour analyser la description et générer le personnage
             const characterDataFromAI = await this.generateCharacterFromDescription(description, player);
 
-            // Créer le personnage dans la base de données
             const newCharacter = await dbManager.createCharacter({
                 ...characterDataFromAI,
-                appearance: description // Sauvegarder la description originale du joueur
+                appearance: description
             });
 
-            // Nettoyer les données temporaires
             await dbManager.clearTemporaryData(player.id, 'creation_started');
             await dbManager.clearTemporaryData(player.id, 'creation_mode');
 
-            // Générer l'image du personnage
             let characterImage = null;
             try {
                 characterImage = await imageGenerator.generateCharacterImage(newCharacter, {
@@ -382,7 +356,6 @@ class GameEngine {
         } catch (error) {
             console.error('❌ Erreur création personnage par IA:', error);
 
-            // Nettoyer en cas d'erreur
             await dbManager.clearTemporaryData(player.id, 'creation_started');
             await dbManager.clearTemporaryData(player.id, 'creation_mode');
 
@@ -397,7 +370,6 @@ class GameEngine {
 
     async generateCharacterFromDescription(description, player) {
         try {
-            // Utiliser Groq pour analyser la description et extraire les informations
             if (this.groqClient && this.groqClient.hasValidClient()) {
                 const analysisPrompt = `Analyse cette description de personnage RPG et extrait les informations suivantes au format JSON strict:
 
@@ -423,7 +395,6 @@ Règles importantes:
 
                 console.log('🤖 Réponse IA brute:', aiResponse);
 
-                // Extraire le JSON de la réponse
                 let jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
                 if (!jsonMatch) {
                     throw new Error('Pas de JSON trouvé dans la réponse IA');
@@ -432,7 +403,6 @@ Règles importantes:
                 const characterInfo = JSON.parse(jsonMatch[0]);
                 console.log('📊 Données personnage extraites:', characterInfo);
 
-                // Générer les données complètes du personnage
                 return {
                     playerId: player.id,
                     name: characterInfo.name || `Héros_${player.whatsappNumber.slice(-4)}`,
@@ -462,7 +432,6 @@ Règles importantes:
         } catch (error) {
             console.error('❌ Erreur analyse IA:', error);
 
-            // Fallback - création de personnage de base
             return {
                 playerId: player.id,
                 name: `Héros_${player.whatsappNumber.slice(-4)}`,
@@ -542,7 +511,6 @@ Règles importantes:
                          `🎯 **Techniques apprises :**\n` +
                          `${this.formatTechniques(character.learnedTechniques)}`;
 
-        // Générer l'image du personnage de façon sécurisée
         let characterImage = null;
         try {
             characterImage = await imageGenerator.generateCharacterImage(character, {
@@ -561,20 +529,17 @@ Règles importantes:
     }
 
     async handleGameAction({ player, chatId, message, imageMessage, sock, dbManager, imageGenerator }) {
-        // Vérifier si une création est en cours
         const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
         const savedCharacterName = await dbManager.getTemporaryData(player.id, 'creation_name');
 
-        // Gestion des images pour la création de personnage
         if (imageMessage && creationStarted && savedCharacterName) {
             try {
                 console.log('📸 Réception d\'une image pour la création de personnage...');
                 console.log('🔄 Tentative de téléchargement de l\'image...');
 
-                // Télécharger l'image
                 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-                const imageBuffer = await downloadMediaMessage(imageMessage, 'buffer', {}, { 
-                    logger: require('pino')({ level: 'silent' }) 
+                const imageBuffer = await downloadMediaMessage(imageMessage, 'buffer', {}, {
+                    logger: require('pino')({ level: 'silent' })
                 });
 
                 if (imageBuffer && imageBuffer.length > 0) {
@@ -604,56 +569,45 @@ Règles importantes:
             };
         }
 
-        // Si on a une image mais qu'on n'est pas en création, ignorer
         if (imageMessage && !message) {
             return {
                 text: `📸 Image reçue, mais aucune action prévue pour les images pour le moment.`
             };
         }
 
-        // D'abord traiter les actions de création de personnage (avant de vérifier si personnage existe)
-
-        // Traitement des actions de création de personnage en cours (seulement si création initiée)
         const input = message.toUpperCase().trim();
         if (creationStarted && (input === 'HOMME' || input === 'H' || input === 'FEMME' || input === 'F' || input === '1' || input === '2')) {
             return await this.handleGenderSelection({ player, message, dbManager, imageGenerator });
         }
 
-        // Gestion des numéros de royaumes (1-12) - seulement si le genre est déjà sélectionné
         const tempGender = await dbManager.getTemporaryData(player.id, 'creation_gender');
         const kingdomNumber = parseInt(message);
         if (creationStarted && tempGender && kingdomNumber >= 1 && kingdomNumber <= 12) {
             return await this.handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator });
         }
 
-        // Gestion du nom de personnage (si en cours de création)
         const tempKingdom = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
         const existingName = await dbManager.getTemporaryData(player.id, 'creation_name');
 
         if (creationStarted && tempGender && tempKingdom && !existingName) {
-            // Le joueur est en train de donner le nom de son personnage
             return await this.handleCharacterNameInput({ player, name: message, dbManager, imageGenerator });
         }
 
-        // Gestion de la finalisation de création (après nom, en attente d'image ou "SANS_PHOTO")
         if (creationStarted && tempGender && tempKingdom && existingName) {
             if (message.toUpperCase() === 'SANS_PHOTO') {
                 return await this.finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage: false });
             }
-            // Si c'est un autre message texte, redemander l'image
             return {
                 text: `📸 **En attente de ta photo de visage...**\n\n` +
                       `🖼️ Envoie une photo de ton visage ou écris "SANS_PHOTO" pour continuer sans photo personnalisée.`
             };
         }
 
-        // Gestion de la modification de personnage
         const modificationStarted = await dbManager.getTemporaryData(player.id, 'modification_started');
         if (modificationStarted) {
             return await this.handleModificationDescription({ player, description: message, dbManager, imageGenerator });
         }
 
-        // Vérifier si le joueur est en mode jeu
         const isInGameMode = await dbManager.getTemporaryData(player.id, 'game_mode');
 
         if (!isInGameMode) {
@@ -666,7 +620,6 @@ Règles importantes:
             };
         }
 
-        // Maintenant vérifier si le personnage existe pour les actions de jeu normales
         const character = await dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
@@ -676,8 +629,6 @@ Règles importantes:
             };
         }
 
-        // Détecter si c'est un dialogue avec un PNJ
-        // Détecter si le joueur utilise des guillemets pour parler à un PNJ
         const hasQuotes = message.includes('"') || message.includes('«') || message.includes('»');
         const isDialogue = hasQuotes ||
                           message.toLowerCase().includes('parler') ||
@@ -688,28 +639,27 @@ Règles importantes:
             return await this.processDialogueAction({ player, character, message, dbManager, imageGenerator });
         }
 
-        // Traitement des actions de jeu normales avec IA Gemini
         return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
     }
 
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
-            const sessionId = `player_${player.id}`; // Session unique par joueur
+            const sessionId = `player_${player.id}`;
 
-            // Analyser l'action du joueur avec OpenAI
             const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
                 character: character,
                 location: character.currentLocation,
                 kingdom: character.kingdom
             }, sessionId);
 
-            // Générer la narration: Ollama > Gemini > OpenAI
             let narration;
             try {
-                // Priorité absolue à Groq pour la vitesse et qualité
                 if (this.groqClient && this.groqClient.hasValidClient()) {
                     console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
-                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId, character);
+                    let rawNarration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId, character);
+
+                    const narration = this.narrationFormatter.formatNarration(rawNarration, 'thick');
+
                     console.log('✅ Narration générée avec Groq');
                 } else {
                     throw new Error('Groq non disponible, essai Ollama');
@@ -754,46 +704,36 @@ Règles importantes:
                 }
             }
 
-            // CLAMPING SERVER-SIDE STRICT - Sécuriser toutes les valeurs de l'IA
             const energyCost = Math.max(0, Math.min(character.currentEnergy, actionAnalysis.energyCost || 10));
             const staminaRecovery = Math.max(-15, Math.min(3, actionAnalysis.staminaRecovery || 0));
             const equipmentStress = Math.max(-3, Math.min(0, actionAnalysis.equipmentStress || 0));
 
-            // Valider combatAdvantage dans une liste sécurisée
             const validCombatAdvantages = ['critical_hit', 'normal_hit', 'glancing_blow', 'miss', 'counter_attacked'];
             actionAnalysis.combatAdvantage = validCombatAdvantages.includes(actionAnalysis.combatAdvantage)
                 ? actionAnalysis.combatAdvantage
                 : 'miss';
 
-            // Appliquer le système de combat Dark Souls strict
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
 
-            // Système de dégâts ÉQUILIBRÉ - seulement en vrai combat
             let damageText = '';
             let shouldTakeDamage = false;
 
-            // Dégâts seulement pour les vrais actions de COMBAT agressif
             const realCombatKeywords = ['attaque', 'combat', 'frappe', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite'];
             const isRealCombat = realCombatKeywords.some(keyword =>
                 message.toLowerCase().includes(keyword)
             );
 
-            // Dégâts uniquement si :
-            // 1. Action de combat réel ET contre-attaque réussie
-            // 2. OU action de combat avec haut risque (rare)
             if (isRealCombat && actionAnalysis.combatAdvantage === 'counter_attacked') {
                 shouldTakeDamage = true;
             } else if (isRealCombat && actionAnalysis.riskLevel === 'extreme' && Math.random() < 0.3) {
-                shouldTakeDamage = true; // 30% de chance de dégâts sur action très risquée
+                shouldTakeDamage = true;
             }
 
-            // Pas de dégâts automatiques par épuisement - juste efficacité réduite
             if (character.currentEnergy <= 0) {
                 damageText = `\n⚡ **ÉPUISEMENT** - Vous êtes trop fatigué pour être efficace`;
             }
 
             if (shouldTakeDamage && actionAnalysis.potentialDamage > 0) {
-                // Dégâts réduits et plus équilibrés
                 const baseDamage = Math.max(1, Math.min(8, actionAnalysis.potentialDamage || 3));
                 const damage = Math.min(baseDamage, character.currentLife);
                 character.currentLife = Math.max(0, character.currentLife - damage);
@@ -802,35 +742,30 @@ Règles importantes:
                 console.log(`⚔️ Dégâts appliqués: ${damage} PV (action: ${message}, situation: ${actionAnalysis.combatAdvantage})`);
             }
 
-            // Récupération de stamina (utiliser la valeur clampée)
             if (staminaRecovery !== 0) {
                 if (staminaRecovery > 0) {
                     character.currentEnergy = Math.min(character.maxEnergy, character.currentEnergy + staminaRecovery);
                 } else {
-                    character.currentEnergy = Math.max(0, character.currentEnergy + staminaRecovery); // Soustraction supplémentaire
+                    character.currentEnergy = Math.max(0, character.currentEnergy + staminaRecovery);
                 }
             }
 
-            // Usure d'équipement (utiliser la valeur clampée)
             let equipmentWarning = '';
             if (equipmentStress < 0) {
                 equipmentWarning = `\n⚔️ **USURE ÉQUIPEMENT :** Votre équipement s'abîme (${Math.abs(equipmentStress)})`;
             }
 
-            // Vérifier si le personnage est mort (gestion Dark Souls)
             let deathText = '';
             let isAlive = true;
             if (character.currentLife <= 0) {
                 isAlive = false;
 
-                // Calculer les pertes AVANT modification
                 const coinsBefore = character.coins;
                 const coinsLost = Math.floor(coinsBefore * 0.1);
 
-                // Appliquer les pénalités de mort
-                character.currentLife = Math.ceil(character.maxLife * 0.3); // Respawn avec 30% de vie
-                character.currentEnergy = Math.floor(character.maxEnergy * 0.5); // 50% d'énergie
-                character.coins = Math.max(0, coinsBefore - coinsLost); // Réduction correcte
+                character.currentLife = Math.ceil(character.maxLife * 0.3);
+                character.currentEnergy = Math.floor(character.maxEnergy * 0.5);
+                character.coins = Math.max(0, coinsBefore - coinsLost);
                 character.currentLocation = 'Lieu de Respawn - Sanctuaire des Âmes Perdues';
 
                 deathText = `\n💀 **MORT** - Vous avez succombé à vos blessures...\n` +
@@ -839,7 +774,6 @@ Règles importantes:
                            `❤️ **RÉSURRECTION** - Vous renaissez avec ${character.currentLife} PV`;
             }
 
-            // Sauvegarder les changements (avec position de respawn si mort)
             await dbManager.updateCharacter(character.id, {
                 currentEnergy: character.currentEnergy,
                 currentLife: character.currentLife,
@@ -854,11 +788,9 @@ Règles importantes:
                 'extreme': '🔴'
             }[actionAnalysis.riskLevel] || '⚪';
 
-            // Générer les barres de vie et d'énergie comme dans Dark Souls
             const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
             const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
 
-            // Indicateur d'avantage de combat
             const combatEmoji = {
                 'critical_hit': '🎯',
                 'normal_hit': '⚔️',
@@ -867,7 +799,6 @@ Règles importantes:
                 'counter_attacked': '💀'
             }[actionAnalysis.combatAdvantage] || '⚪';
 
-            // Messages d'alerte pour détection et conséquences
             let detectionWarning = '';
             if (actionAnalysis.detectionRisk) {
                 detectionWarning = `\n👁️ **DÉTECTION** - Vos mouvements ont pu être repérés !`;
@@ -881,7 +812,6 @@ Règles importantes:
                 }
             }
 
-            // Feedback complet des métriques Dark Souls
             const precisionEmoji = {
                 'high': '🎯',
                 'medium': '⚪',
@@ -892,42 +822,44 @@ Règles importantes:
                 ? `\n⚡ **RÉCUP. ENDURANCE :** ${staminaRecovery > 0 ? '+' : ''}${staminaRecovery}`
                 : '';
 
-            // Préparer la réponse avec toutes les métriques Dark Souls
-            const responseText = `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
-                               `📖 **Narration :** ${narration}\n\n` +
-                               `❤️ **Vie :** ${lifeBar}${damageText}${deathText}\n` +
-                               `⚡ **Énergie :** ${energyBar} (-${energyCost})${staminaText}\n` +
-                               `💰 **Argent :** ${character.coins} pièces d'or\n\n` +
-                               `${precisionEmoji} **Précision :** ${actionAnalysis.precision.toUpperCase()}\n` +
-                               `${riskEmoji} **Niveau de risque :** ${actionAnalysis.riskLevel.toUpperCase()}\n` +
-                               `🎯 **Type d'action :** ${actionAnalysis.actionType}\n` +
-                               `${combatEmoji} **Résultat combat :** ${actionAnalysis.combatAdvantage?.replace('_', ' ') || 'N/A'}` +
-                               `${equipmentWarning}${detectionWarning}${consequencesText}\n\n` +
-                               `💭 ${isAlive ? '*Que fais-tu ensuite ?*' : '*Vous renaissez au Sanctuaire... Que faites-vous ?*'}`;
+            const responseText = `╔══════════════════════════════════╗
+║ 🏰 **${character.kingdom}** | 🎯 **${character.name}**
+║ ⚡ Niveau ${character.level} • Grade ${character.powerLevel} • Friction ${character.frictionLevel}
+╠══════════════════════════════════╣
+║ ❤️ Vie: ${character.currentLife}/${character.maxLife} (-${energyCost})${staminaText}
+║ 💰 Or: ${character.coins} pièces
+╠══════════════════════════════════╣
+║ ${precisionEmoji} Précision: ${actionAnalysis.precision.toUpperCase()}
+║ ${riskEmoji} Risque: ${actionAnalysis.riskLevel.toUpperCase()}
+║ 🎯 Action: ${actionAnalysis.actionType}
+║ ${combatEmoji} Combat: ${actionAnalysis.combatAdvantage?.replace('_', ' ') || 'N/A'}
+╚══════════════════════════════════╝
 
-            // Essayer de générer l'image, l'audio et la vidéo, mais ne pas bloquer l'envoi si ça échoue
+📜 **NARRATION:**
+${narration}
+
+${equipmentWarning}${detectionWarning}${consequencesText}
+
+${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire... Que faites-vous ?*'}`;
+
             let actionImage = null;
             let actionAudio = null;
             let actionVideo = null;
             try {
-                // Générer image avec audio (style Skyrim)
                 const mediaResult = await imageGenerator.generateCharacterActionImageWithVoice(character, message, narration);
                 actionImage = mediaResult.image;
                 actionAudio = mediaResult.audio;
 
-                // Générer une vidéo pour cette action
-                const actionImageGenerator = require('../utils/ImageGenerator'); // Assurez-vous que le chemin est correct
+                const actionImageGenerator = require('../utils/ImageGenerator');
                 const imagePath = path.join(__dirname, '..', 'temp', `action_temp_${Date.now()}.png`);
 
                 if (actionImage && imagePath) {
-                    // Sauvegarder l'image temporairement pour la vidéo
                     const fs = require('fs').promises;
                     await fs.writeFile(imagePath, actionImage);
                 }
 
                 actionVideo = await imageGenerator.generateActionVideo(character, message, narration, imagePath);
 
-                // Nettoyer l'image temporaire
                 if (imagePath) {
                     try {
                         const fs = require('fs').promises;
@@ -950,7 +882,6 @@ Règles importantes:
         } catch (error) {
             console.error('❌ Erreur lors du traitement IA:', error);
 
-            // Appliquer au moins une réduction d'énergie de base
             const energyCost = 10;
             character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
 
@@ -973,7 +904,6 @@ Règles importantes:
         }
     }
 
-    // Méthodes utilitaires
     generateBar(current, max, icon) {
         const percentage = Math.round((current / max) * 100);
         const filledBars = Math.round(percentage / 20);
@@ -1032,7 +962,6 @@ Règles importantes:
                            `✨ **Particularités :** ${kingdom.particularities}\n\n`;
         });
 
-        // Générer une image des royaumes avec les fonctions disponibles
         let kingdomImage = null;
         try {
             kingdomImage = await imageGenerator.generateWorldMap({
@@ -1069,7 +998,6 @@ Règles importantes:
 
     async handleButtonsTestCommand({ player, chatId, dbManager, sock }) {
         try {
-            // Vérifier qu'on a accès au socket
             if (!sock || !sock.buttonManager) {
                 return {
                     text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
@@ -1081,14 +1009,11 @@ Règles importantes:
                 };
             }
 
-            // Obtenir le personnage pour personnaliser l'affichage
             const character = await dbManager.getCharacterByPlayer(player.id);
 
-            // Utiliser le buttonManager depuis le socket principal
             const buttonManager = sock.buttonManager;
 
-            // Envoyer un message d'introduction
-            await sock.sendMessage(chatId, { 
+            await sock.sendMessage(chatId, {
                 text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
                       `🎮 Voici comment fonctionne le système de boutons simulés avec des sondages WhatsApp !\n\n` +
                       `✨ Chaque "bouton" est en fait un sondage avec une seule option\n` +
@@ -1096,15 +1021,12 @@ Règles importantes:
                       `**Menu de test :**`
             });
 
-            // Attendre un peu puis envoyer les boutons
             setTimeout(async () => {
                 await buttonManager.sendMainGameMenu(chatId, character);
 
-                // Après 2 secondes, envoyer un menu d'actions
                 setTimeout(async () => {
                     await buttonManager.sendActionMenu(chatId);
 
-                    // Après 2 secondes, envoyer un menu de confirmation
                     setTimeout(async () => {
                         await buttonManager.sendConfirmationMenu(chatId, "Voulez-vous continuer le test ?");
                     }, 2000);
@@ -1112,8 +1034,8 @@ Règles importantes:
             }, 1000);
 
             return {
-                text: '', // Le texte est déjà envoyé via sock.sendMessage
-                skipResponse: true // Indiquer qu'on gère l'envoi nous-mêmes
+                text: '',
+                skipResponse: true
             };
 
         } catch (error) {
@@ -1142,7 +1064,7 @@ Règles importantes:
                   `• ⚡ Énergie : Consommée par les actions\n\n` +
                   `💀 **ATTENTION :** Chaque attaque doit être précise :\n` +
                   `• Mouvement exact (distance en mètres)\n` +
-                  `• Arme utilisée et angle d'attaque\n` +
+                  `• Arme utilisée et angle d\'attaque\n` +
                   `• Partie du corps visée\n\n` +
                   `🎯 **Sans précision = vulnérabilité !**`,
             image: await imageGenerator.generateCombatGuideImage()
@@ -1185,17 +1107,17 @@ Règles importantes:
         return {
             text: `🗺️ **CARTE DU MONDE - FRICTION ULTIMATE**\n\n` +
                   `🏰 **Les 12 Royaumes sont dispersés à travers :**\n` +
-                  `• Plaines fertiles d'Aegyria\n` +
+                  `• Plaines fertiles d\'Aegyria\n` +
                   `• Forêts sombres de Sombrenuit\n` +
                   `• Déserts brûlants de Khelos\n` +
-                  `• Ports fortifiés d'Abrantis\n` +
+                  `• Ports fortifiés d\'Abrantis\n` +
                   `• Montagnes enneigées de Varha\n` +
-                  `• Et bien d'autres contrées dangereuses...\n\n` +
+                  `• Et bien d\'autres contrées dangereuses...\n\n` +
                   `⚔️ **Les 7 Ordres ont établi leurs quartiers :**\n` +
                   `• Dans les sanctuaires profanés\n` +
                   `• Les citadelles fumantes\n` +
                   `• Les forteresses des ombres\n` +
-                  `• Et d'autres lieux mystérieux...\n\n` +
+                  `• Et d\'autres lieux mystérieux...\n\n` +
                   `💀 **Chaque région est dangereuse !**`,
             image: await imageGenerator.generateWorldMap()
         };
@@ -1207,7 +1129,7 @@ Règles importantes:
         if (!character) {
             return {
                 text: `🎮 **MODE JEU ACTIVÉ**\n\n` +
-                      `❌ Tu n'as pas encore de personnage !\n\n` +
+                      `❌ Tu n\'as pas encore de personnage !\n\n` +
                       `✨ **Pour commencer à jouer :**\n` +
                       `1️⃣ Utilise /créer pour créer ton personnage\n` +
                       `2️⃣ Puis utilise /jouer pour entrer dans le monde\n\n` +
@@ -1217,7 +1139,6 @@ Règles importantes:
             };
         }
 
-        // Marquer le joueur en mode jeu
         await dbManager.setTemporaryData(player.id, 'game_mode', true);
 
         return {
@@ -1227,22 +1148,20 @@ Règles importantes:
                   `❤️ **Vie :** ${character.currentLife}/${character.maxLife}\n` +
                   `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}\n\n` +
                   `🎯 **Tes prochains messages seront interprétés comme des actions de jeu.**\n\n` +
-                  `📝 **Exemples d'actions :**\n` +
+                  `📝 **Exemples d\'actions :**\n` +
                   `• "Je regarde autour de moi"\n` +
-                  `• "J'avance vers le nord"\n` +
+                  `• "J\'avance vers le nord"\n` +
                   `• "Je cherche des ennemis"\n` +
-                  `• "J'attaque avec mon épée"\n\n` +
-                  `💬 **Besoin d'aide :** utilise /aide pour voir toutes les commandes\n` +
+                  `• "J\'attaque avec mon épée"\n\n` +
+                  `💬 **Besoin d\'aide :** utilise /aide pour voir toutes les commandes\n` +
                   `⚙️ **Pour sortir du mode jeu :** utilise /menu\n\n` +
-                  `🔥 **L'aventure commence maintenant !**`,
+                  `🔥 **L\'aventure commence maintenant !**`,
             image: await imageGenerator.generateCharacterImage(character)
         };
     }
     async handleGenderSelection({ player, message, dbManager, imageGenerator }) {
-        // Marquer le début de la création si pas déjà fait
         await dbManager.setTemporaryData(player.id, 'creation_started', true);
 
-        // Convertir l'entrée du joueur en genre
         let gender;
         const input = message.toUpperCase().trim();
         if (input === 'HOMME' || input === 'H' || input === '1') {
@@ -1256,7 +1175,6 @@ Règles importantes:
             };
         }
 
-        // Stocker temporairement le genre (en attendant le royaume)
         await dbManager.setTemporaryData(player.id, 'creation_gender', gender);
 
         const kingdoms = await dbManager.getAllKingdoms();
@@ -1269,7 +1187,6 @@ Règles importantes:
 
         kingdomText += `\n⚡ **Tape le numéro du royaume (1 à 12)**`;
 
-        // Générer une image de royaumes fantasy avec les fonctions disponibles
         let kingdomImage = null;
         try {
             kingdomImage = await imageGenerator.generateWorldMap({
@@ -1298,7 +1215,6 @@ Règles importantes:
 
         const selectedKingdom = kingdoms[kingdomNumber - 1];
 
-        // Récupérer le genre stocké temporairement
         const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
 
         if (!gender) {
@@ -1307,7 +1223,6 @@ Règles importantes:
             };
         }
 
-        // Stocker le royaume temporairement avec son ID
         await dbManager.setTemporaryData(player.id, 'creation_kingdom', selectedKingdom.id);
 
         console.log(`✅ Royaume sélectionné: ${selectedKingdom.name} (ID: ${selectedKingdom.id}) pour le joueur ${player.id}`);
@@ -1324,7 +1239,6 @@ Règles importantes:
     }
 
     async handleCharacterNameInput({ player, name, dbManager, imageGenerator }) {
-        // Récupérer les données temporaires
         const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
         const kingdomId = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
 
@@ -1334,7 +1248,6 @@ Règles importantes:
             };
         }
 
-        // Valider le nom (lettres, chiffres, accents)
         const nameRegex = /^[a-zA-Z0-9àâäéèêëïîôöùûüÿç\s-]{2,20}$/;
         if (!nameRegex.test(name)) {
             return {
@@ -1342,7 +1255,6 @@ Règles importantes:
             };
         }
 
-        // Vérifier si le nom existe déjà
         const existingCharacter = await dbManager.getCharacterByName(name.trim());
         if (existingCharacter) {
             return {
@@ -1350,7 +1262,6 @@ Règles importantes:
             };
         }
 
-        // Stocker le nom temporairement et demander l'image
         await dbManager.setTemporaryData(player.id, 'creation_name', name.trim());
 
         return {
@@ -1360,13 +1271,12 @@ Règles importantes:
                   `⚠️ **Important :**\n` +
                   `• Seule la zone du visage sera utilisée\n` +
                   `• Photo claire et bien éclairée recommandée\n` +
-                  `• Si tu n'as pas de photo, écris "SANS_PHOTO"\n\n` +
+                  `• Si tu n\'as pas de photo, écris "SANS_PHOTO"\n\n` +
                   `📷 **Envoie ta photo maintenant...**`
         };
     }
 
     async finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage = false, imageBuffer = null }) {
-        // Récupérer toutes les données temporaires
         const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
         const kingdomId = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
         const name = await dbManager.getTemporaryData(player.id, 'creation_name');
@@ -1377,11 +1287,9 @@ Règles importantes:
             };
         }
 
-        // Récupérer les détails du royaume
         const kingdom = await dbManager.getKingdomById(kingdomId);
         const kingdomName = kingdom ? kingdom.name : kingdomId;
 
-        // Créer le personnage
         const characterData = {
             playerId: player.id,
             name: name,
@@ -1401,7 +1309,7 @@ Règles importantes:
             equipment: {},
             inventory: [],
             learnedTechniques: [],
-            customImage: hasCustomImage // Marquer si le personnage a une image personnalisée
+            customImage: hasCustomImage
         };
 
         console.log(`✅ Création personnage: ${name}, Royaume: ${kingdomName} (${kingdomId}), Genre: ${gender}, Image: ${hasCustomImage}`);
@@ -1409,12 +1317,10 @@ Règles importantes:
         try {
             const newCharacter = await dbManager.createCharacter(characterData);
 
-            // Si image personnalisée, la stocker
             if (hasCustomImage && imageBuffer) {
                 await imageGenerator.saveCustomCharacterImage(newCharacter.id, imageBuffer);
             }
 
-            // Nettoyer TOUTES les données temporaires de création
             await dbManager.clearTemporaryData(player.id, 'creation_started');
             await dbManager.clearTemporaryData(player.id, 'creation_gender');
             await dbManager.clearTemporaryData(player.id, 'creation_kingdom');
@@ -1422,7 +1328,6 @@ Règles importantes:
 
             const imageType = hasCustomImage ? "avec ta photo personnalisée" : "avec une image générée";
 
-            // Générer l'image du personnage de façon sécurisée
             let characterImage = null;
             try {
                 characterImage = await imageGenerator.generateCharacterImage(newCharacter);
@@ -1460,16 +1365,15 @@ Règles importantes:
             };
         }
 
-        // Utiliser le nouveau système de personnalisation sophistiqué pour modification
         if (this.characterCustomization) {
             const success = await this.characterCustomization.startCharacterCustomization(
                 player.whatsappNumber,
                 chatId,
-                true // isModification = true
+                true
             );
 
             if (success) {
-                return { text: '' }; // Le système de personnalisation gère l'envoi des messages
+                return { text: '' };
             } else {
                 return {
                     text: '❌ Impossible de démarrer le système de modification. Une personnalisation est peut-être déjà en cours.\n\n' +
@@ -1477,7 +1381,6 @@ Règles importantes:
                 };
             }
         } else {
-            // Fallback vers l'ancien système si le nouveau n'est pas disponible
             return await this.handleOldModifyCharacterCommand({ player, dbManager, imageGenerator });
         }
     }
@@ -1485,10 +1388,8 @@ Règles importantes:
     async handleOldModifyCharacterCommand({ player, dbManager, imageGenerator }) {
         const character = await dbManager.getCharacterByPlayer(player.id);
 
-        // Marquer le début de la modification
         await dbManager.setTemporaryData(player.id, 'modification_started', true);
 
-        // Générer l'image du personnage de façon sécurisée
         let characterImage = null;
         try {
             characterImage = await imageGenerator.generateCharacterImage(character);
@@ -1527,14 +1428,11 @@ Règles importantes:
         try {
             console.log(`🎨 Génération nouvelle image pour ${character.name} avec description personnalisée...`);
 
-            // Construire le prompt optimisé pour Freepik avec vue première personne FORCÉE
             const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
             const kingdomDesc = this.getKingdomDescription(character.kingdom);
 
-            // Nettoyer et optimiser la description utilisateur
             const cleanDescription = description.trim();
 
-            // Construire un prompt plus structuré et précis avec vue première personne
             const basePrompt = `fantasy ${genderDesc} warrior`;
             const kingdomContext = `from ${character.kingdom} kingdom (${kingdomDesc})`;
             const userCustomization = cleanDescription;
@@ -1544,7 +1442,6 @@ Règles importantes:
 
             console.log(`🎨 Prompt de modification généré: "${fullPrompt}"`);
 
-            // Vérifier que la description utilisateur est bien intégrée
             if (!fullPrompt.toLowerCase().includes(cleanDescription.toLowerCase().substring(0, 20))) {
                 console.log('⚠️ Description utilisateur mal intégrée, correction...');
                 const correctedPrompt = `${userCustomization}, ${basePrompt} ${kingdomContext}, ${artStyle}`;
@@ -1552,7 +1449,6 @@ Règles importantes:
                 fullPrompt = correctedPrompt;
             }
 
-            // Générer l'image avec Freepik FORCÉ en vue première personne
             const imagePath = `temp/character_modified_${character.id}_${Date.now()}.png`;
 
             console.log(`📝 Description originale: "${cleanDescription}"`);
@@ -1560,19 +1456,16 @@ Règles importantes:
 
             await imageGenerator.freepikClient.generateImage(fullPrompt, imagePath, {
                 style: '3d',
-                perspective: 'first_person', // FORCÉ - vue première personne pour IA
+                perspective: 'first_person',
                 nudity: false
             });
 
-            // Lire l'image générée
             const fs = require('fs').promises;
             const imageBuffer = await fs.readFile(imagePath).catch(() => null);
 
-            // Nettoyer les données temporaires
             await dbManager.clearTemporaryData(player.id, 'modification_started');
 
             if (imageBuffer) {
-                // Sauvegarder l'image modifiée comme image personnalisée
                 await imageGenerator.saveCustomCharacterImage(character.id, imageBuffer);
 
                 return {
@@ -1623,7 +1516,6 @@ Règles importantes:
         try {
             console.log(`💬 Dialogue PNJ détecté pour ${character.name}: ${message}`);
 
-            // Extraire le dialogue du joueur (enlever les guillemets s'il y en a)
             let playerSpeech = message;
             if (message.includes('"')) {
                 const matches = message.match(/"([^"]+)"/);
@@ -1632,7 +1524,6 @@ Règles importantes:
                 }
             }
 
-            // Générer une réponse de PNJ avec Groq
             let npcResponse;
             const sessionId = `player_${player.id}`;
 
@@ -1651,7 +1542,6 @@ Règles importantes:
                         }
                     );
                 } else {
-                    // Fallback simple si Groq non disponible
                     npcResponse = `"Salut ${character.name} ! Que fais-tu par ici ?"`;
                 }
             } catch (error) {
@@ -1659,7 +1549,6 @@ Règles importantes:
                 npcResponse = `"Bonjour, voyageur. Belle journée, n'est-ce pas ?"`;
             }
 
-            // Générer l'image et l'audio du dialogue
             let dialogueImage = null;
             let dialogueAudio = null;
 
@@ -1701,10 +1590,8 @@ Règles importantes:
                 };
             }
 
-            // Supprimer le personnage de la base de données
             await dbManager.deleteCharacter(character.id);
 
-            // Nettoyer les données temporaires
             await dbManager.clearTemporaryData(player.id, 'game_mode');
             await dbManager.clearTemporaryData(player.id, 'creation_started');
             await dbManager.clearTemporaryData(player.id, 'creation_mode');
@@ -1730,12 +1617,10 @@ Règles importantes:
 
     async generateNPCResponse(character, playerDialogue, sessionId) {
         try {
-            // Utiliser Groq pour générer une réponse rapide de PNJ
             if (this.groqClient && this.groqClient.hasValidClient()) {
                 return await this.groqClient.generateDialogueResponse(character, playerDialogue, sessionId);
             }
 
-            // Fallback vers les autres clients
             if (this.openAIClient && this.openAIClient.isAvailable) {
                 const context = {
                     character: character,
@@ -1745,7 +1630,6 @@ Règles importantes:
                 return await this.openAIClient.generateCharacterResponse(character, context, playerDialogue, sessionId);
             }
 
-            // Réponse par défaut
             return "Le PNJ vous regarde attentivement et hoche la tête.";
 
         } catch (error) {

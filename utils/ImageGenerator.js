@@ -175,10 +175,10 @@ class ImageGenerator {
             // Créer le dossier si nécessaire
             const customImagesDir = path.join(this.assetsPath, 'custom_images');
             await fs.mkdir(customImagesDir, { recursive: true });
-            
+
             const imagePath = path.join(customImagesDir, `character_${characterId}.png`);
             await fs.writeFile(imagePath, imageBuffer);
-            
+
             // Sauvegarder aussi les métadonnées si fournies
             if (metadata && Object.keys(metadata).length > 0) {
                 const metadataPath = path.join(customImagesDir, `character_${characterId}_metadata.json`);
@@ -189,7 +189,7 @@ class ImageGenerator {
                 }, null, 2));
                 console.log(`✅ Métadonnées image sauvegardées: ${metadataPath}`);
             }
-            
+
             console.log(`✅ Image personnalisée sauvegardée: ${imagePath} (${imageBuffer.length} bytes)`);
             return imagePath;
         } catch (error) {
