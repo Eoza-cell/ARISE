@@ -42,16 +42,30 @@ class HuggingFaceClient {
 
             const optimizedPrompt = this.optimizePromptForHuggingFace(prompt);
             
-            // Generate video using Hugging Face text-to-video
-            const videoBlob = await this.client.textToVideo({
-                provider: "fal-ai",
-                model: "Wan-AI/Wan2.2-T2V-A14B",
+            // Use Hugging Face Inference API for video generation with supported model
+            const response = await this.client.request({
+                model: "damo-vilab/text-to-video-ms-1.7b",
                 inputs: optimizedPrompt,
+                parameters: {
+                    num_frames: options.num_frames || 16,
+                    fps: options.fps || 8,
+                    width: options.width || 256,
+                    height: options.height || 256
+                }
             });
 
-            // Convert Blob to Buffer and save to file
-            const arrayBuffer = await videoBlob.arrayBuffer();
-            const buffer = Buffer.from(arrayBuffer);
+            // Handle response based on format (could be Blob, ArrayBuffer, or direct bytes)
+            let buffer;
+            if (response instanceof Blob) {
+                const arrayBuffer = await response.arrayBuffer();
+                buffer = Buffer.from(arrayBuffer);
+            } else if (response instanceof ArrayBuffer) {
+                buffer = Buffer.from(response);
+            } else if (Buffer.isBuffer(response)) {
+                buffer = response;
+            } else {
+                throw new Error('Format de réponse inattendu de Hugging Face');
+            }
             
             await fs.writeFile(outputPath, buffer);
             console.log(`✅ Vidéo Hugging Face générée: ${outputPath}`);
