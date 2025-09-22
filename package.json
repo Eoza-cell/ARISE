@@ -18,6 +18,7 @@
     "@google/genai": "^1.19.0",
     "@google/generative-ai": "^0.24.1",
     "@hapi/boom": "^10.0.1",
+    "@huggingface/inference": "^4.8.0",
     "@neondatabase/serverless": "^1.0.1",
     "@types/node": "^24.3.1",
     "@whiskeysockets/baileys": "^7.0.0-rc.2",

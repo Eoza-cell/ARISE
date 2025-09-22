@@ -29,6 +29,7 @@ const PlayHTClient = require('./playht/PlayHTClient');
 const CambAIClient = require('./camb/CambAIClient');
 const PuterClient = require('./puter/PuterClient');
 const RunwayClient = require('./runway/RunwayClient');
+const HuggingFaceClient = require('./huggingface/HuggingFaceClient');
 
 class FrictionUltimateBot {
     constructor() {
