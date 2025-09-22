@@ -14,7 +14,7 @@ const { initializeGameData } = require('./data/GameData');
 
 // Clients IA et services
 const OpenAIClient = require('./ai/OpenAIClient');
-const GroqClient = require('./groq/GroqClient'); 
+const GroqClient = require('./groq/GroqClient');
 const GeminiClient = require('./gemini/GeminiClient');
 const OllamaClient = require('./ai/OllamaClient');
 
@@ -30,6 +30,9 @@ const CambAIClient = require('./camb/CambAIClient');
 const PuterClient = require('./puter/PuterClient');
 const RunwayClient = require('./runway/RunwayClient');
 const HuggingFaceClient = require('./huggingface/HuggingFaceClient');
+
+// Gestionnaire de session WhatsApp
+const SessionManager = require('./whatsapp/SessionManager');
 
 class FrictionUltimateBot {
     constructor() {
@@ -70,15 +73,17 @@ class FrictionUltimateBot {
     async startWhatsApp() {
         console.log('📱 Démarrage de la connexion WhatsApp...');
 
-        // Use environment variable for auth state path for security
-        const authInfoPath = process.env.WHATSAPP_AUTH_PATH || 'auth_info';
-        const { state, saveCreds } = await useMultiFileAuthState(authInfoPath);
+        // Utiliser le SessionManager pour gérer les sessions
+        const sessionManager = new SessionManager();
+        const session = await sessionManager.getSession();
+
+        const { state, saveCreds } = await useMultiFileAuthState(session.authDir); // Utilisation du répertoire de session
 
         this.sock = makeWASocket({
             auth: state,
             browser: [
                 process.env.WHATSAPP_BROWSER_NAME || 'Friction Ultimate',
-                process.env.WHATSAPP_BROWSER_TYPE || 'Desktop', 
+                process.env.WHATSAPP_BROWSER_TYPE || 'Desktop',
                 process.env.WHATSAPP_BROWSER_VERSION || '1.0.0'
             ],
             logger: require('pino')({ level: 'error' }) // Reduce sensitive logging
@@ -91,6 +96,8 @@ class FrictionUltimateBot {
             if (qr) {
                 console.log('📱 QR Code généré - Scannez avec WhatsApp:');
                 qrcode.generate(qr, { small: true });
+                // Sauvegarder le QR code dans le SessionManager si nécessaire
+                await sessionManager.saveQrCode(qr);
             }
 
             if (connection === 'close') {
@@ -99,16 +106,29 @@ class FrictionUltimateBot {
 
                 if (shouldReconnect) {
                     setTimeout(() => this.startWhatsApp(), 3000);
+                } else {
+                    // Si déconnecté (loggedOut), supprimer la session pour en créer une nouvelle
+                    console.log('🔌 Déconnexion permanente. Suppression de la session.');
+                    await sessionManager.deleteSession();
+                    // Optionnellement, redémarrer complètement le bot ou le processus
+                    // process.exit(0); // Ou redémarrer après un délai
                 }
             } else if (connection === 'open') {
                 console.log('✅ Connexion WhatsApp établie !');
                 this.isConnected = true;
-                
+
                 // Initialiser le gestionnaire de boutons
                 this.buttonManager = new WhatsAppButtonManager(this.sock);
                 console.log('🔘 Gestionnaire de boutons interactifs initialisé');
-                
+
                 await this.sendWelcomeMessage();
+
+                // Sauvegarder les informations de session une fois connecté
+                await sessionManager.saveSession({
+                    authDir: session.authDir,
+                    isLoggedIn: true,
+                    // Vous pourriez vouloir stocker d'autres métadonnées ici
+                });
             }
         });
 
@@ -160,7 +180,7 @@ class FrictionUltimateBot {
                 // Vérifier si c'est vraiment un doublon en regardant l'heure
                 const now = Date.now();
                 const messageKey = `${from}-${messageText}-${Math.floor(now / 5000)}`; // Fenêtre de 5 secondes
-                
+
                 if (this.processedMessages.has(messageKey)) {
                     console.log(`⚠️ Message de groupe doublon confirmé ignoré: ${messageText}`);
                     return;
@@ -202,7 +222,7 @@ class FrictionUltimateBot {
                 playerNumber = from.split('@')[0];
             }
 
-            // Nettoyer les formats @lid 
+            // Nettoyer les formats @lid
             if (playerNumber.includes(':')) {
                 playerNumber = playerNumber.split(':')[0];
             }
@@ -245,7 +265,7 @@ class FrictionUltimateBot {
     async extractMessageImage(message) {
         try {
             let imageMessage = null;
-            
+
             if (message.message?.imageMessage) {
                 console.log('📸 Image détectée dans le message');
                 imageMessage = message.message.imageMessage;
@@ -253,15 +273,15 @@ class FrictionUltimateBot {
                 console.log('📸 Image view-once détectée');
                 imageMessage = message.message.viewOnceMessage.message.imageMessage;
             }
-            
+
             if (imageMessage) {
                 // Télécharger l'image avec la bonne méthode
                 console.log('📥 Téléchargement de l\'image...');
                 const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-                const buffer = await downloadMediaMessage(message, 'buffer', {}, { 
-                    logger: require('pino')({ level: 'silent' }) 
+                const buffer = await downloadMediaMessage(message, 'buffer', {}, {
+                    logger: require('pino')({ level: 'silent' })
                 });
-                
+
                 if (buffer) {
                     console.log(`✅ Image téléchargée: ${buffer.length} bytes`);
                     return {
@@ -273,7 +293,7 @@ class FrictionUltimateBot {
                     };
                 }
             }
-            
+
             return null;
         } catch (error) {
             console.error('❌ Erreur téléchargement image:', error);
@@ -339,9 +359,9 @@ class FrictionUltimateBot {
                         const fs = require('fs');
                         console.log('🎬 Envoi vidéo - Type:', typeof response.video);
                         console.log('🎬 Envoi vidéo - Valeur:', response.video);
-                        
+
                         let videoBuffer;
-                        
+
                         if (typeof response.video === 'string') {
                             // C'est un chemin de fichier
                             await fs.promises.access(response.video);
@@ -389,17 +409,17 @@ class FrictionUltimateBot {
         try {
             const from = message.key.remoteJid;
             const voter = message.key.participant || from;
-            
+
             console.log(`🗳️ Vote de sondage reçu de ${voter}`);
-            
+
             // Pour l'instant, juste loguer le vote - vous pouvez ajouter la logique spécifique plus tard
             console.log('📊 Vote sondage détecté - Action bouton simulé');
-            
+
             // Optionnel: envoyer une confirmation
-            await this.sock.sendMessage(from, { 
-                text: '✅ Action reçue! (Bouton simulé activé)' 
+            await this.sock.sendMessage(from, {
+                text: '✅ Action reçue! (Bouton simulé activé)'
             });
-            
+
         } catch (error) {
             console.error('❌ Erreur traitement vote sondage:', error);
         }
@@ -414,16 +434,16 @@ class FrictionUltimateBot {
 
         try {
             // Envoyer un message d'introduction
-            await this.sock.sendMessage(chatId, { 
-                text: '🎮 Démonstration des boutons interactifs!\nVoici un menu simulé avec des sondages:' 
+            await this.sock.sendMessage(chatId, {
+                text: '🎮 Démonstration des boutons interactifs!\nVoici un menu simulé avec des sondages:'
             });
-            
+
             // Attendre un peu
             await new Promise(resolve => setTimeout(resolve, 1000));
-            
+
             // Créer le menu principal du jeu
             await this.buttonManager.sendMainGameMenu(chatId);
-            
+
         } catch (error) {
             console.error('❌ Erreur démonstration boutons:', error);
         }
