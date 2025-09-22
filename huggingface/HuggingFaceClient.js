@@ -42,7 +42,70 @@ class HuggingFaceClient {
 
             const optimizedPrompt = this.optimizePromptForHuggingFace(prompt);
             
-            // Use Hugging Face Inference API for video generation with supported model
+            console.log(`🎬 Utilisation du modèle Wan-AI/Wan2.2-T2V-A14B pour génération vidéo...`);
+
+            // Use the new textToVideo API with Wan-AI model
+            const videoBlob = await this.client.textToVideo({
+                provider: "auto",
+                model: "Wan-AI/Wan2.2-T2V-A14B",
+                inputs: optimizedPrompt
+            });
+
+            console.log(`📥 Réponse reçue, traitement du blob vidéo...`);
+
+            // Handle the Blob response
+            let buffer;
+            if (videoBlob instanceof Blob) {
+                const arrayBuffer = await videoBlob.arrayBuffer();
+                buffer = Buffer.from(arrayBuffer);
+                console.log(`💾 Vidéo convertie en buffer (${buffer.length} bytes)`);
+            } else {
+                throw new Error('Format de réponse inattendu - attendu Blob');
+            }
+            
+            // Créer le dossier de sortie si nécessaire
+            const outputDir = path.dirname(outputPath);
+            await fs.mkdir(outputDir, { recursive: true });
+
+            await fs.writeFile(outputPath, buffer);
+            console.log(`✅ Vidéo Hugging Face générée avec Wan-AI: ${outputPath} (${buffer.length} bytes)`);
+            
+            return {
+                success: true,
+                videoPath: outputPath,
+                duration: options.duration || 5,
+                provider: 'huggingface',
+                model: 'Wan-AI/Wan2.2-T2V-A14B',
+                fileSize: buffer.length
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur génération vidéo Hugging Face:', error.message);
+            
+            // Si l'erreur concerne le modèle, essayer un fallback
+            if (error.message.includes('model') || error.message.includes('Wan-AI')) {
+                console.log('🔄 Tentative avec le modèle de fallback...');
+                try {
+                    const fallbackVideo = await this.generateVideoWithFallbackModel(prompt, outputPath, options);
+                    return fallbackVideo;
+                } catch (fallbackError) {
+                    console.error('❌ Erreur modèle de fallback:', fallbackError.message);
+                }
+            }
+            
+            throw new Error(`Génération vidéo échouée: ${error.message}`);
+        }
+    }
+
+    /**
+     * Méthode de fallback avec l'ancien modèle
+     */
+    async generateVideoWithFallbackModel(prompt, outputPath, options = {}) {
+        try {
+            console.log(`🔄 Utilisation du modèle de fallback damo-vilab/text-to-video-ms-1.7b...`);
+
+            const optimizedPrompt = this.optimizePromptForHuggingFace(prompt);
+            
             const response = await this.client.request({
                 model: "damo-vilab/text-to-video-ms-1.7b",
                 inputs: optimizedPrompt,
@@ -54,7 +117,6 @@ class HuggingFaceClient {
                 }
             });
 
-            // Handle response based on format (could be Blob, ArrayBuffer, or direct bytes)
             let buffer;
             if (response instanceof Blob) {
                 const arrayBuffer = await response.arrayBuffer();
@@ -67,50 +129,56 @@ class HuggingFaceClient {
                 throw new Error('Format de réponse inattendu de Hugging Face');
             }
             
+            const outputDir = path.dirname(outputPath);
+            await fs.mkdir(outputDir, { recursive: true });
+
             await fs.writeFile(outputPath, buffer);
-            console.log(`✅ Vidéo Hugging Face générée: ${outputPath}`);
+            console.log(`✅ Vidéo Hugging Face générée avec modèle de fallback: ${outputPath}`);
             
             return {
                 success: true,
                 videoPath: outputPath,
                 duration: options.duration || 5,
-                provider: 'huggingface'
+                provider: 'huggingface',
+                model: 'damo-vilab/text-to-video-ms-1.7b',
+                fileSize: buffer.length
             };
 
         } catch (error) {
-            console.error('❌ Erreur génération vidéo Hugging Face:', error.message);
-            throw new Error(`Génération vidéo échouée: ${error.message}`);
+            console.error('❌ Erreur modèle de fallback:', error.message);
+            throw error;
         }
     }
 
     optimizePromptForHuggingFace(prompt) {
-        // Optimize prompt for Hugging Face video generation
+        // Optimize prompt specifically for Wan-AI/Wan2.2-T2V-A14B model
         let optimized = prompt
             .replace(/['"]/g, '') // Remove quotes
             .replace(/\s+/g, ' ') // Normalize spaces
             .trim();
 
-        // Add common video generation improvements
+        // Add video generation improvements optimized for Wan-AI model
         const improvements = [
-            'cinematic',
-            'high quality',
-            'detailed',
-            'smooth motion'
+            'cinematic quality',
+            'professional video',
+            'smooth camera movement',
+            'high definition',
+            '4K quality'
         ];
 
         // Add improvements if not already present
         improvements.forEach(improvement => {
-            if (!optimized.toLowerCase().includes(improvement)) {
+            if (!optimized.toLowerCase().includes(improvement.toLowerCase())) {
                 optimized += `, ${improvement}`;
             }
         });
 
-        // Limit length for better performance
-        if (optimized.length > 200) {
-            optimized = optimized.substring(0, 197) + '...';
+        // Wan-AI model works better with longer, more descriptive prompts
+        if (optimized.length > 300) {
+            optimized = optimized.substring(0, 297) + '...';
         }
 
-        console.log(`🎯 Prompt optimisé HF: "${optimized}"`);
+        console.log(`🎯 Prompt optimisé pour Wan-AI: "${optimized}"`);
         return optimized;
     }
 
