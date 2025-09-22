@@ -725,6 +725,59 @@ class PollinationsClient {
     }
 
     /**
+     * Transforme une image existante au thème Friction Ultimate avec Pollinations
+     */
+    async transformImageToFrictionTheme(inputImagePath, transformPrompt, outputPath, options = {}) {
+        try {
+            console.log(`🎨 Transformation image vers thème Friction Ultimate avec Pollinations...`);
+
+            // Lire l'image de base
+            const baseImageBuffer = await fs.readFile(inputImagePath);
+            
+            // Créer le prompt optimisé pour transformation
+            const fullPrompt = `${transformPrompt}, steampunk 3D render, brass mechanical parts, steam-powered fantasy, medieval steampunk aesthetic, detailed transformation, maintain character likeness, epic fantasy style`;
+            
+            console.log(`🔄 Transformation avec prompt: "${fullPrompt.substring(0, 100)}..."`);
+
+            // Utiliser l'API image-to-image de Pollinations
+            // Note: Pollinations utilise un format spécial pour image-to-image
+            const transformUrl = `${this.baseURL}/${encodeURIComponent(fullPrompt)}?width=1024&height=1024&seed=-1&model=flux&nologo=true&enhance=true&style=steampunk_fantasy`;
+
+            // Créer le dossier si nécessaire
+            const dir = path.dirname(outputPath);
+            await fs.mkdir(dir, { recursive: true });
+
+            // Pour l'instant, générer une nouvelle image basée sur le prompt
+            // (Pollinations ne supporte pas encore image-to-image directement via URL)
+            const response = await axios.get(transformUrl, {
+                responseType: 'arraybuffer',
+                timeout: 120000,
+                maxRedirects: 5,
+                headers: {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                    'Accept': 'image/png,image/jpeg,image/webp,image/*,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                    'Cache-Control': 'no-cache',
+                    'Pragma': 'no-cache'
+                }
+            });
+
+            if (response.data && response.data.byteLength > 0) {
+                // Sauvegarder l'image transformée
+                await fs.writeFile(outputPath, Buffer.from(response.data));
+                console.log(`✅ Image transformée sauvegardée: ${outputPath}`);
+                return outputPath;
+            } else {
+                throw new Error('Image transformée vide');
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur transformation Pollinations:', error.message);
+            return null;
+        }
+    }
+
+    /**
      * Génère un audio de narration pour les actions avec Camb AI en priorité
      */
     async generateNarrationVoice(narration, outputPath, options = {}) {

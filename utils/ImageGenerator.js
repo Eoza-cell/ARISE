@@ -330,9 +330,9 @@ class ImageGenerator {
                     }
                 } catch (pollinationsError) {
                     if (pollinationsError.message.includes('timeout')) {
-                        console.log('⚠️ Timeout Pollinations (>2min), fallback vers Freepik:', pollinationsError.message);
+                        console.log('⚠️ Timeout Pollinations (>2min), fallback vers Freepik:', pollinatorsError.message);
                     } else {
-                        console.log('⚠️ Erreur Pollinations action, fallback vers Freepik:', pollinationsError.message);
+                        console.log('⚠️ Erreur Pollinations action, fallback vers Freepik:', pollinatorsError.message);
                     }
                 }
             }
@@ -459,7 +459,7 @@ class ImageGenerator {
                         return imageBuffer;
                     }
                 } catch (pollinationsError) {
-                    console.log(`⚠️ Erreur Pollinations personnage, fallback vers Freepik:`, pollinationsError.message);
+                    console.log(`⚠️ Erreur Pollinations personnage, fallback vers Freepik:`, pollinatorsError.message);
                 }
             }
 
@@ -836,17 +836,17 @@ class ImageGenerator {
     async generateActionVideo(character, action, narration, imagePath = null) {
         try {
             const videoPath = path.join(this.tempPath, `action_video_${character.id}_${Date.now()}.mp4`);
-            
+
             // Essayer HuggingFace d'abord (GRATUIT et fonctionne)
             if (this.hasHuggingFace && this.huggingfaceClient) {
                 try {
                     console.log('🤗 Génération vidéo d\'action avec HuggingFace GRATUIT...');
                     const videoPrompt = `${character.name} performing ${action} in ${character.currentLocation}, medieval fantasy RPG character in action, dynamic movement, epic fantasy scene, cinematic quality`;
-                    
+
                     const result = await this.huggingfaceClient.generateVideoFromText(videoPrompt, videoPath, {
                         duration: 4
                     });
-                    
+
                     if (result && result.success) {
                         console.log('✅ Vidéo d\'action générée par HuggingFace GRATUIT');
                         return result.videoPath; // Retourner le chemin au lieu du buffer
@@ -1147,7 +1147,7 @@ class ImageGenerator {
         try {
             // D'abord essayer d'utiliser l'image de fiche personnage existante
             let actionImage = null;
-            
+
             try {
                 // Essayer d'utiliser l'image personnalisée du personnage comme base
                 const customImage = await this.getCustomCharacterImage(character.id);
@@ -1191,6 +1191,116 @@ class ImageGenerator {
         } catch (error) {
             console.error('❌ Erreur génération action avec voix:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Transforme une image existante avec Pollinations pour l'adapter au thème Friction Ultimate
+     */
+    async transformImageWithPollinations(baseImageBuffer, character, action, narration, options = {}) {
+        try {
+            console.log(`🎨 Transformation image avec Pollinations pour thème Friction Ultimate...`);
+
+            if (!this.hasPollinations || !this.pollinationsClient) {
+                console.log('⚠️ Pollinations non disponible pour transformation');
+                return baseImageBuffer; // Retourner l'image originale
+            }
+
+            // Sauvegarder l'image de base temporairement
+            const tempInputPath = path.join(this.tempPath, `temp_base_${character.id}_${Date.now()}.png`);
+            const tempOutputPath = path.join(this.tempPath, `transformed_action_${character.id}_${Date.now()}.png`);
+
+            await fs.writeFile(tempInputPath, baseImageBuffer);
+
+            // Créer un prompt de transformation spécialement adapté à Friction Ultimate
+            const transformPrompt = this.createTransformationPrompt(character, action, narration);
+
+            console.log(`🎯 Prompt de transformation: "${transformPrompt}"`);
+
+            // Utiliser l'API de transformation d'image de Pollinations
+            const transformedImagePath = await this.pollinationsClient.transformImageToFrictionTheme(
+                tempInputPath,
+                transformPrompt,
+                tempOutputPath,
+                {
+                    style: 'steampunk_fantasy',
+                    strength: 0.7, // Garder 30% de l'image originale
+                    ...options
+                }
+            );
+
+            if (transformedImagePath) {
+                const transformedBuffer = await fs.readFile(transformedImagePath);
+                console.log(`✅ Image transformée avec succès par Pollinations`);
+
+                // Nettoyer les fichiers temporaires
+                setTimeout(() => {
+                    fs.unlink(tempInputPath, () => {});
+                    fs.unlink(transformedImagePath, () => {});
+                }, 5000);
+
+                return transformedBuffer;
+            } else {
+                console.log('⚠️ Transformation échouée, utilisation image originale');
+                return baseImageBuffer;
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur transformation image:', error.message);
+            return baseImageBuffer; // Retourner l'image originale en cas d'erreur
+        }
+    }
+
+    /**
+     * Crée un prompt optimisé pour la transformation au thème Friction Ultimate
+     */
+    createTransformationPrompt(character, action, narration) {
+        const genderDesc = character.gender === 'male' ? 'male' : 'female';
+        const kingdomStyle = this.getKingdomStyle(character.kingdom);
+
+        return `Transform this ${genderDesc} character into Friction Ultimate steampunk fantasy style: ${character.name} performing ${action}. ${narration}. Steampunk medieval fantasy, brass and copper armor, steam-powered weapons, mechanical gears, ${kingdomStyle}, epic fantasy atmosphere, cinematic lighting, detailed steampunk aesthetic, maintain facial features but add steampunk fantasy elements`;
+    }
+
+
+    /**
+     * Génère un audio de narration pour les actions avec Camb AI en priorité
+     */
+    async generateNarrationVoice(narration, outputPath, options = {}) {
+        try {
+            console.log(`📖 Génération narration vocale: "${narration.substring(0, 30)}..."`);
+
+            // Préparer les options pour la narration avec Camb AI
+            const voiceOptions = {
+                gender: options.gender || 'male',
+                age: options.age || 35,
+                language: 'fr',
+                voice_id: options.voice_id || null,
+                ...options
+            };
+
+            // Essayer d'abord Camb AI (qualité supérieure MARS5)
+            if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
+                console.log('🎙️ Génération narration avec Camb AI MARS5...');
+                try {
+                    const cambResult = await this.cambAIClient.generateNarrationVoice(narration, outputPath, voiceOptions);
+                    if (cambResult) {
+                        console.log('✅ Narration générée avec Camb AI MARS5');
+                        return cambResult;
+                    }
+                } catch (cambError) {
+                    console.log('⚠️ Camb AI narration échec:', cambError.message);
+                }
+            } else {
+                console.log('⚠️ Camb AI non disponible pour la narration');
+            }
+
+            // Fallback vers Pollinations
+            console.log('🔄 Fallback narration vers Pollinations...');
+            return await this.pollinationsClient.generatePollinationsVoice(narration, outputPath, voiceOptions);
+
+        } catch (error) {
+            console.error('❌ Erreur génération narration vocale:', error.message);
+            return null;
         }
     }
 

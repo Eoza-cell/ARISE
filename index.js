@@ -155,10 +155,17 @@ class FrictionUltimateBot {
                 console.log(`📝 Message texte: "${messageText}"`);
             }
 
-            // Gestion des groupes : ignorer les messages sans participant (doublons) SAUF pour les images
+            // Gestion des groupes : ignorer SEULEMENT les vrais doublons
             if (from.includes('@g.us') && !message.key.participant && !messageImage) {
-                console.log(`⚠️ Message de groupe sans participant ignoré (doublon): ${messageText}`);
-                return;
+                // Vérifier si c'est vraiment un doublon en regardant l'heure
+                const now = Date.now();
+                const messageKey = `${from}-${messageText}-${Math.floor(now / 5000)}`; // Fenêtre de 5 secondes
+                
+                if (this.processedMessages.has(messageKey)) {
+                    console.log(`⚠️ Message de groupe doublon confirmé ignoré: ${messageText}`);
+                    return;
+                }
+                this.processedMessages.add(messageKey);
             }
 
             // Définir le vrai expéditeur pour l'affichage et la déduplication
