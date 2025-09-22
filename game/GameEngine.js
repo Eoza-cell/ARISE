@@ -656,9 +656,7 @@ Règles importantes:
             try {
                 if (this.groqClient && this.groqClient.hasValidClient()) {
                     console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
-                    let rawNarration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId, character);
-
-                    const narration = this.narrationFormatter.formatNarration(rawNarration, 'thick');
+                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId, character);
 
                     console.log('✅ Narration générée avec Groq');
                 } else {
@@ -850,24 +848,9 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 actionImage = mediaResult.image;
                 actionAudio = mediaResult.audio;
 
-                const actionImageGenerator = require('../utils/ImageGenerator');
-                const imagePath = path.join(__dirname, '..', 'temp', `action_temp_${Date.now()}.png`);
+                // Générer la vidéo d'action avec HuggingFace en priorité
+                actionVideo = await imageGenerator.generateActionVideo(character, message, narration);
 
-                if (actionImage && imagePath) {
-                    const fs = require('fs').promises;
-                    await fs.writeFile(imagePath, actionImage);
-                }
-
-                actionVideo = await imageGenerator.generateActionVideo(character, message, narration, imagePath);
-
-                if (imagePath) {
-                    try {
-                        const fs = require('fs').promises;
-                        await fs.unlink(imagePath);
-                    } catch (err) {
-                        console.log('⚠️ Impossible de supprimer le fichier temporaire:', err.message);
-                    }
-                }
             } catch (mediaError) {
                 console.error('❌ Erreur génération média:', mediaError.message);
             }

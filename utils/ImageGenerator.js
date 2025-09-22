@@ -835,19 +835,43 @@ class ImageGenerator {
 
     async generateActionVideo(character, action, narration, imagePath = null) {
         try {
-            console.log('🎬 Génération vidéo d\'action avec RunwayML...');
-
-            if (!this.hasRunway || !this.runwayClient) {
-                console.log('⚠️ RunwayClient non disponible pour vidéo');
-                return null;
+            const videoPath = path.join(this.tempPath, `action_video_${character.id}_${Date.now()}.mp4`);
+            
+            // Essayer HuggingFace d'abord (GRATUIT et fonctionne)
+            if (this.hasHuggingFace && this.huggingfaceClient) {
+                try {
+                    console.log('🤗 Génération vidéo d\'action avec HuggingFace GRATUIT...');
+                    const videoPrompt = `${character.name} performing ${action} in ${character.currentLocation}, medieval fantasy RPG character in action, dynamic movement, epic fantasy scene, cinematic quality`;
+                    
+                    const result = await this.huggingfaceClient.generateVideoFromText(videoPrompt, videoPath, {
+                        duration: 4
+                    });
+                    
+                    if (result && result.success) {
+                        console.log('✅ Vidéo d\'action générée par HuggingFace GRATUIT');
+                        return await fs.readFile(result.videoPath).catch(() => null);
+                    }
+                } catch (hfError) {
+                    console.log('⚠️ Erreur HuggingFace vidéo action, fallback vers RunwayML:', hfError.message);
+                }
             }
 
-            // Construire le prompt pour la vidéo
-            const videoPrompt = `${character.name} performing: ${action}. Medieval fantasy setting, cinematic movement, epic fantasy atmosphere`;
+            // Fallback vers RunwayML (si disponible)
+            if (this.hasRunway && this.runwayClient) {
+                try {
+                    console.log('🎬 Génération vidéo d\'action avec RunwayML...');
+                    const videoPrompt = `${character.name} performing: ${action}. Medieval fantasy setting, cinematic movement, epic fantasy atmosphere`;
+                    const videoPath = await this.runwayClient.generateVideo(videoPrompt, imagePath);
+                    return await fs.readFile(videoPath).catch(() => null);
+                } catch (runwayError) {
+                    console.log('⚠️ Erreur RunwayML vidéo action:', runwayError.message);
+                }
+            }
 
-            return await this.runwayClient.generateVideo(videoPrompt, imagePath);
+            console.log('⚠️ Aucun service vidéo disponible - pas de vidéo d\'action générée');
+            return null;
         } catch (error) {
-            console.error('❌ Erreur génération vidéo:', error.message);
+            console.error('❌ Erreur génération vidéo action:', error.message);
             return null;
         }
     }
@@ -1121,7 +1145,23 @@ class ImageGenerator {
      */
     async generateCharacterActionImageWithVoice(character, action, narration, options = {}) {
         try {
-            const result = await this.generateCharacterActionImage(character, action, narration, options);
+            // D'abord essayer d'utiliser l'image de fiche personnage existante
+            let actionImage = null;
+            
+            try {
+                // Essayer d'utiliser l'image personnalisée du personnage comme base
+                const customImage = await this.getCustomCharacterImage(character.id);
+                if (customImage) {
+                    console.log(`✅ Utilisation de l'image de fiche personnage pour l'action de ${character.name}`);
+                    actionImage = customImage;
+                } else {
+                    // Fallback vers génération normale
+                    actionImage = await this.generateCharacterActionImage(character, action, narration, options);
+                }
+            } catch (imageError) {
+                console.log('⚠️ Impossible d\'utiliser l\'image de fiche, génération normale:', imageError.message);
+                actionImage = await this.generateCharacterActionImage(character, action, narration, options);
+            }
 
             // Générer aussi l'audio de narration
             let audioBuffer = null;
@@ -1145,7 +1185,7 @@ class ImageGenerator {
             }
 
             return {
-                image: result,
+                image: actionImage,
                 audio: audioBuffer
             };
         } catch (error) {
