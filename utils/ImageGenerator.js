@@ -5,6 +5,7 @@ const WorldMapGenerator = require('./WorldMapGenerator');
 const FreepikClient = require('../freepik/FreepikClient');
 const BlenderClient = require('../blender/BlenderClient');
 const RunwayClient = require('../runway/RunwayClient');
+const HuggingFaceClient = require('../huggingface/HuggingFaceClient');
 const KieAiClient = require('../kieai/KieAiClient');
 const RunwareClient = require('../runware/RunwareClient');
 const PollinationsClient = require('../pollinations/PollinationsClient');
@@ -94,6 +95,21 @@ class ImageGenerator {
             console.error('❌ Erreur initialisation RunwayClient:', error.message);
             this.runwayClient = null;
             this.hasRunway = false;
+        }
+
+        // Initialisation de HuggingFaceClient pour génération de vidéos IA
+        try {
+            this.huggingfaceClient = new HuggingFaceClient();
+            this.hasHuggingFace = this.huggingfaceClient.hasValidClient();
+            if (this.hasHuggingFace) {
+                console.log('🤗 HuggingFaceClient initialisé - Génération de vidéos IA activée');
+            } else {
+                console.log('⚠️ HF_TOKEN non configurée - HuggingFace vidéos désactivées');
+            }
+        } catch (error) {
+            console.error('❌ Erreur initialisation HuggingFaceClient:', error.message);
+            this.huggingfaceClient = null;
+            this.hasHuggingFace = false;
         }
 
         // Configuration par défaut
@@ -838,16 +854,34 @@ class ImageGenerator {
 
     async generateCombatVideo(combatContext) {
         try {
-            if (!this.hasRunway || !this.runwayClient) {
-                console.log('⚠️ RunwayML non disponible - pas de vidéo de combat générée');
-                return null;
-            }
-
             const videoPath = path.join(this.tempPath, `combat_video_${Date.now()}.mp4`);
 
-            console.log(`🎬 Génération vidéo de combat: ${combatContext.attacker.name} vs ${combatContext.defender.name}`);
+            // Essayer HuggingFace d'abord (si disponible)
+            if (this.hasHuggingFace && this.huggingfaceClient) {
+                try {
+                    console.log(`🤗 Génération vidéo de combat avec HuggingFace: ${combatContext.attacker.name} vs ${combatContext.defender.name}`);
+                    const result = await this.huggingfaceClient.generateCombatVideo(
+                        `${combatContext.attacker.name} fighting ${combatContext.defender.name}`,
+                        combatContext.attacker,
+                        videoPath
+                    );
+                    if (result && result.success) {
+                        console.log('✅ Vidéo de combat générée par HuggingFace');
+                        return result.videoPath;
+                    }
+                } catch (hfError) {
+                    console.log('⚠️ Erreur HuggingFace combat, fallback vers RunwayML:', hfError.message);
+                }
+            }
 
-            return await this.runwayClient.generateCombatVideo(combatContext, videoPath);
+            // Fallback vers RunwayML
+            if (this.hasRunway && this.runwayClient) {
+                console.log(`🎬 Génération vidéo de combat avec RunwayML: ${combatContext.attacker.name} vs ${combatContext.defender.name}`);
+                return await this.runwayClient.generateCombatVideo(combatContext, videoPath);
+            }
+
+            console.log('⚠️ Aucun service vidéo disponible - pas de vidéo de combat générée');
+            return null;
 
         } catch (error) {
             console.error('❌ Erreur génération vidéo de combat:', error);
@@ -857,16 +891,30 @@ class ImageGenerator {
 
     async generateLocationVideo(location, character) {
         try {
-            if (!this.hasRunway || !this.runwayClient) {
-                console.log('⚠️ RunwayML non disponible - pas de vidéo de lieu générée');
-                return null;
-            }
-
             const videoPath = path.join(this.tempPath, `location_video_${location.replace(/\s+/g, '_')}_${Date.now()}.mp4`);
 
-            console.log(`🎬 Génération vidéo de lieu: ${location}`);
+            // Essayer HuggingFace d'abord (si disponible)
+            if (this.hasHuggingFace && this.huggingfaceClient) {
+                try {
+                    console.log(`🤗 Génération vidéo de lieu avec HuggingFace: ${location}`);
+                    const result = await this.huggingfaceClient.generateLocationVideo(location, character, videoPath);
+                    if (result && result.success) {
+                        console.log('✅ Vidéo de lieu générée par HuggingFace');
+                        return result.videoPath;
+                    }
+                } catch (hfError) {
+                    console.log('⚠️ Erreur HuggingFace lieu, fallback vers RunwayML:', hfError.message);
+                }
+            }
 
-            return await this.runwayClient.generateLocationVideo(location, character, videoPath);
+            // Fallback vers RunwayML
+            if (this.hasRunway && this.runwayClient) {
+                console.log(`🎬 Génération vidéo de lieu avec RunwayML: ${location}`);
+                return await this.runwayClient.generateLocationVideo(location, character, videoPath);
+            }
+
+            console.log('⚠️ Aucun service vidéo disponible - pas de vidéo de lieu générée');
+            return null;
 
         } catch (error) {
             console.error('❌ Erreur génération vidéo de lieu:', error);
@@ -876,17 +924,69 @@ class ImageGenerator {
 
     async generateCustomVideo(prompt, outputPath, options = {}) {
         try {
-            if (!this.hasRunway || !this.runwayClient) {
-                throw new Error('RunwayML non disponible');
+            // Essayer HuggingFace d'abord (si disponible)
+            if (this.hasHuggingFace && this.huggingfaceClient) {
+                try {
+                    console.log(`🤗 Génération vidéo personnalisée avec HuggingFace: ${prompt.substring(0, 100)}...`);
+                    const result = await this.huggingfaceClient.generateVideoFromText(prompt, outputPath, options);
+                    if (result && result.success) {
+                        console.log('✅ Vidéo personnalisée générée par HuggingFace');
+                        return result;
+                    }
+                } catch (hfError) {
+                    console.log('⚠️ Erreur HuggingFace vidéo personnalisée, fallback vers RunwayML:', hfError.message);
+                }
             }
 
-            console.log(`🎬 Génération vidéo personnalisée: ${prompt.substring(0, 100)}...`);
+            // Fallback vers RunwayML
+            if (this.hasRunway && this.runwayClient) {
+                console.log(`🎬 Génération vidéo personnalisée avec RunwayML: ${prompt.substring(0, 100)}...`);
+                return await this.runwayClient.generateVideoFromText(prompt, outputPath, options);
+            }
 
-            return await this.runwayClient.generateVideoFromText(prompt, outputPath, options);
+            throw new Error('Aucun service de génération vidéo disponible');
 
         } catch (error) {
             console.error('❌ Erreur génération vidéo personnalisée:', error);
             throw error;
+        }
+    }
+
+    async generateMagicSpellVideo(spellName, character) {
+        try {
+            const videoPath = path.join(this.tempPath, `spell_video_${spellName.replace(/\s+/g, '_')}_${Date.now()}.mp4`);
+
+            // Essayer HuggingFace d'abord (si disponible)
+            if (this.hasHuggingFace && this.huggingfaceClient) {
+                try {
+                    console.log(`🤗 Génération vidéo de sort avec HuggingFace: ${spellName}`);
+                    const result = await this.huggingfaceClient.generateMagicSpellVideo(spellName, character, videoPath);
+                    if (result && result.success) {
+                        console.log('✅ Vidéo de sort générée par HuggingFace');
+                        return result.videoPath;
+                    }
+                } catch (hfError) {
+                    console.log('⚠️ Erreur HuggingFace sort, fallback vers RunwayML:', hfError.message);
+                }
+            }
+
+            // Fallback vers RunwayML (si disponible)
+            if (this.hasRunway && this.runwayClient) {
+                try {
+                    const prompt = `${character.name} casting ${spellName} magic spell, mystical energy effects, glowing magical aura, fantasy spellcasting, dynamic magical particles, epic scene`;
+                    console.log(`🎬 Génération vidéo de sort avec RunwayML: ${spellName}`);
+                    return await this.runwayClient.generateVideoFromText(prompt, videoPath, { duration: 4 });
+                } catch (runwayError) {
+                    console.log('⚠️ Erreur RunwayML sort:', runwayError.message);
+                }
+            }
+
+            console.log('⚠️ Aucun service vidéo disponible - pas de vidéo de sort générée');
+            return null;
+
+        } catch (error) {
+            console.error('❌ Erreur génération vidéo de sort:', error);
+            return null;
         }
     }
 
