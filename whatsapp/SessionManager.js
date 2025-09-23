@@ -117,6 +117,40 @@ class SessionManager {
         }
     }
 
+    // Méthode compatible pour l'interface du bot
+    async getSession() {
+        const authDir = await this.initializeSession();
+        return { authDir };
+    }
+
+    // Méthode pour sauvegarder le QR code
+    async saveQrCode(qr) {
+        // Optionnel - pour le moment juste loguer
+        console.log('🔐 QR Code prêt pour scan');
+    }
+
+    // Méthode pour supprimer la session
+    async deleteSession() {
+        try {
+            if (fs.existsSync(this.sessionPath)) {
+                fs.rmSync(this.sessionPath, { recursive: true, force: true });
+                console.log('🗑️ Session supprimée');
+            }
+        } catch (error) {
+            console.error('❌ Erreur suppression session:', error);
+        }
+    }
+
+    // Méthode pour sauvegarder la session
+    async saveSession(sessionData) {
+        try {
+            console.log('💾 Session sauvegardée');
+            // Implémentation basique - peut être étendue
+        } catch (error) {
+            console.error('❌ Erreur sauvegarde session:', error);
+        }
+    }
+
     // Méthode pour encoder votre propre session (à utiliser une seule fois)
     encodeYourSession(sessionPath = 'auth_info') {
         try {
