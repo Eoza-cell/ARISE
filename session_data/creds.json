@@ -1,34 +1,34 @@
 {
   "noiseKey": {
-    "private": "WXjhB8b657Kh3mzoUrYxTUYup38hU6nq",
-    "public": "R3BCoGkhfFa9r3wCTR7q5Eoax3V0eZWp"
+    "private": "IU5ClYcLUWvCOxcWOK/M+mPzwSyXc1ej",
+    "public": "/3Z0cWr70/kX+9Rz5=aCLp0o5IQt7/f/"
   },
   "pairingEphemeralKeyPair": {
-    "private": "94a=yR0c+oNfr4ishgEn",
-    "public": "1@WYrBxyk4q/9U+csA=49JVLm2WGnq=y=n9X3QTWUscrG97mlkcZ8U4cQA4QaLQTaRCR1+FnBsfzAKcY9bORIX65W4/M/BgeX=rlDbI355bWbmMTtWxvQzWNIYTt56tRu5CU/JvGEAdNXvAqLJCwN7P9eMdMlP=PCE"
+    "private": "DCvylStHazXi9+RFpSUf",
+    "public": "1@5wpbwiFoVfd+pD6b2YIpUQOUSdQnhjctA+K1kX7mVsGxvB1mC570Xj3aS+mET6aSHZ0ikUvnEGtQf1MrN6+QuKLjXVpRp35dkEcEyGN/L2TJUmv/y2NTC6b58ldiAZRaT+2wtPHQRNZId8l3ZIhBeBuxZJVIUhA6"
   },
   "signedIdentityKey": {
-    "private": "kW/agO9QB9Rg2DLl5hAfc8lSW3wBQv/16pekPeE1Mv9F",
-    "public": "mFX9/Gg1/M4hD4tUb3h+XdIaeP2Z0dY0/5n/IHmYO5di"
+    "private": "FfPt7zSoycW+mvK1w+bea+++BHtIpahwHDSAwZCZWfh6",
+    "public": "gOOnVF4Glypu9Zwoc99ArIWnCmBQhXrQJd5T01bu+Fr/"
   },
   "signedPreKey": {
     "keyPair": {
-      "private": "dnkj219sxAhWgiMEEyz+sgs2PZ=MePvDaK7kz1bSEEba",
-      "public": "xFXexkKxzAA3f+kxJy7buFKrXeBRWArTIHPYE+l=E2fA"
+      "private": "nFkDcTn2LwD8mP9BryFiqxN7zfP+DIfkjthOBB5cQ5D/",
+      "public": "g94MGGNgcWlPKkOyc+11rup6r+w8hcpFFvLL1LhBRfXW"
     },
-    "signature": "her/TBm=pEeG9uMCCKR9CcLZSfm6W/xu1tF6jnaiZhXYuq6zIrTctwMDMsKhTKY1",
-    "keyId": 48888
+    "signature": "KB/d+BqK9WrUmSpPb9vLCDto5Qbj9FY8vILdhuWI4wY8n5c/rVBmRNuLvOl5ggSI",
+    "keyId": 775221
   },
-  "registrationId": 13856625,
-  "advSecretKey": "InwPBFTbWfh4l07X4UCGQhbrKuYs+bCR8X05jttcOFID",
+  "registrationId": 13919945,
+  "advSecretKey": "2LtmIjy=48Pv4LZnbfXal+kscQagUsWJ4=2Xw8udVKOq",
   "me": {
-    "id": "Friction-Ultimate-1758664530642",
+    "id": "Friction-Ultimate-1758664551075",
     "name": "Friction Ultimate Bot"
   },
   "signalIdentities": [],
-  "myAppStateKeyId": "SxOL44",
+  "myAppStateKeyId": "5=fZ+u",
   "firstUnuploadedPreKeyId": 1,
   "nextPreKeyId": 31,
-  "lastAccountSyncTimestamp": 1758664530642,
+  "lastAccountSyncTimestamp": 1758664551075,
   "platform": "web"
 }
