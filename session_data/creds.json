@@ -1,34 +1,34 @@
 {
   "noiseKey": {
-    "private": "WVdh0RYX+SaWWik8540xzOiofXRlPdr8",
-    "public": "rMyB57RGqv7SpxwUH464DrMFkbLXBp33"
+    "private": "WXjhB8b657Kh3mzoUrYxTUYup38hU6nq",
+    "public": "R3BCoGkhfFa9r3wCTR7q5Eoax3V0eZWp"
   },
   "pairingEphemeralKeyPair": {
-    "private": "7A0YyI8bAjRrEP6LKcoo",
-    "public": "1@//HpMJx41aio=tKmnHghvPub4F1dHlMngXxiGZebCxg4jxBkyutih85dHPi2pmTyI90rP9NEjd7TQgXcnd=fbgCxTNScvJOIItZTAKqFQh20gbzKADcK431YEGyDwYYxtyB/qR7CEL81ARlxSa7Ng3+oZo0TD9Wt"
+    "private": "94a=yR0c+oNfr4ishgEn",
+    "public": "1@WYrBxyk4q/9U+csA=49JVLm2WGnq=y=n9X3QTWUscrG97mlkcZ8U4cQA4QaLQTaRCR1+FnBsfzAKcY9bORIX65W4/M/BgeX=rlDbI355bWbmMTtWxvQzWNIYTt56tRu5CU/JvGEAdNXvAqLJCwN7P9eMdMlP=PCE"
   },
   "signedIdentityKey": {
-    "private": "Zxpf/ifs1iBBI0dotUVvBbb7R8wqwy6QObwoVXjQ337g",
-    "public": "Iq35Qhf1RA8T6yOW+msUEZ8GkB7OHHlkeJXYmdwaWbpk"
+    "private": "kW/agO9QB9Rg2DLl5hAfc8lSW3wBQv/16pekPeE1Mv9F",
+    "public": "mFX9/Gg1/M4hD4tUb3h+XdIaeP2Z0dY0/5n/IHmYO5di"
   },
   "signedPreKey": {
     "keyPair": {
-      "private": "xBUc9jFDDIThF12tTms6=/BoNCYknSYjG=WiZtxMM2Z/",
-      "public": "ZKP3y/wd8=GlTx4l=pePRiXMUZPUFoodnBtqDD3toEQZ"
+      "private": "dnkj219sxAhWgiMEEyz+sgs2PZ=MePvDaK7kz1bSEEba",
+      "public": "xFXexkKxzAA3f+kxJy7buFKrXeBRWArTIHPYE+l=E2fA"
     },
-    "signature": "hrLirSb9AKBih9tU3dX/GDHaOQNiAO0ghX7bCiRD=TWSDp53DIRdVMYRfLorUkMs",
-    "keyId": 331118
+    "signature": "her/TBm=pEeG9uMCCKR9CcLZSfm6W/xu1tF6jnaiZhXYuq6zIrTctwMDMsKhTKY1",
+    "keyId": 48888
   },
-  "registrationId": 4807269,
-  "advSecretKey": "1m/eDhFL57Z05nGPorY4AdtlQ2Ba/FDCKnGS69BFBa9V",
+  "registrationId": 13856625,
+  "advSecretKey": "InwPBFTbWfh4l07X4UCGQhbrKuYs+bCR8X05jttcOFID",
   "me": {
-    "id": "Friction-Ultimate-1758664513852",
+    "id": "Friction-Ultimate-1758664530642",
     "name": "Friction Ultimate Bot"
   },
   "signalIdentities": [],
-  "myAppStateKeyId": "lgbQu/",
+  "myAppStateKeyId": "SxOL44",
   "firstUnuploadedPreKeyId": 1,
   "nextPreKeyId": 31,
-  "lastAccountSyncTimestamp": 1758664513852,
+  "lastAccountSyncTimestamp": 1758664530642,
   "platform": "web"
 }
