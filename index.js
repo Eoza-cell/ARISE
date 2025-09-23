@@ -103,9 +103,27 @@ class FrictionUltimateBot {
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                 console.log('❌ Connexion fermée, reconnexion:', shouldReconnect);
+                
+                // Vérifier si c'est un problème de clé privée invalide
+                const errorMessage = lastDisconnect?.error?.message;
+                if (errorMessage && errorMessage.includes('Invalid private key type')) {
+                    console.log('⚠️ Erreur de clé privée détectée - arrêt des tentatives de reconnexion');
+                    console.log('💡 Pour se connecter à WhatsApp, utilisez une vraie session ou scannez le QR code');
+                    return; // Arrêter les tentatives de reconnexion
+                }
 
                 if (shouldReconnect) {
-                    setTimeout(() => this.startWhatsApp(), 3000);
+                    // Limiter le nombre de tentatives
+                    if (!this.reconnectAttempts) this.reconnectAttempts = 0;
+                    this.reconnectAttempts++;
+                    
+                    if (this.reconnectAttempts > 5) {
+                        console.log('❌ Trop de tentatives de reconnexion - arrêt');
+                        console.log('💡 Le serveur web continue de fonctionner sur le port 5000');
+                        return;
+                    }
+                    
+                    setTimeout(() => this.startWhatsApp(), 5000);
                 } else {
                     // Si déconnecté (loggedOut), supprimer la session pour en créer une nouvelle
                     console.log('🔌 Déconnexion permanente. Suppression de la session.');

@@ -10,14 +10,8 @@ class SessionManager {
     }
 
     getDefaultSession() {
-        // Session par défaut encodée - vous devez remplacer ceci par votre vraie session
-        return "FRICTION-ULTIMATE-SESSION-V1.0.0-" + Buffer.from(JSON.stringify({
-            clientID: "Friction-Ultimate-" + Date.now(),
-            serverToken: "1@" + this.generateRandomString(160),
-            clientToken: this.generateRandomString(20),
-            encKey: this.generateRandomString(32),
-            macKey: this.generateRandomString(32)
-        })).toString('base64');
+        // Retourner null pour forcer l'utilisation du système QR natif de Baileys
+        return null;
     }
 
     generateRandomString(length) {
@@ -33,26 +27,22 @@ class SessionManager {
         console.log('🔐 Initialisation de la session WhatsApp...');
         
         try {
-            // Créer le dossier de session s'il n'existe pas
-            if (!fs.existsSync(this.sessionPath)) {
-                fs.mkdirSync(this.sessionPath, { recursive: true });
-                console.log('📁 Dossier de session créé');
+            // Utiliser uniquement le système d'authentification QR natif de Baileys
+            console.log('📱 Démarrage en mode QR Code');
+            console.log('💡 Scannez le QR Code avec WhatsApp pour vous connecter');
+            
+            // Créer le dossier d'authentification par défaut
+            const authDir = 'auth_info_baileys';
+            if (!fs.existsSync(authDir)) {
+                fs.mkdirSync(authDir, { recursive: true });
+                console.log('📁 Dossier d\'authentification créé');
             }
-
-            // Décoder et utiliser la session
-            if (this.encodedSession && this.encodedSession.startsWith('FRICTION-ULTIMATE-SESSION-')) {
-                const sessionData = this.decodeSession(this.encodedSession);
-                await this.setupSessionFiles(sessionData);
-                console.log('✅ Session WhatsApp initialisée avec succès');
-                return this.sessionPath;
-            } else {
-                console.log('⚠️ Aucune session encodée trouvée - utilisation du mode normal');
-                return 'auth_info';
-            }
+            
+            return authDir;
 
         } catch (error) {
             console.error('❌ Erreur lors de l\'initialisation de la session:', error);
-            return 'auth_info';
+            return 'auth_info_baileys';
         }
     }
 
