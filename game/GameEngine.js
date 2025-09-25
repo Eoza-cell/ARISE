@@ -44,7 +44,9 @@ class GameEngine {
             '/inventaire': this.handleInventoryCommand.bind(this),
             '/carte': this.handleMapCommand.bind(this),
             '/boutons': this.handleButtonsTestCommand.bind(this),
-            '/buttons': this.handleButtonsTestCommand.bind(this)
+            '/buttons': this.handleButtonsTestCommand.bind(this),
+            '/autorise': this.handleAuthorizeCommand.bind(this),
+            '/config_royaume': this.handleConfigKingdomCommand.bind(this)
         };
     }
 
@@ -1629,6 +1631,156 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         } catch (error) {
             console.error('❌ Erreur génération réponse PNJ:', error);
             return "Le PNJ semble perplexe et ne sait pas quoi répondre.";
+        }
+    }
+
+    async handleAuthorizeCommand({ player, chatId, message, dbManager, imageGenerator }) {
+        try {
+            // Extraire le nom du joueur de la commande
+            const parts = message.split(' ');
+            if (parts.length < 2) {
+                return {
+                    text: `📋 **COMMANDE AUTORISE**\n\n` +
+                          `Usage: /autorise [nom_du_joueur]\n\n` +
+                          `**Exemple:** /autorise Jean\n\n` +
+                          `Cette commande permet d'autoriser un joueur dans le royaume correspondant au groupe WhatsApp actuel.`
+                };
+            }
+
+            const playerName = parts.slice(1).join(' ').trim();
+
+            // Déterminer le royaume basé sur l'ID du groupe WhatsApp
+            const kingdom = await this.getKingdomFromChatId(chatId, dbManager);
+
+            if (!kingdom) {
+                return {
+                    text: `❌ **GROUPE NON CONFIGURÉ**\n\n` +
+                          `Ce groupe WhatsApp n'est pas encore associé à un royaume.\n\n` +
+                          `Contactez un administrateur pour configurer le royaume de ce groupe.`
+                };
+            }
+
+            // Rechercher le personnage par nom
+            const character = await dbManager.getCharacterByName(playerName);
+
+            if (!character) {
+                return {
+                    text: `❌ **JOUEUR NON TROUVÉ**\n\n` +
+                          `Aucun personnage trouvé avec le nom "${playerName}".\n\n` +
+                          `Vérifiez l'orthographe ou demandez au joueur de créer son personnage avec /créer.`
+                };
+            }
+
+            // Vérifier si le joueur est déjà dans le bon royaume
+            if (character.kingdom === kingdom.id) {
+                return {
+                    text: `✅ **DÉJÀ AUTORISÉ**\n\n` +
+                          `Le joueur **${character.name}** est déjà membre du royaume **${kingdom.name}**.\n\n` +
+                          `🏰 Royaume actuel: ${kingdom.name}\n` +
+                          `📍 Localisation: ${character.currentLocation}`
+                };
+            }
+
+            // Mettre à jour le royaume du personnage
+            await dbManager.updateCharacter(character.id, {
+                kingdom: kingdom.id,
+                currentLocation: this.getStartingLocation(kingdom.id)
+            });
+
+            console.log(`👑 Autorisation: ${character.name} transféré vers ${kingdom.name} via groupe ${chatId}`);
+
+            return {
+                text: `👑 **AUTORISATION ACCORDÉE** 👑\n\n` +
+                      `✅ Le joueur **${character.name}** a été autorisé dans le royaume **${kingdom.name}**!\n\n` +
+                      `🏰 **Ancien royaume:** ${character.kingdom}\n` +
+                      `🏰 **Nouveau royaume:** ${kingdom.name}\n` +
+                      `📍 **Nouvelle localisation:** ${this.getStartingLocation(kingdom.id)}\n\n` +
+                      `Le joueur peut maintenant participer aux activités de ce royaume.`,
+                image: await imageGenerator.generateKingdomImage(kingdom.id)
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur commande autorise:', error);
+            return {
+                text: `❌ **ERREUR D'AUTORISATION**\n\n` +
+                      `Une erreur s'est produite lors de l'autorisation.\n\n` +
+                      `Veuillez réessayer ou contactez un administrateur.`
+            };
+        }
+    }
+
+    async getKingdomFromChatId(chatId, dbManager) {
+        // Mapping des groupes WhatsApp aux royaumes
+        // Vous devrez configurer ces associations selon vos groupes réels
+        const chatKingdomMapping = {
+            // Exemples d'IDs de groupes (à remplacer par les vrais IDs)
+            '120363227300362988@g.us': 'AEGYRIA',
+            '120363303602296165@g.us': 'SOMBRENUIT',
+            // Ajoutez ici les autres mappings selon vos groupes
+        };
+
+        const kingdomId = chatKingdomMapping[chatId];
+        
+        if (!kingdomId) {
+            // Si le mapping n'est pas configuré, retourner null
+            return null;
+        }
+
+        // Récupérer les informations complètes du royaume
+        return await dbManager.getKingdomById(kingdomId);
+    }
+
+    async handleConfigKingdomCommand({ player, chatId, message, dbManager, imageGenerator }) {
+        try {
+            const parts = message.split(' ');
+            
+            if (parts.length < 2) {
+                const kingdoms = await dbManager.getAllKingdoms();
+                let kingdomsList = kingdoms.map((k, i) => `${i + 1}. ${k.name} (${k.id})`).join('\n');
+                
+                return {
+                    text: `⚙️ **CONFIGURATION ROYAUME**\n\n` +
+                          `Usage: /config_royaume [ROYAUME_ID]\n\n` +
+                          `**Royaumes disponibles:**\n${kingdomsList}\n\n` +
+                          `**Exemple:** /config_royaume AEGYRIA\n\n` +
+                          `Cette commande associe ce groupe WhatsApp au royaume spécifié.\n\n` +
+                          `📍 **Groupe actuel:** ${chatId}`
+                };
+            }
+
+            const kingdomId = parts[1].toUpperCase();
+            const kingdom = await dbManager.getKingdomById(kingdomId);
+
+            if (!kingdom) {
+                return {
+                    text: `❌ **ROYAUME INVALIDE**\n\n` +
+                          `Le royaume "${kingdomId}" n'existe pas.\n\n` +
+                          `Utilisez /config_royaume pour voir la liste des royaumes disponibles.`
+                };
+            }
+
+            // Ici vous pouvez sauvegarder la configuration dans la base de données
+            // ou dans un fichier de configuration selon vos préférences
+            
+            return {
+                text: `✅ **CONFIGURATION RÉUSSIE**\n\n` +
+                      `Ce groupe WhatsApp est maintenant associé au royaume **${kingdom.name}**!\n\n` +
+                      `🏰 **Royaume:** ${kingdom.name}\n` +
+                      `📍 **ID Groupe:** ${chatId}\n` +
+                      `🎯 **ID Royaume:** ${kingdom.id}\n\n` +
+                      `Les commandes /autorise fonctionneront maintenant pour ce royaume.\n\n` +
+                      `⚠️ **Note:** Ajoutez manuellement cette association dans le code :\n` +
+                      `'${chatId}': '${kingdom.id}'`,
+                image: await imageGenerator.generateKingdomImage(kingdom.id)
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur config royaume:', error);
+            return {
+                text: `❌ **ERREUR DE CONFIGURATION**\n\n` +
+                      `Une erreur s'est produite lors de la configuration.\n\n` +
+                      `Veuillez réessayer ou contactez un administrateur.`
+            };
         }
     }
 }
