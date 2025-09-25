@@ -1,33 +1,26 @@
-const GeminiClient = require('../gemini/GeminiClient');
 const OpenAIClient = require('../ai/OpenAIClient');
 const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
-const CharacterCustomizationManager = require('../utils/CharacterCustomizationManager');
-const ImmersiveNarrationManager = require('../utils/ImmersiveNarrationManager');
+const GeminiClient = require('../gemini/GeminiClient');
 const AdvancedGameMechanics = require('./AdvancedMechanics');
 const path = require('path');
-const NarrationFormatter = require('../utils/NarrationFormatter');
 
 class GameEngine {
-    constructor({ dbManager, imageGenerator, playhtClient, cambAIClient, puterClient, asset3DManager, blenderClient, runwayClient }) {
+    constructor(dbManager) {
         this.dbManager = dbManager;
-        this.imageGenerator = imageGenerator;
-        this.playhtClient = playhtClient;
-        this.cambAIClient = cambAIClient;
-        this.puterClient = puterClient;
-        this.asset3DManager = asset3DManager;
-        this.blenderClient = blenderClient;
-        this.runwayClient = runwayClient;
+        this.imageGenerator = null; // Sera initialisé plus tard
+        this.playhtClient = null;
+        this.cambAIClient = null;
+        this.puterClient = null;
+        this.asset3DManager = null;
+        this.blenderClient = null;
+        this.runwayClient = null;
 
         this.openAIClient = new OpenAIClient(this.dbManager);
         this.ollamaClient = new OllamaClient();
         this.groqClient = new GroqClient();
         this.geminiClient = new GeminiClient();
-
-        this.narrationManager = new ImmersiveNarrationManager(this.dbManager);
-        this.narrationFormatter = new NarrationFormatter();
         this.advancedMechanics = new AdvancedGameMechanics(this.dbManager, this);
-
         this.characterCustomization = null;
 
         this.commandHandlers = {

@@ -39,14 +39,19 @@ class FrictionUltimateBot {
         this.sock = null;
         // Initialiser le moteur de jeu avec accès à la base de données
         this.dbManager = new DatabaseManager();
-        this.gameEngine = new GameEngine(this.dbManager);
         this.imageGenerator = new ImageGenerator();
+        this.gameEngine = new GameEngine(this.dbManager);
         this.buttonManager = null; // Sera initialisé après la connexion
         this.isConnected = false;
         this.processedMessages = new Set(); // Système de déduplication
 
+        // Injecter l'ImageGenerator dans le GameEngine
+        this.gameEngine.imageGenerator = this.imageGenerator;
+        
         // Injecter le client Groq dans l'ImageGenerator pour optimisation des prompts
-        this.imageGenerator.setGroqClient(this.gameEngine.groqClient);
+        if (this.imageGenerator.setGroqClient) {
+            this.imageGenerator.setGroqClient(this.gameEngine.groqClient);
+        }
     }
 
     async initialize() {
