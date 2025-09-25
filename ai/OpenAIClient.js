@@ -2,10 +2,58 @@ const OpenAI = require('openai');
 
 // Persistent database-backed AI memory system
 class AIMemory {
-    constructor(dbManager, maxHistory = 1000) {
+    constructor(dbManager, maxHistory = 2000) {
         this.dbManager = dbManager;
         this.maxHistory = maxHistory;
-        this.recentMemory = new Map(); // Cache en mémoire pour les messages récents
+        this.recentMemory = new Map();
+        this.behaviorPatterns = new Map(); // Patterns comportementaux
+        this.relationshipMatrix = new Map(); // Relations entre PNJ et joueurs
+        this.worldEvents = new Map(); // Événements globaux
+        this.personalityProfiles = new Map(); // Profils de personnalité
+    }
+
+    // Analyser les patterns de comportement du joueur
+    analyzePlayerBehavior(playerId, action, context) {
+        if (!this.behaviorPatterns.has(playerId)) {
+            this.behaviorPatterns.set(playerId, {
+                aggressiveness: 0,
+                exploration: 0,
+                social: 0,
+                strategic: 0,
+                risk_taking: 0
+            });
+        }
+
+        const patterns = this.behaviorPatterns.get(playerId);
+        
+        if (action.includes('attaque') || action.includes('combat')) patterns.aggressiveness++;
+        if (action.includes('explore') || action.includes('cherche')) patterns.exploration++;
+        if (action.includes('parle') || action.includes('dis')) patterns.social++;
+        if (action.includes('prépare') || action.includes('planifie')) patterns.strategic++;
+        if (context.riskLevel === 'high' || context.riskLevel === 'extreme') patterns.risk_taking++;
+
+        this.behaviorPatterns.set(playerId, patterns);
+        return patterns;
+    }
+
+    // Générer des réactions dynamiques basées sur l'historique
+    generateDynamicResponse(playerId, currentContext) {
+        const patterns = this.behaviorPatterns.get(playerId) || {};
+        const relationships = this.relationshipMatrix.get(playerId) || new Map();
+        
+        let responseModifier = "";
+        
+        if (patterns.aggressiveness > 10) {
+            responseModifier += "Les PNJ sont maintenant méfiants de votre réputation violente. ";
+        }
+        if (patterns.social > 15) {
+            responseModifier += "Votre réputation sociale vous ouvre des portes. ";
+        }
+        if (patterns.exploration > 20) {
+            responseModifier += "Les habitants vous reconnaissent comme un explorateur chevronné. ";
+        }
+
+        return responseModifier;
     }
 
     async getHistory(sessionId) {

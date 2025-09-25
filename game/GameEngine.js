@@ -4,6 +4,7 @@ const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
 const CharacterCustomizationManager = require('../utils/CharacterCustomizationManager');
 const ImmersiveNarrationManager = require('../utils/ImmersiveNarrationManager');
+const AdvancedGameMechanics = require('./AdvancedMechanics');
 const path = require('path');
 const NarrationFormatter = require('../utils/NarrationFormatter');
 
@@ -25,6 +26,7 @@ class GameEngine {
 
         this.narrationManager = new ImmersiveNarrationManager(this.dbManager);
         this.narrationFormatter = new NarrationFormatter();
+        this.advancedMechanics = new AdvancedGameMechanics(this.dbManager, this);
 
         this.characterCustomization = null;
 
@@ -46,7 +48,13 @@ class GameEngine {
             '/boutons': this.handleButtonsTestCommand.bind(this),
             '/buttons': this.handleButtonsTestCommand.bind(this),
             '/autorise': this.handleAuthorizeCommand.bind(this),
-            '/config_royaume': this.handleConfigKingdomCommand.bind(this)
+            '/config_royaume': this.handleConfigKingdomCommand.bind(this),
+            '/reputation': this.handleReputationCommand.bind(this),
+            '/evenements': this.handleEventsCommand.bind(this),
+            '/meteo': this.handleWeatherCommand.bind(this),
+            '/marché': this.handleMarketCommand.bind(this),
+            '/factions': this.handleFactionsCommand.bind(this),
+            '/defis': this.handleChallengesCommand.bind(this)
         };
     }
 
@@ -989,6 +997,93 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             if (!sock || !sock.buttonManager) {
                 return {
                     text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
+
+
+    async handleReputationCommand({ player, dbManager }) {
+        const reputation = await dbManager.getTemporaryData(player.id, 'reputation') || {
+            honor: 50, fear: 0, respect: 50, notoriety: 0
+        };
+
+        const reputationText = `🏆 **RÉPUTATION DE ${player.username.toUpperCase()}**\n\n` +
+                              `⚔️ **Honneur :** ${reputation.honor}/100 ${this.getReputationBar(reputation.honor)}\n` +
+                              `😨 **Peur :** ${reputation.fear}/100 ${this.getReputationBar(reputation.fear)}\n` +
+                              `🤝 **Respect :** ${reputation.respect}/100 ${this.getReputationBar(reputation.respect)}\n` +
+                              `🔥 **Notoriété :** ${reputation.notoriety}/100 ${this.getReputationBar(reputation.notoriety)}\n\n` +
+                              `📊 **Effets actifs :**\n` +
+                              `${this.advancedMechanics.getReputationEffects(reputation).join('\n')}`;
+
+        return { text: reputationText };
+    }
+
+    async handleEventsCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return { text: "❌ Aucun personnage trouvé !" };
+        }
+
+        const randomEvent = await this.advancedMechanics.triggerRandomEvent(character, character.currentLocation);
+        const socialEvent = this.advancedMechanics.generateSocialEvent(character, character.currentLocation);
+
+        const eventsText = `🎲 **ÉVÉNEMENTS EN COURS**\n\n` +
+                          `🌟 **Événement aléatoire :**\n${randomEvent.description}\n` +
+                          `Choix : ${randomEvent.choices.join(' | ')}\n\n` +
+                          `🏛️ **Événement social :**\n${socialEvent.description}\n` +
+                          `Effets : ${socialEvent.effects.join(', ')}\n` +
+                          `Durée : ${socialEvent.duration}\n\n` +
+                          `💡 **Tapez votre choix pour participer !**`;
+
+        return { text: eventsText };
+    }
+
+    async handleWeatherCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return { text: "❌ Aucun personnage trouvé !" };
+        }
+
+        const weather = this.advancedMechanics.weatherSystem.updateWeather(character.currentLocation);
+        
+        const weatherText = `🌤️ **MÉTÉO À ${character.currentLocation.toUpperCase()}**\n\n` +
+                           `☁️ **Conditions :** ${this.advancedMechanics.weatherSystem.currentWeather}\n` +
+                           `👁️ **Visibilité :** ${weather.visibility}%\n` +
+                           `🏃 **Mobilité :** ${weather.movement}%\n` +
+                           `😊 **Ambiance :** ${weather.mood}\n\n` +
+                           `⚠️ **Impact sur le gameplay en cours...**`;
+
+        return { text: weatherText };
+    }
+
+    async handleMarketCommand({ player, dbManager }) {
+        const marketEvents = this.advancedMechanics.economyEngine.marketEvents;
+        
+        const marketText = `💰 **MARCHÉ DYNAMIQUE**\n\n` +
+                          `📈 **Événements économiques actifs :**\n` +
+                          `${marketEvents.map(e => `• ${e.event}`).join('\n')}\n\n` +
+                          `💡 **Les prix s'adaptent à vos actions et aux événements mondiaux !**\n` +
+                          `🔄 **Système économique en temps réel actif**`;
+
+        return { text: marketText };
+    }
+
+    async handleFactionsCommand({ player, dbManager }) {
+        const factionStandings = await dbManager.getTemporaryData(player.id, 'faction_standings') || {};
+        
+        const factionsText = `⚔️ **RELATIONS AVEC LES FACTIONS**\n\n` +
+                            `${Object.entries(factionStandings).map(([faction, standing]) => 
+                                `🏛️ **${faction}:** ${standing}/100 ${this.getReputationBar(standing)}`
+                            ).join('\n')}\n\n` +
+                            `💡 **Vos actions affectent vos relations !**\n` +
+                            `🤝 **Formez des alliances ou créez des ennemis**`;
+
+        return { text: factionsText };
+    }
+
+    getReputationBar(value) {
+        const filled = Math.floor(value / 10);
+        const empty = 10 - filled;
+        return '█'.repeat(filled) + '░'.repeat(empty);
+    }
+
                           `⚠️ Système de boutons non initialisé.\n\n` +
                           `Les boutons simulés avec des sondages WhatsApp permettent de créer des interfaces interactives sans API officielle !\n\n` +
                           `🎮 Chaque sondage = un bouton\n` +

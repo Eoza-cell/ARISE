@@ -143,21 +143,120 @@ class GroqClient {
 
             console.log(`🗺️ Génération narration exploration avec Groq pour: ${action}`);
 
-            const prompt = `Tu es un narrateur immersif pour un RPG médiéval-technologique. 
+            // Récupérer la continuité et les événements dynamiques
+            const locationContinuity = this.getLocationContinuity(sessionId, location);
+            const dynamicEvents = this.generateDynamicEvents(location, character);
+            const npcReactions = this.generateSmartNPCReactions(character, action);
 
-CONTEXTE:
+            const prompt = `Tu es un narrateur IA ULTRA-PERFORMANT pour un RPG comme GTA mais médiéval-technologique. 
+
+CONTEXTE AVANCÉ:
 - Personnage: ${character.name} (Niveau ${character.powerLevel})
 - Lieu: ${location}
 - Action: "${action}"
 - Royaume: ${character.kingdom}
+- Continuité: ${locationContinuity}
 
-Génère une narration immersive et captivante en français qui:
-1. Décrit l'environnement avec des détails sensoriels
-2. Raconte les conséquences de l'action du joueur
-3. Crée du suspense pour la suite
-4. Reste cohérent avec l'univers fantasy steampunk
+ÉVÉNEMENTS DYNAMIQUES EN COURS:
+${dynamicEvents}
 
-Développe bien le récit pour une expérience immersive complète. Sois créatif et détaillé.`;
+RÉACTIONS PNJ INTELLIGENTES:
+${npcReactions}
+
+SYSTÈME IA RÉACTIVE GTA-STYLE:
+1. 🌍 MONDE VIVANT - Les PNJ continuent leur vie même sans le joueur
+2. 🎯 CONSÉQUENCES RÉALISTES - Chaque action a des répercussions à long terme
+3. 🧠 MÉMOIRE PERSISTANTE - Le monde se souvient des actions passées
+4. 📈 RÉPUTATION DYNAMIQUE - Les factions réagissent selon l'historique
+5. 🎲 ÉVÉNEMENTS ALÉATOIRES - Surprises constantes et opportunités
+6. 👥 IA SOCIALE - Relations complexes entre personnages
+7. 🔄 ADAPTATION - L'environnement s'adapte au style de jeu
+
+Génère une narration ÉPIQUE et INTERACTIVE qui:
+- Intègre les événements dynamiques en cours
+- Montre les réactions intelligentes des PNJ
+- Crée des opportunités et des défis inattendus
+- Utilise la mémoire du monde pour la cohérence
+- Propose des choix multiples implicites
+- Maintient le suspense et l'engagement
+
+Style: Immersif, cinématographique, avec des détails sensoriels riches.`;
+
+            const response = await this.client.chat.completions.create({
+                messages: [{ role: 'user', content: prompt }],
+                model: this.model,
+                max_tokens: 1200, // Augmenté pour plus de détails
+                temperature: 0.85 // Légèrement plus créatif
+            });
+
+            let narration = response.choices[0]?.message?.content?.trim();
+
+            if (!narration) {
+                throw new Error('Réponse Groq vide');
+            }
+
+            // Ajouter les événements dynamiques à la mémoire
+            this.addToMemory(sessionId, "system", `Événements: ${dynamicEvents}`, location);
+            this.addToMemory(sessionId, "exploration", narration, location);
+
+            console.log(`✅ Narration IA avancée générée (${narration.length} caractères)`);
+            return narration;
+
+        } catch (error) {
+            console.error('❌ Erreur Groq narration exploration:', error.message);
+            throw error;
+        }
+    }
+
+    // Générer des événements dynamiques comme dans GTA
+    generateDynamicEvents(location, character) {
+        const events = [
+            "🚨 Une patrouille de gardes passe dans la rue principale",
+            "💰 Un marchand ambulant crie ses offres spéciales",
+            "⚔️ Deux guerriers s'entraînent dans la cour, attirant les regards",
+            "🌧️ Une pluie fine commence à tomber, changeant l'atmosphère",
+            "📜 Un crieur public annonce des nouvelles du royaume",
+            "🐎 Un cavalier arrive au galop avec des messages urgents",
+            "🎭 Des troubadours installent leur spectacle sur la place",
+            "🔥 De la fumée s'élève d'une forge en activité",
+            "👥 Un groupe de voyageurs discute de terres lointaines",
+            "🕊️ Un faucon messager traverse le ciel"
+        ];
+
+        const randomEvents = [];
+        const eventCount = Math.floor(Math.random() * 3) + 1;
+        
+        for (let i = 0; i < eventCount; i++) {
+            randomEvents.push(events[Math.floor(Math.random() * events.length)]);
+        }
+
+        return randomEvents.join('\n');
+    }
+
+    // Générer des réactions PNJ intelligentes
+    generateSmartNPCReactions(character, action) {
+        const reactions = [];
+        
+        if (action.includes('attaque') || action.includes('combat')) {
+            reactions.push("🛡️ Les gardes se mettent en alerte");
+            reactions.push("😨 Les civils fuient la zone de combat");
+            reactions.push("👮 Des renforts sont appelés discrètement");
+        }
+        
+        if (action.includes('parle') || action.includes('social')) {
+            reactions.push("👂 Certains PNJ tendent l'oreille avec curiosité");
+            reactions.push("🤝 Des alliés potentiels s'approchent");
+            reactions.push("📰 L'information se répand rapidement");
+        }
+
+        if (action.includes('explore') || action.includes('cherche')) {
+            reactions.push("👁️ Des yeux curieux vous observent");
+            reactions.push("🗺️ Un local vous propose ses services de guide");
+            reactions.push("⚠️ Quelqu'un vous met en garde contre les dangers");
+        }
+
+        return reactions.slice(0, 2).join('\n');
+    }
 
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: prompt }],
