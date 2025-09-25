@@ -1636,28 +1636,63 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
     async handleAuthorizeCommand({ player, chatId, message, dbManager, imageGenerator }) {
         try {
-            // Extraire le nom du joueur de la commande
+            // Extraire le nom du joueur et optionnellement le royaume de la commande
             const parts = message.split(' ');
             if (parts.length < 2) {
                 return {
                     text: `📋 **COMMANDE AUTORISE**\n\n` +
-                          `Usage: /autorise [nom_du_joueur]\n\n` +
-                          `**Exemple:** /autorise Jean\n\n` +
-                          `Cette commande permet d'autoriser un joueur dans le royaume correspondant au groupe WhatsApp actuel.`
+                          `Usage: /autorise [nom_du_joueur] [ROYAUME_OPTIONNEL]\n\n` +
+                          `**Exemples:**\n` +
+                          `• /autorise Jean\n` +
+                          `• /autorise Jean AEGYRIA\n\n` +
+                          `Si aucun royaume n'est spécifié, le système détectera automatiquement le royaume pour ce groupe.`
                 };
             }
 
-            const playerName = parts.slice(1).join(' ').trim();
+            const playerName = parts[1].trim();
+            const specifiedKingdom = parts[2] ? parts[2].toUpperCase().trim() : null;
 
-            // Déterminer le royaume basé sur l'ID du groupe WhatsApp
-            const kingdom = await this.getKingdomFromChatId(chatId, dbManager);
+            let kingdom = null;
 
-            if (!kingdom) {
-                return {
-                    text: `❌ **GROUPE NON CONFIGURÉ**\n\n` +
-                          `Ce groupe WhatsApp n'est pas encore associé à un royaume.\n\n` +
-                          `Contactez un administrateur pour configurer le royaume de ce groupe.`
-                };
+            // Si un royaume est spécifié dans la commande, l'utiliser et enregistrer l'association
+            if (specifiedKingdom) {
+                kingdom = await dbManager.getKingdomById(specifiedKingdom);
+                
+                if (!kingdom) {
+                    const kingdoms = await dbManager.getAllKingdoms();
+                    let kingdomsList = kingdoms.map((k, i) => `${i + 1}. ${k.name} (${k.id})`).join('\n');
+                    
+                    return {
+                        text: `❌ **ROYAUME INVALIDE**\n\n` +
+                              `Le royaume "${specifiedKingdom}" n'existe pas.\n\n` +
+                              `**Royaumes disponibles:**\n${kingdomsList}`
+                    };
+                }
+
+                // Enregistrer automatiquement l'association groupe-royaume
+                try {
+                    await dbManager.saveChatKingdomAssociation(chatId, kingdom.id);
+                    console.log(`✅ Association automatique sauvegardée: ${chatId} -> ${kingdom.id}`);
+                } catch (saveError) {
+                    console.error('⚠️ Erreur sauvegarde association:', saveError);
+                    // Continue malgré l'erreur d'association
+                }
+            } else {
+                // Essayer de récupérer le royaume depuis l'association existante
+                kingdom = await this.getKingdomFromChatId(chatId, dbManager);
+
+                if (!kingdom) {
+                    return {
+                        text: `❌ **GROUPE NON CONFIGURÉ**\n\n` +
+                              `Ce groupe WhatsApp n'est pas encore associé à un royaume.\n\n` +
+                              `**Solutions:**\n` +
+                              `• Utilisez: /autorise ${playerName} ROYAUME_ID\n` +
+                              `• Ou configurez d'abord avec: /config_royaume ROYAUME_ID\n\n` +
+                              `**Exemples:**\n` +
+                              `• /autorise ${playerName} AEGYRIA\n` +
+                              `• /config_royaume AEGYRIA`
+                    };
+                }
             }
 
             // Rechercher le personnage par nom
@@ -1681,6 +1716,9 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 };
             }
 
+            // Sauvegarder l'ancien royaume pour l'affichage
+            const oldKingdom = character.kingdom;
+
             // Mettre à jour le royaume du personnage
             await dbManager.updateCharacter(character.id, {
                 kingdom: kingdom.id,
@@ -1692,9 +1730,10 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             return {
                 text: `👑 **AUTORISATION ACCORDÉE** 👑\n\n` +
                       `✅ Le joueur **${character.name}** a été autorisé dans le royaume **${kingdom.name}**!\n\n` +
-                      `🏰 **Ancien royaume:** ${character.kingdom}\n` +
+                      `🏰 **Ancien royaume:** ${oldKingdom}\n` +
                       `🏰 **Nouveau royaume:** ${kingdom.name}\n` +
                       `📍 **Nouvelle localisation:** ${this.getStartingLocation(kingdom.id)}\n\n` +
+                      `${specifiedKingdom ? '✨ **Association groupe-royaume automatiquement enregistrée!**\n\n' : ''}` +
                       `Le joueur peut maintenant participer aux activités de ce royaume.`,
                 image: await imageGenerator.generateKingdomImage(kingdom.id)
             };
