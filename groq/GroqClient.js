@@ -225,7 +225,7 @@ Style: Immersif, cinématographique, avec des détails sensoriels riches.`;
 
         const randomEvents = [];
         const eventCount = Math.floor(Math.random() * 3) + 1;
-        
+
         for (let i = 0; i < eventCount; i++) {
             randomEvents.push(events[Math.floor(Math.random() * events.length)]);
         }
@@ -236,13 +236,13 @@ Style: Immersif, cinématographique, avec des détails sensoriels riches.`;
     // Générer des réactions PNJ intelligentes
     generateSmartNPCReactions(character, action) {
         const reactions = [];
-        
+
         if (action.includes('attaque') || action.includes('combat')) {
             reactions.push("🛡️ Les gardes se mettent en alerte");
             reactions.push("😨 Les civils fuient la zone de combat");
             reactions.push("👮 Des renforts sont appelés discrètement");
         }
-        
+
         if (action.includes('parle') || action.includes('social')) {
             reactions.push("👂 Certains PNJ tendent l'oreille avec curiosité");
             reactions.push("🤝 Des alliés potentiels s'approchent");
@@ -256,29 +256,6 @@ Style: Immersif, cinématographique, avec des détails sensoriels riches.`;
         }
 
         return reactions.slice(0, 2).join('\n');
-    }
-
-            const response = await this.client.chat.completions.create({
-                messages: [{ role: 'user', content: prompt }],
-                model: this.model,
-                max_tokens: 800, // Augmenté pour narration complète
-                temperature: 0.8
-            });
-
-            let narration = response.choices[0]?.message?.content?.trim();
-
-            if (!narration) {
-                throw new Error('Réponse Groq vide');
-            }
-
-            // Supprimer la limitation - laisser la narration complète
-            console.log(`✅ Narration complète générée (${narration.length} caractères)`);
-            return narration;
-
-        } catch (error) {
-            console.error('❌ Erreur Groq narration exploration:', error.message);
-            throw error;
-        }
     }
 
     async generateDialogueResponse(character, playerDialogue, sessionId) {
