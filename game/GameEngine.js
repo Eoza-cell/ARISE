@@ -1710,21 +1710,38 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async getKingdomFromChatId(chatId, dbManager) {
-        // Mapping des groupes WhatsApp aux royaumes
-        // Vous devrez configurer ces associations selon vos groupes réels
+        // Configuration des mappings groupe -> royaume
+        // Ajoutez vos groupes WhatsApp ici avec leurs royaumes correspondants
         const chatKingdomMapping = {
-            // Exemples d'IDs de groupes (à remplacer par les vrais IDs)
-            '120363227300362988@g.us': 'AEGYRIA',
-            '120363303602296165@g.us': 'SOMBRENUIT',
-            // Ajoutez ici les autres mappings selon vos groupes
+            // Format: 'ID_DU_GROUPE@g.us': 'ROYAUME_ID'
+            
+            // Exemple avec le groupe actuel détecté dans les logs
+            '120363321025702398@g.us': 'AEGYRIA',
+            
+            // Ajoutez vos autres groupes ici:
+            // '120363227300362988@g.us': 'SOMBRENUIT',
+            // '120363303602296165@g.us': 'KHELOS',
+            // '120363123456789012@g.us': 'ABRANTIS',
+            // '120363234567890123@g.us': 'VARHA',
+            // '120363345678901234@g.us': 'SYLVARIA',
+            // '120363456789012345@g.us': 'ECLYPSIA',
+            // '120363567890123456@g.us': 'TERRE_DESOLE',
+            // '120363678901234567@g.us': 'DRAK_TARR',
+            // '120363789012345678@g.us': 'URVALA',
+            // '120363890123456789@g.us': 'OMBREFIEL',
+            // '120363901234567890@g.us': 'KHALDAR',
         };
 
         const kingdomId = chatKingdomMapping[chatId];
         
         if (!kingdomId) {
-            // Si le mapping n'est pas configuré, retourner null
+            console.log(`⚠️ Groupe non configuré: ${chatId}`);
+            console.log(`💡 Pour configurer ce groupe, ajoutez cette ligne au mapping:`);
+            console.log(`   '${chatId}': 'ROYAUME_CHOISI',`);
             return null;
         }
+
+        console.log(`✅ Groupe ${chatId} mappé vers le royaume ${kingdomId}`);
 
         // Récupérer les informations complètes du royaume
         return await dbManager.getKingdomById(kingdomId);
@@ -1743,8 +1760,9 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                           `Usage: /config_royaume [ROYAUME_ID]\n\n` +
                           `**Royaumes disponibles:**\n${kingdomsList}\n\n` +
                           `**Exemple:** /config_royaume AEGYRIA\n\n` +
-                          `Cette commande associe ce groupe WhatsApp au royaume spécifié.\n\n` +
-                          `📍 **Groupe actuel:** ${chatId}`
+                          `Cette commande vous aide à configurer ce groupe WhatsApp.\n\n` +
+                          `📍 **ID du groupe actuel:** \`${chatId}\`\n\n` +
+                          `💡 **Pour les développeurs:** Copiez cet ID pour l'ajouter dans le mapping des groupes.`
                 };
             }
 
@@ -1759,18 +1777,30 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 };
             }
 
-            // Ici vous pouvez sauvegarder la configuration dans la base de données
-            // ou dans un fichier de configuration selon vos préférences
+            // Vérifier si le groupe est déjà configuré
+            const currentKingdom = await this.getKingdomFromChatId(chatId, dbManager);
+            
+            if (currentKingdom && currentKingdom.id === kingdomId) {
+                return {
+                    text: `✅ **DÉJÀ CONFIGURÉ**\n\n` +
+                          `Ce groupe est déjà associé au royaume **${kingdom.name}**!\n\n` +
+                          `🏰 **Royaume:** ${kingdom.name}\n` +
+                          `📍 **ID Groupe:** \`${chatId}\`\n\n` +
+                          `Les commandes /autorise fonctionnent déjà pour ce royaume.`
+                };
+            }
             
             return {
-                text: `✅ **CONFIGURATION RÉUSSIE**\n\n` +
-                      `Ce groupe WhatsApp est maintenant associé au royaume **${kingdom.name}**!\n\n` +
+                text: `⚙️ **INSTRUCTIONS DE CONFIGURATION**\n\n` +
+                      `Pour associer ce groupe au royaume **${kingdom.name}**, ajoutez cette ligne dans le code :\n\n` +
+                      `\`'${chatId}': '${kingdom.id}',\`\n\n` +
+                      `📍 **Localisation:** Fichier \`game/GameEngine.js\`\n` +
+                      `🔍 **Fonction:** \`getKingdomFromChatId\`\n` +
+                      `📝 **Section:** \`chatKingdomMapping\`\n\n` +
                       `🏰 **Royaume:** ${kingdom.name}\n` +
-                      `📍 **ID Groupe:** ${chatId}\n` +
-                      `🎯 **ID Royaume:** ${kingdom.id}\n\n` +
-                      `Les commandes /autorise fonctionneront maintenant pour ce royaume.\n\n` +
-                      `⚠️ **Note:** Ajoutez manuellement cette association dans le code :\n` +
-                      `'${chatId}': '${kingdom.id}'`,
+                      `🎯 **ID Royaume:** ${kingdom.id}\n` +
+                      `📱 **ID Groupe:** \`${chatId}\`\n\n` +
+                      `Une fois ajouté, les commandes /autorise fonctionneront pour ce royaume.`,
                 image: await imageGenerator.generateKingdomImage(kingdom.id)
             };
 
