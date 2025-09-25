@@ -999,6 +999,8 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                     text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
 
 
+    }
+
     async handleReputationCommand({ player, dbManager }) {
         const reputation = await dbManager.getTemporaryData(player.id, 'reputation') || {
             honor: 50, fear: 0, respect: 50, notoriety: 0

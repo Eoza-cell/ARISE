@@ -1,12 +1,12 @@
-const { InferenceClient } = require("@huggingface/inference");
+
 const fs = require('fs').promises;
 const path = require('path');
 
 class HuggingFaceClient {
     constructor() {
         this.apiKey = process.env.HF_TOKEN;
-        this.client = null;
         this.isAvailable = false;
+        this.baseURL = 'https://router.huggingface.co/fal-ai/fal-ai/ltxv-13b-098-distilled/image-to-video';
         
         this.initializeClient();
     }
@@ -18,9 +18,8 @@ class HuggingFaceClient {
                 return;
             }
 
-            this.client = new InferenceClient(this.apiKey);
             this.isAvailable = true;
-            console.log('✅ Client Hugging Face initialisé avec succès');
+            console.log('✅ Client Hugging Face initialisé avec succès (ltxv-13b-098-distilled)');
 
         } catch (error) {
             console.error('❌ Erreur lors de l\'initialisation du client Hugging Face:', error.message);
@@ -29,7 +28,7 @@ class HuggingFaceClient {
     }
 
     hasValidClient() {
-        return this.isAvailable && this.client && this.apiKey;
+        return this.isAvailable && this.apiKey;
     }
 
     async generateVideoFromText(prompt, outputPath, options = {}) {
@@ -40,99 +39,122 @@ class HuggingFaceClient {
 
             console.log(`🤗 Génération vidéo Hugging Face avec prompt: "${prompt.substring(0, 100)}..."`);
 
-            const optimizedPrompt = this.optimizePromptForHuggingFace(prompt);
-            
-            console.log(`🎬 Utilisation du modèle Wan-AI/Wan2.2-T2V-A14B pour génération vidéo...`);
+            // Utiliser l'image du personnage si disponible
+            let characterImage = null;
+            if (options.characterImagePath) {
+                try {
+                    characterImage = await fs.readFile(options.characterImagePath);
+                    console.log(`📸 Image du personnage chargée: ${options.characterImagePath}`);
+                } catch (error) {
+                    console.log(`⚠️ Impossible de charger l'image: ${options.characterImagePath}`);
+                }
+            }
 
-            // Use the new textToVideo API with Wan-AI model
-            const videoBlob = await this.client.textToVideo({
-                provider: "auto",
-                model: "Wan-AI/Wan2.2-T2V-A14B",
-                inputs: optimizedPrompt
+            // Si pas d'image de personnage, utiliser une image par défaut ou générer sans
+            if (!characterImage) {
+                console.log('⚠️ Pas d\'image de personnage disponible - génération vidéo sans image de base');
+                throw new Error('Image de personnage requise pour la génération vidéo');
+            }
+
+            const optimizedPrompt = this.optimizePromptForImageToVideo(prompt);
+            
+            console.log(`🎬 Utilisation du modèle ltxv-13b-098-distilled pour génération vidéo image-to-video...`);
+
+            // Utiliser le nouveau modèle image-to-video
+            const response = await fetch(`${this.baseURL}?_subdomain=queue`, {
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                method: 'POST',
+                body: JSON.stringify({
+                    image_url: `data:image/png;base64,${characterImage.toString('base64')}`,
+                    prompt: optimizedPrompt,
+                    duration: options.duration || 5,
+                    fps: options.fps || 24,
+                    width: options.width || 1024,
+                    height: options.height || 768
+                })
             });
 
-            console.log(`📥 Réponse reçue, traitement du blob vidéo...`);
+            if (!response.ok) {
+                throw new Error(`Erreur API HuggingFace: ${response.status} ${response.statusText}`);
+            }
 
-            // Handle the Blob response
-            let buffer;
-            if (videoBlob instanceof Blob) {
-                const arrayBuffer = await videoBlob.arrayBuffer();
-                buffer = Buffer.from(arrayBuffer);
-                console.log(`💾 Vidéo convertie en buffer (${buffer.length} bytes)`);
+            const result = await response.json();
+            console.log(`📥 Réponse reçue, traitement de la vidéo...`);
+
+            // Gérer la réponse selon le format retourné
+            let videoBuffer;
+            if (result.video_url) {
+                // Télécharger la vidéo depuis l'URL
+                const videoResponse = await fetch(result.video_url);
+                if (!videoResponse.ok) {
+                    throw new Error(`Erreur téléchargement vidéo: ${videoResponse.status}`);
+                }
+                const arrayBuffer = await videoResponse.arrayBuffer();
+                videoBuffer = Buffer.from(arrayBuffer);
+            } else if (result.video) {
+                // Vidéo encodée en base64
+                videoBuffer = Buffer.from(result.video, 'base64');
             } else {
-                throw new Error('Format de réponse inattendu - attendu Blob');
+                throw new Error('Format de réponse vidéo inattendu');
             }
             
             // Créer le dossier de sortie si nécessaire
             const outputDir = path.dirname(outputPath);
             await fs.mkdir(outputDir, { recursive: true });
 
-            await fs.writeFile(outputPath, buffer);
-            console.log(`✅ Vidéo Hugging Face générée avec Wan-AI: ${outputPath} (${buffer.length} bytes)`);
+            await fs.writeFile(outputPath, videoBuffer);
+            console.log(`✅ Vidéo Hugging Face générée avec ltxv-13b-098-distilled: ${outputPath} (${videoBuffer.length} bytes)`);
             
             return {
                 success: true,
                 videoPath: outputPath,
                 duration: options.duration || 5,
                 provider: 'huggingface',
-                model: 'Wan-AI/Wan2.2-T2V-A14B',
-                fileSize: buffer.length
+                model: 'ltxv-13b-098-distilled',
+                fileSize: videoBuffer.length
             };
 
         } catch (error) {
             console.error('❌ Erreur génération vidéo Hugging Face:', error.message);
-            
-            // Si l'erreur concerne le modèle, essayer un fallback
-            if (error.message.includes('model') || error.message.includes('Wan-AI')) {
-                console.log('🔄 Tentative avec le modèle de fallback...');
-                try {
-                    const fallbackVideo = await this.generateVideoWithFallbackModel(prompt, outputPath, options);
-                    return fallbackVideo;
-                } catch (fallbackError) {
-                    console.error('❌ Erreur modèle de fallback:', fallbackError.message);
-                }
-            }
-            
             throw new Error(`Génération vidéo échouée: ${error.message}`);
         }
     }
 
-    /**
-     * Méthode de fallback avec l'ancien modèle
-     */
     async generateVideoWithFallbackModel(prompt, outputPath, options = {}) {
         try {
-            console.log(`🔄 Utilisation du modèle de fallback damo-vilab/text-to-video-ms-1.7b...`);
+            console.log(`🔄 Utilisation du modèle de fallback text-to-video...`);
 
-            const optimizedPrompt = this.optimizePromptForHuggingFace(prompt);
-            
-            const response = await this.client.request({
-                model: "damo-vilab/text-to-video-ms-1.7b",
-                inputs: optimizedPrompt,
-                parameters: {
-                    num_frames: options.num_frames || 16,
-                    fps: options.fps || 8,
-                    width: options.width || 256,
-                    height: options.height || 256
-                }
+            // Fallback vers un modèle text-to-video classique si image-to-video échoue
+            const response = await fetch('https://api-inference.huggingface.co/models/damo-vilab/text-to-video-ms-1.7b', {
+                headers: {
+                    'Authorization': `Bearer ${this.apiKey}`,
+                    'Content-Type': 'application/json',
+                },
+                method: 'POST',
+                body: JSON.stringify({
+                    inputs: this.optimizePromptForImageToVideo(prompt),
+                    parameters: {
+                        num_frames: options.num_frames || 16,
+                        fps: options.fps || 8,
+                        width: options.width || 256,
+                        height: options.height || 256
+                    }
+                })
             });
 
-            let buffer;
-            if (response instanceof Blob) {
-                const arrayBuffer = await response.arrayBuffer();
-                buffer = Buffer.from(arrayBuffer);
-            } else if (response instanceof ArrayBuffer) {
-                buffer = Buffer.from(response);
-            } else if (Buffer.isBuffer(response)) {
-                buffer = response;
-            } else {
-                throw new Error('Format de réponse inattendu de Hugging Face');
+            if (!response.ok) {
+                throw new Error(`Erreur API fallback: ${response.status}`);
             }
+
+            const videoBuffer = Buffer.from(await response.arrayBuffer());
             
             const outputDir = path.dirname(outputPath);
             await fs.mkdir(outputDir, { recursive: true });
 
-            await fs.writeFile(outputPath, buffer);
+            await fs.writeFile(outputPath, videoBuffer);
             console.log(`✅ Vidéo Hugging Face générée avec modèle de fallback: ${outputPath}`);
             
             return {
@@ -141,7 +163,7 @@ class HuggingFaceClient {
                 duration: options.duration || 5,
                 provider: 'huggingface',
                 model: 'damo-vilab/text-to-video-ms-1.7b',
-                fileSize: buffer.length
+                fileSize: videoBuffer.length
             };
 
         } catch (error) {
@@ -150,44 +172,45 @@ class HuggingFaceClient {
         }
     }
 
-    optimizePromptForHuggingFace(prompt) {
-        // Optimize prompt specifically for Wan-AI/Wan2.2-T2V-A14B model
+    optimizePromptForImageToVideo(prompt) {
+        // Optimiser le prompt spécifiquement pour image-to-video
         let optimized = prompt
-            .replace(/['"]/g, '') // Remove quotes
-            .replace(/\s+/g, ' ') // Normalize spaces
+            .replace(/['"]/g, '') // Supprimer les guillemets
+            .replace(/\s+/g, ' ') // Normaliser les espaces
             .trim();
 
-        // Add video generation improvements optimized for Wan-AI model
+        // Ajouter des améliorations pour l'image-to-video
         const improvements = [
-            'cinematic quality',
-            'professional video',
-            'smooth camera movement',
-            'high definition',
-            '4K quality'
+            'smooth movement',
+            'natural motion',
+            'fluid animation',
+            'realistic movement',
+            'cinematic quality'
         ];
 
-        // Add improvements if not already present
+        // Ajouter les améliorations si pas déjà présentes
         improvements.forEach(improvement => {
             if (!optimized.toLowerCase().includes(improvement.toLowerCase())) {
                 optimized += `, ${improvement}`;
             }
         });
 
-        // Wan-AI model works better with longer, more descriptive prompts
-        if (optimized.length > 300) {
-            optimized = optimized.substring(0, 297) + '...';
+        // Limiter la longueur pour le modèle
+        if (optimized.length > 200) {
+            optimized = optimized.substring(0, 197) + '...';
         }
 
-        console.log(`🎯 Prompt optimisé pour Wan-AI: "${optimized}"`);
+        console.log(`🎯 Prompt optimisé pour image-to-video: "${optimized}"`);
         return optimized;
     }
 
-    // RPG-specific video generation methods
+    // Méthodes RPG spécifiques avec support d'image
     async generateCombatVideo(action, character, outputPath) {
         const prompt = `${character.name} in medieval fantasy combat, ${action}, epic battle scene, dynamic movement, armor and weapons, dramatic lighting, action sequence`;
         
         return await this.generateVideoFromText(prompt, outputPath, {
-            duration: 4
+            duration: 4,
+            characterImagePath: character.imagePath || null
         });
     }
 
@@ -195,7 +218,8 @@ class HuggingFaceClient {
         const prompt = `${character.name} performing ${action} in ${location}, medieval fantasy setting, character in motion, atmospheric environment, cinematic camera angle`;
         
         return await this.generateVideoFromText(prompt, outputPath, {
-            duration: 5
+            duration: 5,
+            characterImagePath: character.imagePath || null
         });
     }
 
@@ -203,7 +227,8 @@ class HuggingFaceClient {
         const prompt = `Fantasy location: ${location}, ${character.name} exploring the area, epic landscape, atmospheric lighting, cinematic camera movement, medieval fantasy world`;
         
         return await this.generateVideoFromText(prompt, outputPath, {
-            duration: 6
+            duration: 6,
+            characterImagePath: character.imagePath || null
         });
     }
 
@@ -211,8 +236,24 @@ class HuggingFaceClient {
         const prompt = `${character.name} casting ${spellName} magic spell, mystical energy effects, glowing magical aura, fantasy spellcasting, dynamic magical particles, epic scene`;
         
         return await this.generateVideoFromText(prompt, outputPath, {
-            duration: 4
+            duration: 4,
+            characterImagePath: character.imagePath || null
         });
+    }
+
+    // Nouvelle méthode pour générer une vidéo avec une image personnalisée
+    async generateVideoFromImage(imagePath, prompt, outputPath, options = {}) {
+        try {
+            console.log(`🎬 Génération vidéo depuis image: ${imagePath}`);
+            
+            return await this.generateVideoFromText(prompt, outputPath, {
+                ...options,
+                characterImagePath: imagePath
+            });
+        } catch (error) {
+            console.error('❌ Erreur génération vidéo depuis image:', error);
+            throw error;
+        }
     }
 }
 
