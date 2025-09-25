@@ -248,7 +248,7 @@ class GameEngine {
                   `• Origine/royaume préféré\n` +
                   `• Personnalité et histoire\n\n` +
                   `💡 **Exemple de description :**\n` +
-                  `"Un guerrier noble avec une armure dorée, venant des plaines d'honneur d'AEGYRIA. Il est courageux et loyal."\n\n` +
+                  `"Un guerrier noble d'AEGYRIA avec une armure dorée. Il est courageux et loyal."\n\n` +
                   `📸 **Commence par envoyer ta photo maintenant !**`,
             image: await imageGenerator.generateMenuImage()
         };
@@ -997,95 +997,6 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             if (!sock || !sock.buttonManager) {
                 return {
                     text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
-
-
-    }
-
-    async handleReputationCommand({ player, dbManager }) {
-        const reputation = await dbManager.getTemporaryData(player.id, 'reputation') || {
-            honor: 50, fear: 0, respect: 50, notoriety: 0
-        };
-
-        const reputationText = `🏆 **RÉPUTATION DE ${player.username.toUpperCase()}**\n\n` +
-                              `⚔️ **Honneur :** ${reputation.honor}/100 ${this.getReputationBar(reputation.honor)}\n` +
-                              `😨 **Peur :** ${reputation.fear}/100 ${this.getReputationBar(reputation.fear)}\n` +
-                              `🤝 **Respect :** ${reputation.respect}/100 ${this.getReputationBar(reputation.respect)}\n` +
-                              `🔥 **Notoriété :** ${reputation.notoriety}/100 ${this.getReputationBar(reputation.notoriety)}\n\n` +
-                              `📊 **Effets actifs :**\n` +
-                              `${this.advancedMechanics.getReputationEffects(reputation).join('\n')}`;
-
-        return { text: reputationText };
-    }
-
-    async handleEventsCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return { text: "❌ Aucun personnage trouvé !" };
-        }
-
-        const randomEvent = await this.advancedMechanics.triggerRandomEvent(character, character.currentLocation);
-        const socialEvent = this.advancedMechanics.generateSocialEvent(character, character.currentLocation);
-
-        const eventsText = `🎲 **ÉVÉNEMENTS EN COURS**\n\n` +
-                          `🌟 **Événement aléatoire :**\n${randomEvent.description}\n` +
-                          `Choix : ${randomEvent.choices.join(' | ')}\n\n` +
-                          `🏛️ **Événement social :**\n${socialEvent.description}\n` +
-                          `Effets : ${socialEvent.effects.join(', ')}\n` +
-                          `Durée : ${socialEvent.duration}\n\n` +
-                          `💡 **Tapez votre choix pour participer !**`;
-
-        return { text: eventsText };
-    }
-
-    async handleWeatherCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return { text: "❌ Aucun personnage trouvé !" };
-        }
-
-        const weather = this.advancedMechanics.weatherSystem.updateWeather(character.currentLocation);
-        
-        const weatherText = `🌤️ **MÉTÉO À ${character.currentLocation.toUpperCase()}**\n\n` +
-                           `☁️ **Conditions :** ${this.advancedMechanics.weatherSystem.currentWeather}\n` +
-                           `👁️ **Visibilité :** ${weather.visibility}%\n` +
-                           `🏃 **Mobilité :** ${weather.movement}%\n` +
-                           `😊 **Ambiance :** ${weather.mood}\n\n` +
-                           `⚠️ **Impact sur le gameplay en cours...**`;
-
-        return { text: weatherText };
-    }
-
-    async handleMarketCommand({ player, dbManager }) {
-        const marketEvents = this.advancedMechanics.economyEngine.marketEvents;
-        
-        const marketText = `💰 **MARCHÉ DYNAMIQUE**\n\n` +
-                          `📈 **Événements économiques actifs :**\n` +
-                          `${marketEvents.map(e => `• ${e.event}`).join('\n')}\n\n` +
-                          `💡 **Les prix s'adaptent à vos actions et aux événements mondiaux !**\n` +
-                          `🔄 **Système économique en temps réel actif**`;
-
-        return { text: marketText };
-    }
-
-    async handleFactionsCommand({ player, dbManager }) {
-        const factionStandings = await dbManager.getTemporaryData(player.id, 'faction_standings') || {};
-        
-        const factionsText = `⚔️ **RELATIONS AVEC LES FACTIONS**\n\n` +
-                            `${Object.entries(factionStandings).map(([faction, standing]) => 
-                                `🏛️ **${faction}:** ${standing}/100 ${this.getReputationBar(standing)}`
-                            ).join('\n')}\n\n` +
-                            `💡 **Vos actions affectent vos relations !**\n` +
-                            `🤝 **Formez des alliances ou créez des ennemis**`;
-
-        return { text: factionsText };
-    }
-
-    getReputationBar(value) {
-        const filled = Math.floor(value / 10);
-        const empty = 10 - filled;
-        return '█'.repeat(filled) + '░'.repeat(empty);
-    }
-
                           `⚠️ Système de boutons non initialisé.\n\n` +
                           `Les boutons simulés avec des sondages WhatsApp permettent de créer des interfaces interactives sans API officielle !\n\n` +
                           `🎮 Chaque sondage = un bouton\n` +
@@ -1133,6 +1044,110 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         }
     }
 
+    async handleReputationCommand({ player, dbManager }) {
+        const reputation = await dbManager.getTemporaryData(player.id, 'reputation') || {
+            honor: 50, fear: 0, respect: 50, notoriety: 0
+        };
+
+        const reputationText = `🏆 **RÉPUTATION DE ${player.username.toUpperCase()}**\n\n` +
+                              `⚔️ **Honneur :** ${reputation.honor}/100 ${this.getReputationBar(reputation.honor)}\n` +
+                              `😨 **Peur :** ${reputation.fear}/100 ${this.getReputationBar(reputation.fear)}\n` +
+                              `🤝 **Respect :** ${reputation.respect}/100 ${this.getReputationBar(reputation.respect)}\n` +
+                              `🔥 **Notoriété :** ${reputation.notoriety}/100 ${this.getReputationBar(reputation.notoriety)}\n\n` +
+                              `📊 **Effets actifs :**\n` +
+                              `${this.advancedMechanics.getReputationEffects(reputation).join('\n')}`;
+
+        return { text: reputationText };
+    }
+
+    async handleEventsCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return { text: "❌ Aucun personnage trouvé !" };
+        }
+
+        const randomEvent = await this.advancedMechanics.triggerRandomEvent(character, character.currentLocation);
+        const socialEvent = this.advancedMechanics.generateSocialEvent(character, character.currentLocation);
+
+        const eventsText = `🎲 **ÉVÉNEMENTS EN COURS**\n\n` +
+                          `🌟 **Événement aléatoire :**\n${randomEvent.description}\n` +
+                          `Choix : ${randomEvent.choices.join(' | ')}\n\n` +
+                          `🏛️ **Événement social :**\n${socialEvent.description}\n` +
+                          `Effets : ${socialEvent.effects.join(', ')}\n` +
+                          `Durée : ${socialEvent.duration}\n\n` +
+                          `💡 **Tapez votre choix pour participer !**`;
+
+        return { text: eventsText };
+    }
+
+    async handleWeatherCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return { text: "❌ Aucun personnage trouvé !" };
+        }
+
+        const weather = this.advancedMechanics.weatherSystem.updateWeather(character.currentLocation);
+
+        const weatherText = `🌤️ **MÉTÉO À ${character.currentLocation.toUpperCase()}**\n\n` +
+                           `☁️ **Conditions :** ${this.advancedMechanics.weatherSystem.currentWeather}\n` +
+                           `👁️ **Visibilité :** ${weather.visibility}%\n` +
+                           `🏃 **Mobilité :** ${weather.movement}%\n` +
+                           `😊 **Ambiance :** ${weather.mood}\n\n` +
+                           `⚠️ **Impact sur le gameplay en cours...**`;
+
+        return { text: weatherText };
+    }
+
+    async handleMarketCommand({ player, dbManager }) {
+        const marketEvents = this.advancedMechanics.economyEngine.marketEvents;
+
+        const marketText = `💰 **MARCHÉ DYNAMIQUE**\n\n` +
+                          `📈 **Événements économiques actifs :**\n` +
+                          `${marketEvents.map(e => `• ${e.event}`).join('\n')}\n\n` +
+                          `💡 **Les prix s'adaptent à vos actions et aux événements mondiaux !**\n` +
+                          `🔄 **Système économique en temps réel actif**`;
+
+        return { text: marketText };
+    }
+
+    async handleFactionsCommand({ player, dbManager }) {
+        const factionStandings = await dbManager.getTemporaryData(player.id, 'faction_standings') || {};
+
+        const factionsText = `⚔️ **RELATIONS AVEC LES FACTIONS**\n\n` +
+                            `${Object.entries(factionStandings).map(([faction, standing]) => 
+                                `🏛️ **${faction}:** ${standing}/100 ${this.getReputationBar(standing)}`
+                            ).join('\n')}\n\n` +
+                            `💡 **Vos actions affectent vos relations !**\n` +
+                            `🤝 **Formez des alliances ou créez des ennemis**`;
+
+        return { text: factionsText };
+    }
+
+    getReputationBar(value) {
+        const filled = Math.floor(value / 10);
+        const empty = 10 - filled;
+        return '█'.repeat(filled) + '░'.repeat(empty);
+    }
+
+    async handleChallengesCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return { text: "❌ Aucun personnage trouvé !" };
+        }
+
+        const challenges = this.advancedMechanics.generateDailyChallenges(character);
+
+        const challengesText = `🏆 **DÉFIS QUOTIDIENS**\n\n` +
+                              `${challenges.map((challenge, i) => 
+                                  `${i + 1}. **${challenge.name}**\n` +
+                                  `📝 ${challenge.description}\n` +
+                                  `🏅 Récompense: ${challenge.reward}\n`
+                              ).join('\n')}\n\n` +
+                              `💡 **Complétez ces défis pour gagner de l'expérience et des récompenses !**`;
+
+        return { text: challengesText };
+    }
+
     async handleCombatCommand({ imageGenerator }) {
         return {
             text: `⚔️ **SYSTÈME DE COMBAT - FRICTION ULTIMATE**\n\n` +
@@ -1149,7 +1164,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                   `• ⚡ Énergie : Consommée par les actions\n\n` +
                   `💀 **ATTENTION :** Chaque attaque doit être précise :\n` +
                   `• Mouvement exact (distance en mètres)\n` +
-                  `• Arme utilisée et angle d\'attaque\n` +
+                  `• Arme utilisée et angle d'attaque\n` +
                   `• Partie du corps visée\n\n` +
                   `🎯 **Sans précision = vulnérabilité !**`,
             image: await imageGenerator.generateCombatGuideImage()
@@ -1222,7 +1237,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         if (!character) {
             return {
                 text: `🎮 **MODE JEU ACTIVÉ**\n\n` +
-                      `❌ Tu n\'as pas encore de personnage !\n\n` +
+                      `❌ Tu n'as pas encore de personnage !\n\n` +
                       `✨ **Pour commencer à jouer :**\n` +
                       `1️⃣ Utilise /créer pour créer ton personnage\n` +
                       `2️⃣ Puis utilise /jouer pour entrer dans le monde\n\n` +
@@ -1754,11 +1769,11 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             // Si un royaume est spécifié dans la commande, l'utiliser et enregistrer l'association
             if (specifiedKingdom) {
                 kingdom = await dbManager.getKingdomById(specifiedKingdom);
-                
+
                 if (!kingdom) {
                     const kingdoms = await dbManager.getAllKingdoms();
                     let kingdomsList = kingdoms.map((k, i) => `${i + 1}. ${k.name} (${k.id})`).join('\n');
-                    
+
                     return {
                         text: `❌ **ROYAUME INVALIDE**\n\n` +
                               `Le royaume "${specifiedKingdom}" n'existe pas.\n\n` +
@@ -1849,7 +1864,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         try {
             // Récupérer l'association depuis la base de données
             const association = await dbManager.getChatKingdomAssociation(chatId);
-            
+
             if (!association) {
                 console.log(`⚠️ Groupe non configuré: ${chatId}`);
                 return null;
@@ -1868,11 +1883,11 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     async handleConfigKingdomCommand({ player, chatId, message, dbManager, imageGenerator }) {
         try {
             const parts = message.split(' ');
-            
+
             if (parts.length < 2) {
                 const kingdoms = await dbManager.getAllKingdoms();
                 let kingdomsList = kingdoms.map((k, i) => `${i + 1}. ${k.name} (${k.id})`).join('\n');
-                
+
                 return {
                     text: `⚙️ **CONFIGURATION ROYAUME**\n\n` +
                           `Usage: /config_royaume [ROYAUME_ID]\n\n` +
@@ -1897,7 +1912,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
             // Vérifier si le groupe est déjà configuré
             const currentKingdom = await this.getKingdomFromChatId(chatId, dbManager);
-            
+
             if (currentKingdom && currentKingdom.id === kingdomId) {
                 return {
                     text: `✅ **DÉJÀ CONFIGURÉ**\n\n` +
@@ -1907,13 +1922,13 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                           `Les commandes /autorise fonctionnent déjà pour ce royaume.`
                 };
             }
-            
+
             // Sauvegarder automatiquement l'association
             try {
                 await dbManager.saveChatKingdomAssociation(chatId, kingdomId);
-                
+
                 console.log(`✅ Association sauvegardée: ${chatId} -> ${kingdomId}`);
-                
+
                 return {
                     text: `✅ **CONFIGURATION RÉUSSIE !**\n\n` +
                           `Le groupe WhatsApp a été automatiquement associé au royaume **${kingdom.name}**!\n\n` +
@@ -1926,7 +1941,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 };
             } catch (saveError) {
                 console.error('❌ Erreur sauvegarde association:', saveError);
-                
+
                 return {
                     text: `❌ **ERREUR DE SAUVEGARDE**\n\n` +
                           `Impossible de sauvegarder l'association du groupe au royaume **${kingdom.name}**.\n\n` +
