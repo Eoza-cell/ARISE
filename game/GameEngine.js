@@ -1710,41 +1710,23 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async getKingdomFromChatId(chatId, dbManager) {
-        // Configuration des mappings groupe -> royaume
-        // Ajoutez vos groupes WhatsApp ici avec leurs royaumes correspondants
-        const chatKingdomMapping = {
-            // Format: 'ID_DU_GROUPE@g.us': 'ROYAUME_ID'
+        try {
+            // Récupérer l'association depuis la base de données
+            const association = await dbManager.getChatKingdomAssociation(chatId);
             
-            // Exemple avec le groupe actuel détecté dans les logs
-            '120363321025702398@g.us': 'AEGYRIA',
-            
-            // Ajoutez vos autres groupes ici:
-            // '120363227300362988@g.us': 'SOMBRENUIT',
-            // '120363303602296165@g.us': 'KHELOS',
-            // '120363123456789012@g.us': 'ABRANTIS',
-            // '120363234567890123@g.us': 'VARHA',
-            // '120363345678901234@g.us': 'SYLVARIA',
-            // '120363456789012345@g.us': 'ECLYPSIA',
-            // '120363567890123456@g.us': 'TERRE_DESOLE',
-            // '120363678901234567@g.us': 'DRAK_TARR',
-            // '120363789012345678@g.us': 'URVALA',
-            // '120363890123456789@g.us': 'OMBREFIEL',
-            // '120363901234567890@g.us': 'KHALDAR',
-        };
+            if (!association) {
+                console.log(`⚠️ Groupe non configuré: ${chatId}`);
+                return null;
+            }
 
-        const kingdomId = chatKingdomMapping[chatId];
-        
-        if (!kingdomId) {
-            console.log(`⚠️ Groupe non configuré: ${chatId}`);
-            console.log(`💡 Pour configurer ce groupe, ajoutez cette ligne au mapping:`);
-            console.log(`   '${chatId}': 'ROYAUME_CHOISI',`);
+            console.log(`✅ Groupe ${chatId} mappé vers le royaume ${association.kingdomId}`);
+
+            // Récupérer les informations complètes du royaume
+            return await dbManager.getKingdomById(association.kingdomId);
+        } catch (error) {
+            console.error('❌ Erreur récupération association groupe-royaume:', error);
             return null;
         }
-
-        console.log(`✅ Groupe ${chatId} mappé vers le royaume ${kingdomId}`);
-
-        // Récupérer les informations complètes du royaume
-        return await dbManager.getKingdomById(kingdomId);
     }
 
     async handleConfigKingdomCommand({ player, chatId, message, dbManager, imageGenerator }) {
@@ -1790,19 +1772,32 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 };
             }
             
-            return {
-                text: `⚙️ **INSTRUCTIONS DE CONFIGURATION**\n\n` +
-                      `Pour associer ce groupe au royaume **${kingdom.name}**, ajoutez cette ligne dans le code :\n\n` +
-                      `\`'${chatId}': '${kingdom.id}',\`\n\n` +
-                      `📍 **Localisation:** Fichier \`game/GameEngine.js\`\n` +
-                      `🔍 **Fonction:** \`getKingdomFromChatId\`\n` +
-                      `📝 **Section:** \`chatKingdomMapping\`\n\n` +
-                      `🏰 **Royaume:** ${kingdom.name}\n` +
-                      `🎯 **ID Royaume:** ${kingdom.id}\n` +
-                      `📱 **ID Groupe:** \`${chatId}\`\n\n` +
-                      `Une fois ajouté, les commandes /autorise fonctionneront pour ce royaume.`,
-                image: await imageGenerator.generateKingdomImage(kingdom.id)
-            };
+            // Sauvegarder automatiquement l'association
+            try {
+                await dbManager.saveChatKingdomAssociation(chatId, kingdomId);
+                
+                console.log(`✅ Association sauvegardée: ${chatId} -> ${kingdomId}`);
+                
+                return {
+                    text: `✅ **CONFIGURATION RÉUSSIE !**\n\n` +
+                          `Le groupe WhatsApp a été automatiquement associé au royaume **${kingdom.name}**!\n\n` +
+                          `🏰 **Royaume:** ${kingdom.name}\n` +
+                          `🎯 **ID Royaume:** ${kingdom.id}\n` +
+                          `📱 **ID Groupe:** \`${chatId}\`\n\n` +
+                          `✨ **L'association a été sauvegardée dans la base de données.**\n\n` +
+                          `Les commandes /autorise fonctionnent maintenant pour ce royaume !`,
+                    image: await imageGenerator.generateKingdomImage(kingdom.id)
+                };
+            } catch (saveError) {
+                console.error('❌ Erreur sauvegarde association:', saveError);
+                
+                return {
+                    text: `❌ **ERREUR DE SAUVEGARDE**\n\n` +
+                          `Impossible de sauvegarder l'association du groupe au royaume **${kingdom.name}**.\n\n` +
+                          `Erreur: ${saveError.message}\n\n` +
+                          `Veuillez réessayer ou contactez un administrateur.`
+                };
+            }
 
         } catch (error) {
             console.error('❌ Erreur config royaume:', error);

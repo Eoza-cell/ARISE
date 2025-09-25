@@ -205,6 +205,15 @@ class DatabaseManager {
                 created_at TIMESTAMP DEFAULT NOW() NOT NULL
             );
 
+            -- Table des associations chat-royaume
+            CREATE TABLE IF NOT EXISTS chat_kingdom_associations (
+                id SERIAL PRIMARY KEY,
+                chat_id TEXT NOT NULL UNIQUE,
+                kingdom_id TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW() NOT NULL,
+                updated_at TIMESTAMP DEFAULT NOW() NOT NULL
+            );
+
             -- Index pour améliorer les performances
             CREATE INDEX IF NOT EXISTS idx_players_whatsapp ON players(whatsapp_number);
             CREATE INDEX IF NOT EXISTS idx_characters_player ON characters(player_id);
@@ -216,6 +225,8 @@ class DatabaseManager {
             CREATE INDEX IF NOT EXISTS idx_character_memories_importance ON character_memories(importance DESC);
             CREATE INDEX IF NOT EXISTS idx_game_backups_player ON game_backups(player_id);
             CREATE INDEX IF NOT EXISTS idx_conversation_memory_content ON conversation_memory USING gin(to_tsvector('french', content));
+            CREATE INDEX IF NOT EXISTS idx_chat_kingdom_associations_chat ON chat_kingdom_associations(chat_id);
+            CREATE INDEX IF NOT EXISTS idx_chat_kingdom_associations_kingdom ON chat_kingdom_associations(kingdom_id);
         `;
 
         await this.pool.query(createTablesSQL);
@@ -718,6 +729,85 @@ class DatabaseManager {
         } catch (error) {
             console.error('❌ Erreur lors du nettoyage mémoire:', error);
             return 0;
+        }
+    }
+
+    // Gestion des associations chat-royaume
+    async saveChatKingdomAssociation(chatId, kingdomId) {
+        try {
+            // Utiliser une requête SQL directe pour cette fonctionnalité
+            await this.pool.query(`
+                INSERT INTO chat_kingdom_associations (chat_id, kingdom_id, created_at, updated_at)
+                VALUES ($1, $2, NOW(), NOW())
+                ON CONFLICT (chat_id) 
+                DO UPDATE SET kingdom_id = $2, updated_at = NOW()
+            `, [chatId, kingdomId]);
+
+            console.log(`✅ Association sauvegardée: ${chatId} -> ${kingdomId}`);
+            return true;
+        } catch (error) {
+            console.error('❌ Erreur sauvegarde association chat-royaume:', error);
+            throw error;
+        }
+    }
+
+    async getChatKingdomAssociation(chatId) {
+        try {
+            const result = await this.pool.query(
+                'SELECT chat_id, kingdom_id, created_at, updated_at FROM chat_kingdom_associations WHERE chat_id = $1',
+                [chatId]
+            );
+
+            if (result.rows.length > 0) {
+                return {
+                    chatId: result.rows[0].chat_id,
+                    kingdomId: result.rows[0].kingdom_id,
+                    createdAt: result.rows[0].created_at,
+                    updatedAt: result.rows[0].updated_at
+                };
+            }
+
+            return null;
+        } catch (error) {
+            console.error('❌ Erreur récupération association chat-royaume:', error);
+            throw error;
+        }
+    }
+
+    async deleteChatKingdomAssociation(chatId) {
+        try {
+            const result = await this.pool.query(
+                'DELETE FROM chat_kingdom_associations WHERE chat_id = $1 RETURNING *',
+                [chatId]
+            );
+
+            if (result.rows.length > 0) {
+                console.log(`✅ Association supprimée: ${chatId}`);
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            console.error('❌ Erreur suppression association chat-royaume:', error);
+            throw error;
+        }
+    }
+
+    async getAllChatKingdomAssociations() {
+        try {
+            const result = await this.pool.query(
+                'SELECT chat_id, kingdom_id, created_at, updated_at FROM chat_kingdom_associations ORDER BY created_at DESC'
+            );
+
+            return result.rows.map(row => ({
+                chatId: row.chat_id,
+                kingdomId: row.kingdom_id,
+                createdAt: row.created_at,
+                updatedAt: row.updated_at
+            }));
+        } catch (error) {
+            console.error('❌ Erreur récupération toutes associations:', error);
+            return [];
         }
     }
 }
