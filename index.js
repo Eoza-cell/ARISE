@@ -43,7 +43,10 @@ class FrictionUltimateBot {
         this.gameEngine = new GameEngine(this.dbManager);
         this.buttonManager = null; // Sera initialisé après la connexion
         this.isConnected = false;
-        this.processedMessages = new Set(); // Système de déduplication
+        // Système de déduplication amélioré avec cache borné
+        this.processedMessages = new Map(); // ID du message -> timestamp
+        this.maxCacheSize = 1000; // Limite de cache pour éviter la fuite mémoire
+        this.cacheCleanupInterval = 5 * 60 * 1000; // Nettoyer le cache toutes les 5 minutes
 
         // Injecter l'ImageGenerator dans le GameEngine
         this.gameEngine.imageGenerator = this.imageGenerator;
@@ -180,9 +183,33 @@ class FrictionUltimateBot {
     async handleIncomingMessage(message) {
         try {
             const from = message.key.remoteJid;
+            const messageId = message.key.id;
+            
+            // CORRECTION CRITIQUE : Ignorer les messages de groupe sans participant 
+            // (c'est le premier événement dupliqué de Baileys)
+            if (from.includes('@g.us') && !message.key.participant) {
+                console.log('⚠️ Message de groupe sans participant ignoré (doublon Baileys)');
+                return;
+            }
+
+            // Système de déduplication basé sur l'ID unique du message par chat
+            const messageKey = `${from}:${messageId}`;
+            const now = Date.now();
+            
+            if (this.processedMessages.has(messageKey)) {
+                const lastProcessed = this.processedMessages.get(messageKey);
+                console.log(`⚠️ Message déjà traité ignoré: ${messageKey} (il y a ${now - lastProcessed}ms)`);
+                return;
+            }
+            
+            // Marquer le message comme traité
+            this.processedMessages.set(messageKey, now);
+            
+            // Nettoyage du cache - garder seulement les messages des 10 dernières minutes
+            this.cleanupCache();
+
             const messageText = this.extractMessageText(message);
             const messageImage = await this.extractMessageImage(message);
-            const messageId = message.key.id;
 
             // Si pas de texte ni d'image, ignorer
             if (!messageText && !messageImage) {
@@ -198,65 +225,29 @@ class FrictionUltimateBot {
                 console.log(`📝 Message texte: "${messageText}"`);
             }
 
-            // Gestion des groupes : ignorer SEULEMENT les vrais doublons
-            if (from.includes('@g.us') && !message.key.participant && !messageImage) {
-                // Vérifier si c'est vraiment un doublon en regardant l'heure
-                const now = Date.now();
-                const messageKey = `${from}-${messageText}-${Math.floor(now / 5000)}`; // Fenêtre de 5 secondes
-
-                if (this.processedMessages.has(messageKey)) {
-                    console.log(`⚠️ Message de groupe doublon confirmé ignoré: ${messageText}`);
+            // Extraction CORRECTE du numéro WhatsApp du joueur
+            let playerNumber;
+            if (from.includes('@g.us')) {
+                // Message de groupe - TOUJOURS utiliser le participant (utilisateur réel)
+                playerNumber = message.key.participant;
+                if (!playerNumber) {
+                    console.log('⚠️ Message de groupe sans participant - ignoré');
                     return;
                 }
-                this.processedMessages.add(messageKey);
-            }
-
-            // Définir le vrai expéditeur pour l'affichage et la déduplication
-            const realSender = message.key.participant || from;
-
-            // Déduplication améliorée - utiliser timestamp + contenu
-            const messageTextForKey = messageText ? messageText.trim().substring(0, 50) : '';
-            const timestamp = Math.floor(Date.now() / 1000); // Seconde actuelle
-            const uniqueKey = `${realSender}-${messageTextForKey}-${timestamp}`;
-
-            if (this.processedMessages.has(uniqueKey)) {
-                console.log(`⚠️ Message dupliqué ignoré: ${messageText} (sender: ${realSender})`);
-                return;
-            }
-
-            this.processedMessages.add(uniqueKey);
-
-            // Nettoyer la cache toutes les 500 messages pour éviter les fuites mémoire
-            if (this.processedMessages.size > 500) {
-                // Garder seulement les 100 derniers pour performance
-                const recentMessages = Array.from(this.processedMessages).slice(-100);
-                this.processedMessages.clear();
-                recentMessages.forEach(key => this.processedMessages.add(key));
-            }
-
-            console.log(`📨 Message de ${realSender}: ${messageText}`);
-
-            // Extraction du numéro WhatsApp du joueur (gestion des groupes) - AMÉLIORÉE
-            let playerNumber;
-            if (message.key.participant) {
-                // Message de groupe - utiliser le participant (l'utilisateur réel)
-                playerNumber = message.key.participant;
             } else {
                 // Message privé - utiliser l'expéditeur direct
                 playerNumber = from;
             }
 
-            // Nettoyer les formats @lid et autres suffixes
+            // Nettoyer les formats @lid et autres suffixes pour avoir un ID propre
             if (playerNumber.includes(':')) {
                 playerNumber = playerNumber.split(':')[0];
             }
             
-            // Log détaillé pour debug admin
-            console.log(`🔍 ID utilisateur extrait: "${playerNumber}"`);
-            console.log(`🔍 Message original from: "${from}"`);
-            console.log(`🔍 Message participant: "${message.key.participant}"`);
+            console.log(`📨 Message de ${playerNumber}: ${messageText || '[image]'}`);
+            console.log(`🔍 ID utilisateur: "${playerNumber}" | Chat: "${from}"`);
             
-            // Traitement spécial pour votre ID
+            // Traitement spécial pour l'administrateur
             if (playerNumber.includes('48198576038116')) {
                 console.log(`👑 ID administrateur détecté: ${playerNumber}`);
             }
@@ -480,6 +471,37 @@ class FrictionUltimateBot {
 
         } catch (error) {
             console.error('❌ Erreur démonstration boutons:', error);
+        }
+    }
+
+    // Méthode de nettoyage du cache pour éviter les fuites mémoire
+    cleanupCache() {
+        const now = Date.now();
+        const maxAge = 10 * 60 * 1000; // 10 minutes
+        const sizeBefore = this.processedMessages.size;
+        
+        // Supprimer les messages anciens
+        for (const [key, timestamp] of this.processedMessages.entries()) {
+            if (now - timestamp > maxAge) {
+                this.processedMessages.delete(key);
+            }
+        }
+        
+        // Si le cache est encore trop grand, garder seulement les plus récents
+        if (this.processedMessages.size > this.maxCacheSize) {
+            const sortedEntries = Array.from(this.processedMessages.entries())
+                .sort((a, b) => b[1] - a[1]) // Trier par timestamp décroissant
+                .slice(0, this.maxCacheSize); // Garder seulement les N plus récents
+            
+            this.processedMessages.clear();
+            for (const [key, timestamp] of sortedEntries) {
+                this.processedMessages.set(key, timestamp);
+            }
+        }
+        
+        const sizeAfter = this.processedMessages.size;
+        if (sizeBefore !== sizeAfter) {
+            console.log(`🧹 Cache nettoyé: ${sizeBefore} → ${sizeAfter} messages`);
         }
     }
 }
