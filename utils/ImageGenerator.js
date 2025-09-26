@@ -243,9 +243,9 @@ class ImageGenerator {
                     }
                 } catch (pollinationsError) {
                     if (pollinationsError.message.includes('timeout')) {
-                        console.log('⚠️ Timeout Pollinations menu (>2min), fallback vers Freepik:', pollinationsError.message);
+                        console.log('⚠️ Timeout Pollinations menu (>2min), fallback vers Freepik:', pollinatorsError.message);
                     } else {
-                        console.log('⚠️ Erreur Pollinations menu, fallback vers Freepik:', pollinationsError.message);
+                        console.log('⚠️ Erreur Pollinations menu, fallback vers Freepik:', pollinatorsError.message);
                     }
                 }
             }
@@ -837,45 +837,56 @@ class ImageGenerator {
         try {
             const videoPath = path.join(this.tempPath, `action_video_${character.id}_${Date.now()}.mp4`);
 
-            // Essayer HuggingFace d'abord avec l'image du personnage
+            // Prioriser HuggingFace avec ltxv-13b-098-distilled
             if (this.hasHuggingFace && this.huggingfaceClient) {
                 try {
-                    console.log('🤗 Génération vidéo d\'action avec HuggingFace (image-to-video)...');
-                    const videoPrompt = `${character.name} performing ${action} in ${character.currentLocation}, medieval fantasy RPG character in action, dynamic movement, epic fantasy scene, cinematic quality`;
+                    console.log('🤗 Génération vidéo d\'action avec HuggingFace ltxv-13b-098-distilled...');
+                    const videoPrompt = `${character.name} performing ${action}, medieval fantasy RPG character in action, dynamic movement, epic fantasy scene, cinematic quality, smooth motion`;
 
-                    // Utiliser l'image du personnage si disponible
-                    const characterImagePath = imagePath || character.imagePath || character.imageUrl;
-                    
+                    // Utiliser l'image du personnage
+                    const characterImagePath = imagePath || character.imagePath || character.imageUrl || `assets/custom_images/character_${character.id}.png`;
+
                     const result = await this.huggingfaceClient.generateVideoFromText(videoPrompt, videoPath, {
                         duration: 5,
                         characterImagePath: characterImagePath,
                         width: 1024,
-                        height: 768
-                    });
-                    
-                    if (result && result.success) {
-                        console.log('✅ Vidéo d\'action générée par HuggingFace avec image personnage');
-                        return result.videoPath;
-                    }lt = await this.huggingfaceClient.generateVideoFromText(videoPrompt, videoPath, {
-                        duration: 4
+                        height: 768,
+                        fps: 24
                     });
 
                     if (result && result.success) {
-                        console.log('✅ Vidéo d\'action générée par HuggingFace GRATUIT');
-                        return result.videoPath; // Retourner le chemin au lieu du buffer
+                        console.log('✅ Vidéo d\'action générée par HuggingFace ltxv-13b-098-distilled');
+                        return result.videoPath;
                     }
                 } catch (hfError) {
-                    console.log('⚠️ Erreur HuggingFace vidéo action, fallback vers RunwayML:', hfError.message);
+                    console.log('⚠️ Erreur HuggingFace ltxv-13b, essai modèle de fallback:', hfError.message);
+
+                    // Essayer le modèle de fallback text-to-video
+                    try {
+                        const result = await this.huggingfaceClient.generateVideoWithFallbackModel(
+                            `${character.name} performing ${action}, medieval fantasy`,
+                            videoPath,
+                            { duration: 4, width: 512, height: 512 }
+                        );
+
+                        if (result && result.success) {
+                            console.log('✅ Vidéo d\'action générée par HuggingFace (fallback)');
+                            return result.videoPath;
+                        }
+                    } catch (fallbackError) {
+                        console.log('⚠️ Erreur fallback HuggingFace:', fallbackError.message);
+                    }
                 }
             }
 
-            // Fallback vers RunwayML (si disponible)
+            // Fallback vers RunwayML (si disponible et après correction de l'URL)
             if (this.hasRunway && this.runwayClient) {
                 try {
-                    console.log('🎬 Génération vidéo d\'action avec RunwayML...');
+                    console.log('🎬 Génération vidéo d\'action avec RunwayML (URL corrigée)...');
                     const videoPrompt = `${character.name} performing: ${action}. Medieval fantasy setting, cinematic movement, epic fantasy atmosphere`;
-                    const videoPath = await this.runwayClient.generateVideo(videoPrompt, imagePath);
-                    return videoPath; // Retourner le chemin directement
+                    return await this.runwayClient.generateVideoFromText(videoPrompt, videoPath, {
+                        duration: 5
+                    });
                 } catch (runwayError) {
                     console.log('⚠️ Erreur RunwayML vidéo action:', runwayError.message);
                 }
@@ -897,10 +908,10 @@ class ImageGenerator {
             if (this.hasHuggingFace && this.huggingfaceClient) {
                 try {
                     console.log(`🤗 Génération vidéo de combat avec HuggingFace: ${combatContext.attacker.name} vs ${combatContext.defender.name}`);
-                    
+
                     // Utiliser l'image de l'attaquant pour la vidéo
                     const attackerImagePath = combatContext.attacker.imagePath || combatContext.attacker.imageUrl;
-                    
+
                     const result = await this.huggingfaceClient.generateVideoFromText(
                         `${combatContext.attacker.name} fighting in epic medieval combat, dynamic battle scene, weapons and armor, dramatic action`,
                         videoPath,
@@ -943,9 +954,9 @@ class ImageGenerator {
             if (this.hasHuggingFace && this.huggingfaceClient) {
                 try {
                     console.log(`🤗 Génération vidéo de lieu avec HuggingFace: ${location}`);
-                    
+
                     const characterImagePath = character.imagePath || character.imageUrl;
-                    
+
                     const result = await this.huggingfaceClient.generateVideoFromText(
                         `${character.name} exploring ${location}, fantasy landscape, atmospheric environment, cinematic camera movement, medieval fantasy world`,
                         videoPath,

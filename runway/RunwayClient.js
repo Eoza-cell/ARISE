@@ -6,7 +6,7 @@ const path = require('path');
 class RunwayClient {
     constructor() {
         this.apiKey = process.env.RUNWAY_API_KEY || 'key_fea04da0c65548870bb187adebf6f0f5ddf32330106abb7637c9610961cd156e679f2013b021fcb933bc3054c97202d033feb21ab556bd616e8286902a8284e0';
-        this.baseURL = 'https://api.runwayml.com/v1';
+        this.baseURL = 'https://api.dev.runwayml.com/v1';
         this.isAvailable = false;
         
         this.initializeClient();

@@ -50,10 +50,10 @@ class HuggingFaceClient {
                 }
             }
 
-            // Si pas d'image de personnage, utiliser une image par défaut ou générer sans
+            // Si pas d'image de personnage, essayer le modèle de fallback
             if (!characterImage) {
-                console.log('⚠️ Pas d\'image de personnage disponible - génération vidéo sans image de base');
-                throw new Error('Image de personnage requise pour la génération vidéo');
+                console.log('⚠️ Pas d\'image de personnage disponible - utilisation du modèle fallback text-to-video');
+                return await this.generateVideoWithFallbackModel(prompt, outputPath, options);
             }
 
             const optimizedPrompt = this.optimizePromptForImageToVideo(prompt);

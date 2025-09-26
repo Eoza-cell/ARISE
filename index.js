@@ -214,12 +214,13 @@ class FrictionUltimateBot {
             // Définir le vrai expéditeur pour l'affichage et la déduplication
             const realSender = message.key.participant || from;
 
-            // Déduplication basée sur messageId + contenu du message (plus robuste)
-            const messageTextForKey = messageText ? messageText.trim() : '';
-            const uniqueKey = `${messageId}-${messageTextForKey}`;
+            // Déduplication améliorée - utiliser timestamp + contenu
+            const messageTextForKey = messageText ? messageText.trim().substring(0, 50) : '';
+            const timestamp = Math.floor(Date.now() / 1000); // Seconde actuelle
+            const uniqueKey = `${realSender}-${messageTextForKey}-${timestamp}`;
 
             if (this.processedMessages.has(uniqueKey)) {
-                console.log(`⚠️ Message dupliqué ignoré: ${messageText} (messageId: ${messageId})`);
+                console.log(`⚠️ Message dupliqué ignoré: ${messageText} (sender: ${realSender})`);
                 return;
             }
 
