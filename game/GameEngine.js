@@ -88,7 +88,7 @@ class GameEngine {
             'bandit': { power: 20, defense: 15, health: 60, level: 4 },
             'vagabond': { power: 12, defense: 8, health: 40, level: 2 },
             'rat_geant': { power: 8, defense: 5, health: 25, level: 1 },
-            'gobelin': { power: 15, defense: 10, health: 35, level: 2 }
+            'gobelin': { power: 15, defense: 10, health: 35, level:2 }
         };
 
         // Techniques spéciales par rang
@@ -280,14 +280,18 @@ class GameEngine {
                 player = await dbManager.createPlayer(playerNumber, username);
 
                 return {
-                    text: `🎮 **Bienvenue dans FRICTION ULTIMATE !**\n\n` +
-                          `Tu es maintenant enregistré en tant que : **${username}**\n\n` +
-                          `🏰 Dans ce monde médiéval-technologique, chaque action compte et la moindre erreur peut être fatale.\n\n` +
-                          `📱 **Commandes principales :**\n` +
-                          `• /menu - Afficher le menu principal\n` +
-                          `• /créer - Créer ton personnage\n` +
-                          `• /aide - Voir toutes les commandes\n\n` +
-                          `💀 **Attention :** Ce monde est impitoyable. Prépare-toi à l'aventure la plus dangereuse de ta vie !`,
+                    text: `🎮 **Bienvenue dans FRICTION ULTIMATE !**
+
+Tu es maintenant enregistré en tant que : **${username}**
+
+🏰 Dans ce monde médiéval-technologique, chaque action compte et la moindre erreur peut être fatale.
+
+📱 **Commandes principales :**
+• /menu - Afficher le menu principal
+• /créer - Créer ton personnage
+• /aide - Voir toutes les commandes
+
+💀 **Attention :** Ce monde est impitoyable. Prépare-toi à l'aventure la plus dangereuse de ta vie !`,
                     image: await imageGenerator.generateMenuImage()
                 };
             }
@@ -304,15 +308,16 @@ class GameEngine {
                     return await this.handlePhotoReceived({ player, imageMessage, originalMessage: arguments[0].originalMessage, sock, dbManager, imageGenerator });
                 } else {
                     return {
-                        text: "🖼️ J'ai reçu votre image ! Cependant, je ne peux traiter que les commandes textuelles.\n\n" +
-                              "💬 Utilisez `/menu` pour voir les commandes disponibles."
+                        text: `🖼️ J'ai reçu votre image ! Cependant, je ne peux traiter que les commandes textuelles.
+
+💬 Utilisez /menu pour voir les commandes disponibles.`
                     };
                 }
             }
 
             if (!message) {
                 return {
-                    text: "💬 Utilisez `/menu` pour voir les commandes disponibles."
+                    text: `💬 Utilisez /menu pour voir les commandes disponibles.`
                 };
             }
 
@@ -366,8 +371,9 @@ class GameEngine {
 
                 if (!character) {
                     return {
-                        text: `❌ Tu n'as pas encore de personnage !\n\n` +
-                              `Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.`
+                        text: `❌ Tu n'as pas encore de personnage !
+
+Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.`
                     };
                 }
 
@@ -388,7 +394,7 @@ class GameEngine {
         } catch (error) {
             console.error('❌ Erreur dans le moteur de jeu:', error);
             return {
-                text: "❌ Une erreur s'est produite dans le moteur de jeu. Veuillez réessayer."
+                text: `❌ Une erreur s'est produite dans le moteur de jeu. Veuillez réessayer.`
             };
         }
     }
@@ -401,25 +407,26 @@ class GameEngine {
         let menuText = `🎮 **FRICTION ULTIMATE - Menu Principal**\n\n`;
 
         if (character) {
-            menuText += `👤 **Personnage :** ${character.name}\n` +
-                       `🏰 **Royaume :** ${character.kingdom}\n` +
-                       `⚔️ **Ordre :** ${character.order || 'Aucun'}\n` +
-                       `📊 **Niveau :** ${character.level} (${character.powerLevel})\n\n`;
+            menuText += `👤 **Personnage :** ${character.name}
+🏰 **Royaume :** ${character.kingdom}
+⚔️ **Ordre :** ${character.order || 'Aucun'}
+📊 **Niveau :** ${character.level} (${character.powerLevel})\n\n`;
         }
 
-        menuText += `📱 **Commandes disponibles :**\n` +
-                   `• /jouer - 🎮 ENTRER DANS LE JEU\n` +
-                   `• /créer - Créer ton personnage\n` +
-                   `• /modifier - Modifier ton personnage\n` +
-                   `• /fiche - Voir ta fiche de personnage\n` +
-                   `• /royaumes - Explorer les 12 royaumes\n` +
-                   `• /ordres - Découvrir les 7 ordres\n` +
-                   `• /combat - Système de combat\n` +
-                   `• /inventaire - Gérer ton équipement\n` +
-                   `• /carte - Carte du monde\n` +
-                   `• /aide - Aide complète\n` +
-                   `• /time_system - Informations sur le temps de jeu\n\n` +
-                   `💀 **Le monde bouge en permanence. Chaque seconde compte !**`;
+        menuText += `📱 **Commandes disponibles :**
+• /jouer - 🎮 ENTRER DANS LE JEU
+• /créer - Créer ton personnage
+• /modifier - Modifier ton personnage
+• /fiche - Voir ta fiche de personnage
+• /royaumes - Explorer les 12 royaumes
+• /ordres - Découvrir les 7 ordres
+• /combat - Système de combat
+• /inventaire - Gérer ton équipement
+• /carte - Carte du monde
+• /aide - Aide complète
+• /time_system - Informations sur le temps de jeu
+
+💀 **Le monde bouge en permanence. Chaque seconde compte !**`;
 
         try {
             const menuImage = await imageGenerator.generateMenuImage();
@@ -436,16 +443,19 @@ class GameEngine {
     }
 
     async handleCreateCharacterCommand({ player, dbManager, imageGenerator, sock, chatId }) {
-        const existingCharacter = await this.dbManager.getCharacterByPlayer(player.id);
+        const existingCharacter = await dbManager.getCharacterByPlayer(player.id);
 
         if (existingCharacter) {
             return {
-                text: `👤 Tu as déjà un personnage : **${existingCharacter.name}**\n\n` +
-                      `🏰 Royaume : ${existingCharacter.kingdom}\n` +
-                      `⚔️ Ordre : ${existingCharacter.order || 'Aucun'}\n\n` +
-                      `🎨 Pour créer un nouveau personnage,\n` +
-                      `tu dois d'abord supprimer l'actuel.\n\n` +
-                      `Écris "SUPPRIMER_PERSONNAGE" pour confirmer la suppression.`,
+                text: `👤 Tu as déjà un personnage : **${existingCharacter.name}**
+
+🏰 Royaume : ${existingCharacter.kingdom}
+⚔️ Ordre : ${existingCharacter.order || 'Aucun'}
+
+🎨 Pour créer un nouveau personnage,
+tu dois d'abord supprimer l'actuel.
+
+Écris "SUPPRIMER_PERSONNAGE" pour confirmer la suppression.`,
                 image: await imageGenerator.generateCharacterImage(existingCharacter)
             };
         }
@@ -454,19 +464,24 @@ class GameEngine {
         await dbManager.setTemporaryData(player.id, 'creation_mode', 'description');
 
         return {
-            text: `🎭 **CRÉATION DE PERSONNAGE IA** 🎭\n\n` +
-                  `✨ Pour créer ton personnage idéal, l'IA a besoin de ton aide !\n\n` +
-                  `📸 **ÉTAPE 1 - ENVOIE TA PHOTO**\n` +
-                  `Envoie une photo de ton visage pour que l'IA Pollination puisse créer un personnage qui te ressemble !\n\n` +
-                  `📝 **ÉTAPE 2 - DÉCRIS TON PERSONNAGE**\n` +
-                  `Après ta photo, décris ton personnage idéal :\n` +
-                  `• Classe/profession (guerrier, mage, assassin...)\n` +
-                  `• Style vestimentaire et armure\n` +
-                  `• Origine/royaume préféré\n` +
-                  `• Personnalité et histoire\n\n` +
-                  `💡 **Exemple de description :**\n` +
-                  `"Un guerrier noble d'AEGYRIA avec une armure dorée. Il est courageux et loyal."\n\n` +
-                  `📸 **Commence par envoyer ta photo maintenant !**`,
+            text: `🎭 **CRÉATION DE PERSONNAGE IA** 🎭
+
+✨ Pour créer ton personnage idéal, l'IA a besoin de ton aide !
+
+📸 **ÉTAPE 1 - ENVOIE TA PHOTO**
+Envoie une photo de ton visage pour que l'IA Pollination puisse créer un personnage qui te ressemble !
+
+📝 **ÉTAPE 2 - DÉCRIS TON PERSONNAGE**
+Après ta photo, décris ton personnage idéal :
+• Classe/profession (guerrier, mage, assassin...)
+• Style vestimentaire et armure
+• Origine/royaume préféré
+• Personnalité et histoire
+
+💡 **Exemple de description :**
+"Un guerrier noble d'AEGYRIA avec une armure dorée. Il est courageux et loyal."
+
+📸 **Commence par envoyer ta photo maintenant !**`,
             image: await imageGenerator.generateMenuImage()
         };
     }
@@ -474,17 +489,23 @@ class GameEngine {
     async startCharacterCreation({ player, dbManager, imageGenerator }) {
         await dbManager.setTemporaryData(player.id, 'creation_started', true);
 
-        let creationText = `⚔️ **CRÉATION DE PERSONNAGE**\n\n` +
-                          `🎯 **Étape 1/3 - Choix du sexe**\n\n` +
-                          `👤 Choisis le sexe de ton personnage :\n\n` +
-                          `• Tape **HOMME** ou **H** pour masculin\n` +
-                          `• Tape **FEMME** ou **F** pour féminin\n\n` +
-                          `💀 **Attention :** Dans ce monde impitoyable, chaque choix compte !\n\n` +
-                          `⚡ **Processus rapide en 3 étapes :**\n` +
-                          `1. 👤 Sexe (maintenant)\n` +
-                          `2. 🏰 Royaume (prochaine étape)\n` +
-                          `3. 📝 Nom de personnage\n\n` +
-                          `🚀 **Tape HOMME, H, FEMME ou F pour continuer !**`;
+        let creationText = `⚔️ **CRÉATION DE PERSONNAGE**
+
+🎯 **Étape 1/3 - Choix du sexe**
+
+👤 Choisis le sexe de ton personnage :
+
+• Tape **HOMME** ou **H** pour masculin
+• Tape **FEMME** ou **F** pour féminin
+
+💀 **Attention :** Dans ce monde impitoyable, chaque choix compte !
+
+⚡ **Processus rapide en 3 étapes :**
+1. 👤 Sexe (maintenant)
+2. 🏰 Royaume (prochaine étape)
+3. 📝 Nom de personnage
+
+🚀 **Tape HOMME, H, FEMME ou F pour continuer !**`;
 
         return {
             text: creationText,
@@ -509,33 +530,41 @@ class GameEngine {
                 console.log(`✅ Photo sauvegardée pour ${player.whatsappNumber}`);
 
                 return {
-                    text: `📸 **PHOTO REÇUE AVEC SUCCÈS !** 📸\n\n` +
-                          `✅ Ton visage a été enregistré pour la création du personnage.\n\n` +
-                          `📝 **MAINTENANT, DÉCRIS TON PERSONNAGE :**\n\n` +
-                          `Décris le personnage que tu veux incarner :\n\n` +
-                          `💡 **Exemple :**\n` +
-                          `"Un guerrier noble d'AEGYRIA avec une armure dorée et une épée lumineuse. Il est courageux, loyal et protège les innocents. Il vient des plaines d'honneur et rêve de devenir un paladin légendaire."\n\n` +
-                          `🎭 **Inclus :**\n` +
-                          `• Classe/profession\n` +
-                          `• Style d'armure/vêtements\n` +
-                          `• Royaume d'origine\n` +
-                          `• Personnalité\n` +
-                          `• Histoire/objectifs\n\n` +
-                          `🚀 **Écris ta description maintenant !**`
+                    text: `📸 **PHOTO REÇUE AVEC SUCCÈS !** 📸
+
+✅ Ton visage a été enregistré pour la création du personnage.
+
+📝 **MAINTENANT, DÉCRIS TON PERSONNAGE :**
+
+Décris le personnage que tu veux incarner :
+
+💡 **Exemple :**
+"Un guerrier noble d'AEGYRIA avec une armure dorée et une épée lumineuse. Il est courageux, loyal et protège les innocents. Il vient des plaines d'honneur et rêve de devenir un paladin légendaire."
+
+🎭 **Inclus :**
+• Classe/profession
+• Style d'armure/vêtements
+• Royaume d'origine
+• Personnalité
+• Histoire/objectifs
+
+🚀 **Écris ta description maintenant !**`
                 };
             } else {
                 return {
-                    text: `❌ **Erreur de téléchargement de photo**\n\n` +
-                          `La photo n'a pas pu être traitée.\n` +
-                          `📸 Réessaie d'envoyer une photo claire de ton visage.`
+                    text: `❌ **Erreur de téléchargement de photo**
+
+La photo n'a pas pu être traitée.
+📸 Réessaie d'envoyer une photo claire de ton visage.`
                 };
             }
         } catch (error) {
             console.error('❌ Erreur traitement photo:', error);
             return {
-                text: `❌ **Erreur lors du traitement de la photo**\n\n` +
-                      `Une erreur s'est produite. Réessaie d'envoyer ta photo.\n` +
-                      `💡 Assure-toi que l'image est claire et bien éclairée.`
+                text: `❌ **Erreur lors du traitement de la photo**
+
+Une erreur s'est produite. Réessaie d'envoyer ta photo.
+💡 Assure-toi que l'image est claire et bien éclairée.`
             };
         }
     }
@@ -566,17 +595,20 @@ class GameEngine {
             }
 
             return {
-                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !** 🎉\n\n` +
-                      `👤 **Nom :** ${newCharacter.name}\n` +
-                      `⚧️ **Sexe :** ${newCharacter.gender === 'male' ? 'Homme' : 'Femme'}\n` +
-                      `🏰 **Royaume :** ${newCharacter.kingdom}\n` +
-                      `📊 **Niveau :** ${newCharacter.level} (${newCharacter.powerLevel})\n` +
-                      `📍 **Localisation :** ${newCharacter.currentLocation}\n` +
-                      `💰 **Pièces :** ${newCharacter.coins}\n\n` +
-                      `✨ **Description générée par l'IA :**\n` +
-                      `"${description}"\n\n` +
-                      `🎮 **Tapez /jouer pour commencer l'aventure !**\n` +
-                      `📋 **Tapez /fiche pour voir tous les détails**`,
+                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !** 🎉
+
+👤 **Nom :** ${newCharacter.name}
+⚧️ **Sexe :** ${newCharacter.gender === 'male' ? 'Homme' : 'Femme'}
+🏰 **Royaume :** ${newCharacter.kingdom}
+📊 **Niveau :** ${newCharacter.level} (${newCharacter.powerLevel})
+📍 **Localisation :** ${newCharacter.currentLocation}
+💰 **Pièces :** ${newCharacter.coins}
+
+✨ **Description générée par l'IA :**
+"${description}"
+
+🎮 **Tapez /jouer pour commencer l'aventure !**
+📋 **Tapez /fiche pour voir tous les détails**`,
                 image: characterImage
             };
 
@@ -587,10 +619,12 @@ class GameEngine {
             await dbManager.clearTemporaryData(player.id, 'creation_mode');
 
             return {
-                text: `❌ **Erreur lors de la création**\n\n` +
-                      `Une erreur s'est produite lors de l'analyse de votre description.\n` +
-                      `Veuillez réessayer avec /créer.\n\n` +
-                      `💡 **Conseil :** Soyez plus précis dans votre description.`
+                text: `❌ **Erreur lors de la création**
+
+Une erreur s'est produite lors de l'analyse de votre description.
+Veuillez réessayer avec /créer.
+
+💡 **Conseil :** Soyez plus précis dans votre description.`
             };
         }
     }
@@ -883,32 +917,39 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
 
         if (!character) {
             return {
-                text: `❌ Tu n'as pas encore de personnage !\n\n` +
-                      `Utilise la commande /créer pour en créer un.`
+                text: `❌ Tu n'as pas encore de personnage !
+
+Utilise la commande /créer pour en créer un.`
             };
         }
 
         const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
         const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
 
-        const sheetText = `👤 **FICHE DE PERSONNAGE**\n\n` +
-                         `**Nom :** ${character.name}\n` +
-                         `**Sexe :** ${character.gender === 'male' ? 'Homme' : 'Femme'}\n` +
-                         `**Royaume :** ${character.kingdom}\n` +
-                         `**Ordre :** ${character.order || 'Aucun'}\n\n` +
-                         `📊 **Statistiques :**\n` +
-                         `• Niveau : ${character.level}\n` +
-                         `• Expérience : ${character.experience}\n` +
-                         `• Niveau de puissance : ${character.powerLevel}\n` +
-                         `• Niveau de friction : ${character.frictionLevel}\n\n` +
-                         `❤️ **Barres de vie :** ${lifeBar}\n` +
-                         `⚡ **Énergie :** ${energyBar}\n\n` +
-                         `📍 **Position :** ${character.currentLocation}\n` +
-                         `💰 **Pièces :** ${character.coins}\n\n` +
-                         `⚔️ **Équipement actuel :**\n` +
-                         `${this.formatEquipment(character.equipment)}\n\n` +
-                         `🎯 **Techniques apprises :**\n` +
-                         `${this.formatTechniques(character.learnedTechniques)}`;
+        const sheetText = `👤 **FICHE DE PERSONNAGE**
+
+**Nom :** ${character.name}
+**Sexe :** ${character.gender === 'male' ? 'Homme' : 'Femme'}
+**Royaume :** ${character.kingdom}
+**Ordre :** ${character.order || 'Aucun'}
+
+📊 **Statistiques :**
+• Niveau : ${character.level}
+• Expérience : ${character.experience}
+• Niveau de puissance : ${character.powerLevel}
+• Niveau de friction : ${character.frictionLevel}
+
+❤️ **Barres de vie :** ${lifeBar}
+⚡ **Énergie :** ${energyBar}
+
+📍 **Position :** ${character.currentLocation}
+💰 **Pièces :** ${character.coins}
+
+⚔️ **Équipement actuel :**
+${this.formatEquipment(character.equipment)}
+
+🎯 **Techniques apprises :**
+${this.formatTechniques(character.learnedTechniques)}`;
 
         let characterImage = null;
         try {
@@ -997,8 +1038,9 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                 return await this.finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage: false });
             }
             return {
-                text: `📸 **En attente de ta photo de visage...**\n\n` +
-                      `🖼️ Envoie une photo de ton visage ou écris "SANS_PHOTO" pour continuer sans photo personnalisée.`
+                text: `📸 **En attente de ta photo de visage...**
+
+🖼️ Envoie une photo de ton visage ou écris "SANS_PHOTO" pour continuer sans photo personnalisée.`
             };
         }
 
@@ -1011,11 +1053,13 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
 
         if (!isInGameMode) {
             return {
-                text: `💬 **Message libre détecté**\n\n` +
-                      `Salut ! Pour jouer à Friction Ultimate, utilise :\n` +
-                      `🎮 **/jouer** - Entrer en mode jeu\n` +
-                      `📋 **/menu** - Voir toutes les options\n\n` +
-                      `En mode libre, je ne traite pas les actions de jeu.`
+                text: `💬 **Message libre détecté**
+
+Salut ! Pour jouer à Friction Ultimate, utilise :
+🎮 **/jouer** - Entrer en mode jeu
+📋 **/menu** - Voir toutes les options
+
+En mode libre, je ne traite pas les actions de jeu.`
             };
         }
 
@@ -1023,8 +1067,9 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
 
         if (!character) {
             return {
-                text: `❌ Tu dois d'abord créer un personnage avec /créer !\n\n` +
-                      `Utilise /menu pour sortir du mode jeu.`
+                text: `❌ Tu dois d'abord créer un personnage avec /créer !
+
+Utilise /menu pour sortir du mode jeu.`
             };
         }
 
@@ -1158,7 +1203,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
         const lowerMessage = message.toLowerCase();
 
         // Vérifier les techniques de combat de base (toujours autorisées)
-        const basicTechniqueDetected = Object.keys(this.basicCombatTechniques).some(key => 
+        const basicTechniqueDetected = Object.keys(this.basicCombatTechniques).some(key =>
             lowerMessage.includes(key)
         );
 
@@ -1257,7 +1302,9 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
 
                 // Message final
                 await sock.sendMessage(chatId, {
-                    text: `✅ **${type.toUpperCase()} RECHARGÉ !**\n\n${type === 'aura' ? '🔮' : '✨'} Votre ${type} est maintenant à son maximum !`
+                    text: `✅ **${type.toUpperCase()} RECHARGÉ !**
+
+${type === 'aura' ? '🔮' : '✨'} Votre ${type} est maintenant à son maximum !`
                 });
             }
         }, 1000); // Chaque seconde
@@ -1301,7 +1348,11 @@ ${progressBar} ${Math.floor(percentage)}%
             const validationErrors = this.validateAction(character, message);
             if (validationErrors.length > 0) {
                 return {
-                    text: `⚠️ **ACTION INVALIDE**\n\n${validationErrors.join('\n')}\n\n💡 Vérifiez vos capacités et votre inventaire avant d'agir.`
+                    text: `⚠️ **ACTION INVALIDE**
+
+${validationErrors.join('\n')}
+
+💡 Vérifiez vos capacités et votre inventaire avant d'agir.`
                 };
             }
 
@@ -1457,10 +1508,10 @@ ${progressBar} ${Math.floor(percentage)}%
                 character.coins = Math.max(0, coinsBefore - coinsLost);
                 character.currentLocation = 'Lieu de Respawn - Sanctuaire des Âmes Perdues';
 
-                deathText = `\n💀 **MORT** - Vous avez succombé à vos blessures...\n` +
-                           `🕊️ **RESPAWN** - Votre âme trouve refuge au Sanctuaire\n` +
-                           `💰 **PERTE** - ${coinsLost} pièces perdues dans la mort\n` +
-                           `❤️ **RÉSURRECTION** - Vous renaissez avec ${character.currentLife} PV`;
+                deathText = `\n💀 **MORT** - Vous avez succombé à vos blessures...
+🕊️ **RESPAWN** - Votre âme trouve refuge au Sanctuaire
+💰 **PERTE** - ${coinsLost} pièces perdues dans la mort
+❤️ **RÉSURRECTION** - Vous renaissez avec ${character.currentLife} PV`;
             }
 
             await dbManager.updateCharacter(character.id, {
@@ -1524,6 +1575,7 @@ ${progressBar} ${Math.floor(percentage)}%
 ║ ${combatEmoji} Combat: ${actionAnalysis.combatAdvantage?.replace('_', ' ') || 'N/A'}
 ╚══════════════════════════════════╝
 
+${deathText}
 📜 **NARRATION:**
 ${narration}
 
@@ -1570,13 +1622,17 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
 
             return {
-                text: `🎮 **${character.name}** - *${character.currentLocation}*\n\n` +
-                      `📖 **Action :** "${message}"\n\n` +
-                      `❤️ **Vie :** ${lifeBar}\n` +
-                      `⚡ **Énergie :** ${energyBar} (-${energyCost})\n` +
-                      `💰 **Argent :** ${character.coins} pièces d'or\n\n` +
-                      `⚠️ Le narrateur analyse ton action... Les systèmes IA sont temporairement instables.\n\n` +
-                      `💭 *Continue ton aventure...*`
+                text: `🎮 **${character.name}** - *${character.currentLocation}*
+
+📖 **Action :** "${message}"
+
+❤️ **Vie :** ${lifeBar}
+⚡ **Énergie :** ${energyBar} (-${energyCost})
+💰 **Argent :** ${character.coins} pièces d'or
+
+⚠️ Le narrateur analyse ton action... Les systèmes IA sont temporairement instables.
+
+💭 *Continue ton aventure...*`
             };
         }
     }
@@ -1606,22 +1662,26 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
     async handleHelpCommand({ imageGenerator }) {
         return {
-            text: `📱 **AIDE - FRICTION ULTIMATE**\n\n` +
-                  `🎮 **Commandes de base :**\n` +
-                  `• /menu - Menu principal\n` +
-                  `• /créer - Créer un personnage\n` +
-                  `• /modifier - Modifier l'apparence de ton personnage\n` +
-                  `• /fiche - Fiche de personnage\n\n` +
-                  `🌍 **Exploration :**\n` +
-                  `• /royaumes - Les 12 royaumes\n` +
-                  `• /ordres - Les 7 ordres\n` +
-                  `• /carte - Carte du monde\n\n` +
-                  `⚔️ **Combat :**\n` +
-                  `• /combat - Système de combat\n` +
-                  `• /inventaire - Gestion équipement\n` +
-                  `• /time_system - Informations sur le temps de jeu\n\n` +
-                  `💀 **Le monde de Friction est impitoyable !**\n` +
-                  `Chaque action doit être précise et réfléchie.`,
+            text: `📱 **AIDE - FRICTION ULTIMATE**
+
+🎮 **Commandes de base :**
+• /menu - Menu principal
+• /créer - Créer un personnage
+• /modifier - Modifier l'apparence de ton personnage
+• /fiche - Fiche de personnage
+
+🌍 **Exploration :**
+• /royaumes - Les 12 royaumes
+• /ordres - Les 7 ordres
+• /carte - Carte du monde
+
+⚔️ **Combat :**
+• /combat - Système de combat
+• /inventaire - Gestion équipement
+• /time_system - Informations sur le temps de jeu
+
+💀 **Le monde de Friction est impitoyable !**
+Chaque action doit être précise et réfléchie.`,
             image: await imageGenerator.generateHelpImage()
         };
     }
@@ -1632,12 +1692,14 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         let kingdomsText = `🏰 **LES 12 ROYAUMES DE FRICTION ULTIMATE**\n\n`;
 
         kingdoms.forEach((kingdom, index) => {
-            kingdomsText += `**${index + 1}. ${kingdom.name} (${kingdom.id})**\n` +
-                           `${kingdom.description}\n` +
-                           `🌍 **Géographie :** ${kingdom.geography}\n` +
-                           `🎭 **Culture :** ${kingdom.culture}\n` +
-                           `⚔️ **Spécialités :** ${kingdom.specialties.join(', ')}\n` +
-                           `✨ **Particularités :** ${kingdom.particularities}\n\n`;
+            kingdomsText += `**${index + 1}. ${kingdom.name} (${kingdom.id})**
+${kingdom.description}
+🌍 **Géographie :** ${kingdom.geography}
+🎭 **Culture :** ${kingdom.culture}
+⚔️ **Spécialités :** ${kingdom.specialties.join(', ')}
+✨ **Particularités :** ${kingdom.particularities}
+
+`;
         });
 
         let kingdomImage = null;
@@ -1662,10 +1724,12 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         let ordersText = `⚔️ **LES 7 ORDRES DE FRICTION ULTIMATE**\n\n`;
 
         orders.forEach((order, index) => {
-            ordersText += `**${index + 1}. ${order.name}**\n` +
-                         `${order.description}\n` +
-                         `🏰 **Localisation :** ${order.location}\n` +
-                         `⚔️ **Spécialités :** ${order.specialties.join(', ')}\n\n`;
+            ordersText += `**${index + 1}. ${order.name}**
+${order.description}
+🏰 **Localisation :** ${order.location}
+⚔️ **Spécialités :** ${order.specialties.join(', ')}
+
+`;
         });
 
         return {
@@ -1678,12 +1742,16 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         try {
             if (!sock || !sock.buttonManager) {
                 return {
-                    text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
-                          `⚠️ Système de boutons non initialisé.\n\n` +
-                          `Les boutons simulés avec des sondages WhatsApp permettent de créer des interfaces interactives sans API officielle !\n\n` +
-                          `🎮 Chaque sondage = un bouton\n` +
-                          `📊 Cliquer sur le sondage = activer l'action\n\n` +
-                          `Cette fonctionnalité sera bientôt disponible !`
+                    text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**
+
+⚠️ Système de boutons non initialisé.
+
+Les boutons simulés avec des sondages WhatsApp permettent de créer des interfaces interactives sans API officielle !
+
+🎮 Chaque sondage = un bouton
+📊 Cliquer sur le sondage = activer l'action
+
+Cette fonctionnalité sera bientôt disponible !`
                 };
             }
 
@@ -1692,11 +1760,14 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             const buttonManager = sock.buttonManager;
 
             await sock.sendMessage(chatId, {
-                text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**\n\n` +
-                      `🎮 Voici comment fonctionne le système de boutons simulés avec des sondages WhatsApp !\n\n` +
-                      `✨ Chaque "bouton" est en fait un sondage avec une seule option\n` +
-                      `📊 Cliquer dessus équivaut à appuyer sur un bouton\n\n` +
-                      `**Menu de test :**`
+                text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**
+
+🎮 Voici comment fonctionne le système de boutons simulés avec des sondages WhatsApp !
+
+✨ Chaque "bouton" est en fait un sondage avec une seule option
+📊 Cliquer dessus équivaut à appuyer sur un bouton
+
+**Menu de test :**`
             });
 
             setTimeout(async () => {
@@ -1719,9 +1790,11 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         } catch (error) {
             console.error('❌ Erreur démonstration boutons:', error);
             return {
-                text: `❌ **Erreur lors de la démonstration des boutons**\n\n` +
-                      `Le système rencontre un problème technique.\n\n` +
-                      `Veuillez réessayer plus tard ou contactez l'administrateur.`
+                text: `❌ **Erreur lors de la démonstration des boutons**
+
+Le système rencontre un problème technique.
+
+Veuillez réessayer plus tard ou contactez l'administrateur.`
             };
         }
     }
@@ -1731,13 +1804,15 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             honor: 50, fear: 0, respect: 50, notoriety: 0
         };
 
-        const reputationText = `🏆 **RÉPUTATION DE ${player.username.toUpperCase()}**\n\n` +
-                              `⚔️ **Honneur :** ${reputation.honor}/100 ${this.getReputationBar(reputation.honor)}\n` +
-                              `😨 **Peur :** ${reputation.fear}/100 ${this.getReputationBar(reputation.fear)}\n` +
-                              `🤝 **Respect :** ${reputation.respect}/100 ${this.getReputationBar(reputation.respect)}\n` +
-                              `🔥 **Notoriété :** ${reputation.notoriety}/100 ${this.getReputationBar(reputation.notoriety)}\n\n` +
-                              `📊 **Effets actifs :**\n` +
-                              `${this.advancedMechanics.getReputationEffects(reputation).join('\n')}`;
+        const reputationText = `🏆 **RÉPUTATION DE ${player.username.toUpperCase()}**
+
+⚔️ **Honneur :** ${reputation.honor}/100 ${this.getReputationBar(reputation.honor)}
+😨 **Peur :** ${reputation.fear}/100 ${this.getReputationBar(reputation.fear)}
+🤝 **Respect :** ${reputation.respect}/100 ${this.getReputationBar(reputation.respect)}
+🔥 **Notoriété :** ${reputation.notoriety}/100 ${this.getReputationBar(reputation.notoriety)}
+
+📊 **Effets actifs :**
+${this.advancedMechanics.getReputationEffects(reputation).join('\n')}`;
 
         return { text: reputationText };
     }
@@ -1751,13 +1826,18 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         const randomEvent = await this.advancedMechanics.triggerRandomEvent(character, character.currentLocation);
         const socialEvent = this.advancedMechanics.generateSocialEvent(character, character.currentLocation);
 
-        const eventsText = `🎲 **ÉVÉNEMENTS EN COURS**\n\n` +
-                          `🌟 **Événement aléatoire :**\n${randomEvent.description}\n` +
-                          `Choix : ${randomEvent.choices.join(' | ')}\n\n` +
-                          `🏛️ **Événement social :**\n${socialEvent.description}\n` +
-                          `Effets : ${socialEvent.effects.join(', ')}\n` +
-                          `Durée : ${socialEvent.duration}\n\n` +
-                          `💡 **Tapez votre choix pour participer !**`;
+        const eventsText = `🎲 **ÉVÉNEMENTS EN COURS**
+
+🌟 **Événement aléatoire :**
+${randomEvent.description}
+Choix : ${randomEvent.choices.join(' | ')}
+
+🏛️ **Événement social :**
+${socialEvent.description}
+Effets : ${socialEvent.effects.join(', ')}
+Durée : ${socialEvent.duration}
+
+💡 **Tapez votre choix pour participer !**`;
 
         return { text: eventsText };
     }
@@ -1770,12 +1850,14 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
         const weather = this.advancedMechanics.weatherSystem.updateWeather(character.currentLocation);
 
-        const weatherText = `🌤️ **MÉTÉO À ${character.currentLocation.toUpperCase()}**\n\n` +
-                           `☁️ **Conditions :** ${this.advancedMechanics.weatherSystem.currentWeather}\n` +
-                           `👁️ **Visibilité :** ${weather.visibility}%\n` +
-                           `🏃 **Mobilité :** ${weather.movement}%\n` +
-                           `😊 **Ambiance :** ${weather.mood}\n\n` +
-                           `⚠️ **Impact sur le gameplay en cours...**`;
+        const weatherText = `🌤️ **MÉTÉO À ${character.currentLocation.toUpperCase()}**
+
+☁️ **Conditions :** ${this.advancedMechanics.weatherSystem.currentWeather}
+👁️ **Visibilité :** ${weather.visibility}%
+🏃 **Mobilité :** ${weather.movement}%
+😊 **Ambiance :** ${weather.mood}
+
+⚠️ **Impact sur le gameplay en cours...**`;
 
         return { text: weatherText };
     }
@@ -1783,11 +1865,13 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     async handleMarketCommand({ player, dbManager }) {
         const marketEvents = this.advancedMechanics.economyEngine.marketEvents;
 
-        const marketText = `💰 **MARCHÉ DYNAMIQUE**\n\n` +
-                          `📈 **Événements économiques actifs :**\n` +
-                          `${marketEvents.map(e => `• ${e.event}`).join('\n')}\n\n` +
-                          `💡 **Les prix s'adaptent à vos actions et aux événements mondiaux !**\n` +
-                          `🔄 **Système économique en temps réel actif**`;
+        const marketText = `💰 **MARCHÉ DYNAMIQUE**
+
+📈 **Événements économiques actifs :**
+${marketEvents.map(e => `• ${e.event}`).join('\n')}
+
+💡 **Les prix s'adaptent à vos actions et aux événements mondiaux !**
+🔄 **Système économique en temps réel actif**`;
 
         return { text: marketText };
     }
@@ -1795,12 +1879,14 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     async handleFactionsCommand({ player, dbManager }) {
         const factionStandings = await dbManager.getTemporaryData(player.id, 'faction_standings') || {};
 
-        const factionsText = `⚔️ **RELATIONS AVEC LES FACTIONS**\n\n` +
-                            `${Object.entries(factionStandings).map(([faction, standing]) => 
-                                `🏛️ **${faction}:** ${standing}/100 ${this.getReputationBar(standing)}`
-                            ).join('\n')}\n\n` +
-                            `💡 **Vos actions affectent vos relations !**\n` +
-                            `🤝 **Formez des alliances ou créez des ennemis**`;
+        const factionsText = `⚔️ **RELATIONS AVEC LES FACTIONS**
+
+${Object.entries(factionStandings).map(([faction, standing]) =>
+    `🏛️ **${faction}:** ${standing}/100 ${this.getReputationBar(standing)}`
+).join('\n')}
+
+💡 **Vos actions affectent vos relations !**
+🤝 **Formez des alliances ou créez des ennemis**`;
 
         return { text: factionsText };
     }
@@ -1812,43 +1898,49 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async handleChallengesCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        const character = await dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return { text: "❌ Aucun personnage trouvé !" };
         }
 
         const challenges = this.advancedMechanics.generateDailyChallenges(character);
 
-        const challengesText = `🏆 **DÉFIS QUOTIDIENS**\n\n` +
-                              `${challenges.map((challenge, i) => 
-                                  `${i + 1}. **${challenge.name}**\n` +
-                                  `📝 ${challenge.description}\n` +
-                                  `🏅 Récompense: ${challenge.reward}\n`
-                              ).join('\n')}\n\n` +
-                              `💡 **Complétez ces défis pour gagner de l'expérience et des récompenses !**`;
+        const challengesText = `🏆 **DÉFIS QUOTIDIENS**
+
+${challenges.map((challenge, i) =>
+    `${i + 1}. **${challenge.name}**
+📝 ${challenge.description}
+🏅 Récompense: ${challenge.reward}\n`
+).join('\n')}
+
+💡 **Complétez ces défis pour gagner de l'expérience et des récompenses !**`;
 
         return { text: challengesText };
     }
 
     async handleCombatCommand({ imageGenerator }) {
         return {
-            text: `⚔️ **SYSTÈME DE COMBAT - FRICTION ULTIMATE**\n\n` +
-                  `🌟 **Niveaux de puissance (G à A) :**\n` +
-                  `• G - Très faible (débutants)\n` +
-                  `• F - Faible (apprentis)\n` +
-                  `• E - Moyen-faible (soldats basiques)\n` +
-                  `• D - Moyen (combattants aguerris)\n` +
-                  `• C - Moyen-fort (guerriers expérimentés)\n` +
-                  `• B - Fort (spécialistes du combat)\n` +
-                  `• A - Très fort (maîtres du combat)\n\n` +
-                  `⚡ **Barres de combat :**\n` +
-                  `• ❤️ Vie : Détermine ta survie\n` +
-                  `• ⚡ Énergie : Consommée par les actions\n\n` +
-                  `💀 **ATTENTION :** Chaque attaque doit être précise :\n` +
-                  `• Mouvement exact (distance en mètres)\n` +
-                  `• Arme utilisée et angle d'attaque\n` +
-                  `• Partie du corps visée\n\n` +
-                  `🎯 **Sans précision = vulnérabilité !**`,
+            text: `⚔️ **SYSTÈME DE COMBAT - FRICTION ULTIMATE**
+
+🌟 **Niveaux de puissance (G à A) :**
+• G - Très faible (débutants)
+• F - Faible (apprentis)
+• E - Moyen-faible (soldats basiques)
+• D - Moyen (combattants aguerris)
+• C - Moyen-fort (guerriers expérimentés)
+• B - Fort (spécialistes du combat)
+• A - Très fort (maîtres du combat)
+
+⚡ **Barres de combat :**
+• ❤️ Vie : Détermine ta survie
+• ⚡ Énergie : Consommée par les actions
+
+💀 **ATTENTION :** Chaque attaque doit être précise :
+• Mouvement exact (distance en mètres)
+• Arme utilisée et angle d'attaque
+• Partie du corps visée
+
+🎯 **Sans précision = vulnérabilité !**`,
             image: await imageGenerator.generateCombatGuideImage()
         };
     }
@@ -1863,16 +1955,20 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         }
 
         return {
-            text: `🎒 **INVENTAIRE DE ${character.name.toUpperCase()}**\n\n` +
-                  `💰 **Pièces :** ${character.coins}\n\n` +
-                  `⚔️ **Équipement porté :**\n` +
-                  `${this.formatEquipment(character.equipment)}\n\n` +
-                  `📦 **Objets dans l'inventaire :**\n` +
-                  `${this.formatInventory(character.inventory)}\n\n` +
-                  `🔧 **Commandes d'équipement :**\n` +
-                  `• Pour équiper : "équiper [objet]"\n` +
-                  `• Pour déséquiper : "retirer [objet]"\n` +
-                  `• Pour utiliser : "utiliser [objet]"`,
+            text: `🎒 **INVENTAIRE DE ${character.name.toUpperCase()}**
+
+💰 **Pièces :** ${character.coins}
+
+⚔️ **Équipement porté :**
+${this.formatEquipment(character.equipment)}
+
+📦 **Objets dans l'inventaire :**
+${this.formatInventory(character.inventory)}
+
+🔧 **Commandes d'équipement :**
+• Pour équiper : "équiper [objet]"
+• Pour déséquiper : "retirer [objet]"
+• Pour utiliser : "utiliser [objet]"`,
             image: await imageGenerator.generateInventoryImage(character)
         };
     }
@@ -1895,20 +1991,23 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
     async handleMapCommand({ imageGenerator }) {
         return {
-            text: `🗺️ **CARTE DU MONDE - FRICTION ULTIMATE**\n\n` +
-                  `🏰 **Les 12 Royaumes sont dispersés à travers :**\n` +
-                  `• Plaines fertiles d'Aegyria\n` +
-                  `• Forêts sombres de Sombrenuit\n` +
-                  `• Déserts brûlants de Khelos\n` +
-                  `• Ports fortifiés d'Abrantis\n` +
-                  `• Montagnes enneigées de Varha\n` +
-                  `• Et bien d'autres contrées dangereuses...\n\n` +
-                  `⚔️ **Les 7 Ordres ont établi leurs quartiers :**\n` +
-                  `• Dans les sanctuaires profanés\n` +
-                  `• Les citadelles fumantes\n` +
-                  `• Les forteresses des ombres\n` +
-                  `• Et d'autres lieux mystérieux...\n\n` +
-                  `💀 **Chaque région est dangereuse !**`,
+            text: `🗺️ **CARTE DU MONDE - FRICTION ULTIMATE**
+
+🏰 **Les 12 Royaumes sont dispersés à travers :**
+• Plaines fertiles d'Aegyria
+• Forêts sombres de Sombrenuit
+• Déserts brûlants de Khelos
+• Ports fortifiés d'Abrantis
+• Montagnes enneigées de Varha
+• Et bien d'autres contrées dangereuses...
+
+⚔️ **Les 7 Ordres ont établi leurs quartiers :**
+• Dans les sanctuaires profanés
+• Les citadelles fumantes
+• Les forteresses des ombres
+• Et d'autres lieux mystérieux...
+
+💀 **Chaque région est dangereuse !**`,
             image: await imageGenerator.generateWorldMap()
         };
     }
@@ -1918,13 +2017,16 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
         if (!character) {
             return {
-                text: `🎮 **MODE JEU ACTIVÉ**\n\n` +
-                      `❌ Tu n'as pas encore de personnage !\n\n` +
-                      `✨ **Pour commencer à jouer :**\n` +
-                      `1️⃣ Utilise /créer pour créer ton personnage\n` +
-                      `2️⃣ Puis utilise /jouer pour entrer dans le monde\n\n` +
-                      `💬 **Note :** En mode jeu, tes messages seront interprétés comme des actions de jeu.\n` +
-                      `Utilise /aide pour voir toutes les commandes disponibles.`,
+                text: `🎮 **MODE JEU ACTIVÉ**
+
+❌ Tu n'as pas encore de personnage !
+
+✨ **Pour commencer à jouer :**
+1️⃣ Utilise /créer pour créer ton personnage
+2️⃣ Puis utilise /jouer pour entrer dans le monde
+
+💬 **Note :** En mode jeu, tes messages seront interprétés comme des actions de jeu.
+Utilise /aide pour voir toutes les commandes disponibles.`,
                 image: await imageGenerator.generateMenuImage()
             };
         }
@@ -1932,20 +2034,25 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         await dbManager.setTemporaryData(player.id, 'game_mode', true);
 
         return {
-            text: `🎮 **MODE JEU ACTIVÉ** 🎮\n\n` +
-                  `👤 **${character.name}** est maintenant en jeu !\n` +
-                  `📍 **Position :** ${character.currentLocation}\n` +
-                  `❤️ **Vie :** ${character.currentLife}/${character.maxLife}\n` +
-                  `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}\n\n` +
-                  `🎯 **Tes prochains messages seront interprétés comme des actions de jeu.**\n\n` +
-                  `📝 **Exemples d'actions :**\n` +
-                  `• "Je regarde autour de moi"\n` +
-                  `• "J'avance vers le nord"\n` +
-                  `• "Je cherche des ennemis"\n` +
-                  `• "Je attaque avec mon épée"\n\n` +
-                  `💬 **Besoin d'aide :** utilise /aide pour voir toutes les commandes\n` +
-                  `⚙️ **Pour sortir du mode jeu :** utilise /menu\n\n` +
-                  `🔥 **L'aventure commence maintenant !**`,
+            text: `🎮 **MODE JEU ACTIVÉ** 🎮
+
+👤 **${character.name}** est maintenant en jeu !
+📍 **Position :** ${character.currentLocation}
+❤️ **Vie :** ${character.currentLife}/${character.maxLife}
+⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}
+
+🎯 **Tes prochains messages seront interprétés comme des actions de jeu.**
+
+📝 **Exemples d'actions :**
+• "Je regarde autour de moi"
+• "J'avance vers le nord"
+• "Je cherche des ennemis"
+• "Je attaque avec mon épée"
+
+💬 **Besoin d'aide :** utilise /aide pour voir toutes les commandes
+⚙️ **Pour sortir du mode jeu :** utilise /menu
+
+🔥 **L'aventure commence maintenant !**`,
             image: await imageGenerator.generateCharacterImage(character)
         };
     }
@@ -1960,16 +2067,20 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             gender = 'female';
         } else {
             return {
-                text: `❌ Choix invalide ! \n\n` +
-                      `Tape **HOMME**, **H**, **FEMME** ou **F**`
+                text: `❌ Choix invalide !
+
+Tape **HOMME**, **H**, **FEMME** ou **F**`
             };
         }
 
         await dbManager.setTemporaryData(player.id, 'creation_gender', gender);
 
         const kingdoms = await dbManager.getAllKingdoms();
-        let kingdomText = `👤 **Sexe sélectionné :** ${gender === 'male' ? 'HOMME' : 'FEMME'}\n\n` +
-                         `🏰 **Étape 2/3 - Choisis ton royaume :**\n\n`;
+        let kingdomText = `👤 **Sexe sélectionné :** ${gender === 'male' ? 'HOMME' : 'FEMME'}
+
+🏰 **Étape 2/3 - Choisis ton royaume :**
+
+`;
 
         kingdoms.forEach((kingdom, index) => {
             kingdomText += `**${index + 1}.** ${kingdom.name} - ${kingdom.description}\n`;
@@ -1998,8 +2109,9 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
         if (kingdomNumber < 1 || kingdomNumber > kingdoms.length) {
             return {
-                text: `❌ Royaume invalide ! \n\n` +
-                      `Choisis un numéro entre 1 et ${kingdoms.length}`
+                text: `❌ Royaume invalide !
+
+Choisis un numéro entre 1 et ${kingdoms.length}`
             };
         }
 
@@ -2018,12 +2130,15 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         console.log(`✅ Royaume sélectionné: ${selectedKingdom.name} (ID: ${selectedKingdom.id}) pour le joueur ${player.id}`);
 
         return {
-            text: `🏰 **Royaume sélectionné :** ${selectedKingdom.name}\n\n` +
-                  `👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}\n` +
-                  `🏰 **Royaume :** ${selectedKingdom.name}\n\n` +
-                  `📝 **Étape 3/4 - Donne un nom à ton personnage :**\n\n` +
-                  `✍️ Écris simplement le nom que tu veux pour ton personnage.\n` +
-                  `⚠️ **Attention :** Le nom ne peut pas être modifié après !`,
+            text: `🏰 **Royaume sélectionné :** ${selectedKingdom.name}
+
+👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}
+🏰 **Royaume :** ${selectedKingdom.name}
+
+📝 **Étape 3/4 - Donne un nom à ton personnage :**
+
+✍️ Écris simplement le nom que tu veux pour ton personnage.
+⚠️ **Attention :** Le nom ne peut pas être modifié après !`,
             image: await imageGenerator.generateKingdomImage(selectedKingdom.id)
         };
     }
@@ -2045,7 +2160,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             };
         }
 
-        const existingCharacter = await this.dbManager.getCharacterByName(name.trim());
+        const existingCharacter = await dbManager.getCharacterByName(name.trim());
         if (existingCharacter) {
             return {
                 text: `❌ Ce nom est déjà pris ! Choisis un autre nom.`
@@ -2055,14 +2170,17 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         await dbManager.setTemporaryData(player.id, 'creation_name', name.trim());
 
         return {
-            text: `✅ **Nom accepté :** ${name}\n\n` +
-                  `📸 **Étape 4/4 - Photo de ton visage :**\n\n` +
-                  `🖼️ Envoie maintenant une photo de ton visage pour ton personnage.\n` +
-                  `⚠️ **Important :**\n` +
-                  `• Seule la zone du visage sera utilisée\n` +
-                  `• Photo claire et bien éclairée recommandée\n` +
-                  `• Si tu n'as pas de photo, écris "SANS_PHOTO"\n\n` +
-                  `📷 **Envoie ta photo maintenant...**`
+            text: `✅ **Nom accepté :** ${name}
+
+📸 **Étape 4/4 - Photo de ton visage :**
+
+🖼️ Envoie maintenant une photo de ton visage pour ton personnage.
+⚠️ **Important :**
+• Seule la zone du visage sera utilisée
+• Photo claire et bien éclairée recommandée
+• Si tu n'as pas de photo, écris "SANS_PHOTO"
+
+📷 **Envoie ta photo maintenant...**`
         };
     }
 
@@ -2166,14 +2284,16 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             }
 
             return {
-                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !**\n\n` +
-                      `👤 **Nom :** ${newCharacter.name}\n` +
-                      `👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}\n` +
-                      `🏰 **Royaume :** ${kingdomName}\n` +
-                      `📸 **Image :** ${imageType}\n` +
-                      `⚔️ **Niveau :** ${newCharacter.level}\n` +
-                      `🌟 **Niveau de puissance :** ${newCharacter.powerLevel}\n\n` +
-                      `🎮 Utilise **/menu** pour découvrir tes options !`,
+                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !**
+
+👤 **Nom :** ${newCharacter.name}
+👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}
+🏰 **Royaume :** ${kingdomName}
+📸 **Image :** ${imageType}
+⚔️ **Niveau :** ${newCharacter.level}
+🌟 **Niveau de puissance :** ${newCharacter.powerLevel}
+
+🎮 Utilise /menu pour découvrir tes options !`,
                 image: characterImage
             };
 
@@ -2190,8 +2310,9 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
         if (!character) {
             return {
-                text: `❌ Tu n'as pas encore de personnage !\n\n` +
-                      `Utilise la commande /créer pour en créer un.`
+                text: `❌ Tu n'as pas encore de personnage !
+
+Utilise la commande /créer pour en créer un.`
             };
         }
 
@@ -2228,19 +2349,24 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         }
 
         return {
-            text: `✨ **MODIFICATION DE PERSONNAGE (Mode Simple)**\n\n` +
-                  `👤 **Personnage actuel :** ${character.name}\n` +
-                  `🏰 **Royaume :** ${character.kingdom}\n` +
-                  `👤 **Sexe :** ${character.gender === 'male' ? 'Homme' : 'Femme'}\n\n` +
-                  `⚠️ Le système 3D avancé n'est pas disponible.\n\n` +
-                  `🎨 **Nouvelle apparence personnalisée :**\n\n` +
-                  `📝 Décris en détail l'apparence que tu veux pour ton personnage :\n` +
-                  `• Couleur des cheveux, des yeux\n` +
-                  `• Taille, corpulence\n` +
-                  `• Style vestimentaire\n` +
-                  `• Armes et accessoires\n` +
-                  `• Cicatrices, tatouages, etc.\n\n` +
-                  `✍️ **Écris ta description complète en un seul message :**`,
+            text: `✨ **MODIFICATION DE PERSONNAGE (Mode Simple)**
+
+👤 **Personnage actuel :** ${character.name}
+🏰 **Royaume :** ${character.kingdom}
+👤 **Sexe :** ${character.gender === 'male' ? 'Homme' : 'Femme'}
+
+⚠️ Le système 3D avancé n'est pas disponible.
+
+🎨 **Nouvelle apparence personnalisée :**
+
+📝 Décris en détail l'apparence que tu veux pour ton personnage :
+• Couleur des cheveux, des yeux
+• Taille, corpulence
+• Style vestimentaire
+• Armes et accessoires
+• Cicatrices, tatouages, etc.
+
+✍️ **Écris ta description complète en un seul message :**`,
             image: characterImage
         };
     }
@@ -2299,11 +2425,16 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 await imageGenerator.saveCustomCharacterImage(character.id, imageBuffer);
 
                 return {
-                    text: `✨ **PERSONNAGE MODIFIÉ AVEC SUCCÈS !**\n\n` +
-                          `👤 **${character.name}** - Nouvelle apparence générée\n\n` +
-                          `📝 **Description appliquée :**\n"${cleanDescription}"\n\n` +
-                          `🎨 **Image générée par Freepik avec IA (vue première personne)**\n\n` +
-                          `✅ Ton personnage a maintenant une apparence unique basée sur ta description !`,
+                    text: `✨ **PERSONNAGE MODIFIÉ AVEC SUCCÈS !**
+
+👤 **${character.name}** - Nouvelle apparence générée
+
+📝 **Description appliquée :**
+"${cleanDescription}"
+
+🎨 **Image générée par Freepik avec IA (vue première personne)**
+
+✅ Ton personnage a maintenant une apparence unique basée sur ta description !`,
                     image: imageBuffer
                 };
             } else {
@@ -2317,8 +2448,9 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             await dbManager.clearTemporaryData(player.id, 'modification_started');
 
             return {
-                text: `❌ Erreur lors de la génération de l'image personnalisée.\n\n` +
-                      `Réessaie avec une description plus simple ou utilise /modifier à nouveau.`
+                text: `❌ Erreur lors de la génération de l'image personnalisée.
+
+Réessaie avec une description plus simple ou utilise /modifier à nouveau.`
             };
         }
     }
@@ -2396,7 +2528,11 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             }
 
             return {
-                text: `💬 ${playerSpeech}\n\n${npcResponse}\n\n📍 *${character.currentLocation}*`,
+                text: `💬 ${playerSpeech}
+
+${npcResponse}
+
+📍 *${character.currentLocation}*`,
                 image: dialogueImage,
                 audio: dialogueAudio
             };
@@ -2415,8 +2551,9 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
             if (!character) {
                 return {
-                    text: `❌ Tu n'as pas de personnage à supprimer.\n\n` +
-                          `Utilise /créer pour créer un nouveau personnage.`
+                    text: `❌ Tu n'as pas de personnage à supprimer.
+
+Utilise /créer pour créer un nouveau personnage.`
                 };
             }
 
@@ -2429,18 +2566,22 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             console.log(`🗑️ Personnage supprimé: ${character.name} (ID: ${character.id})`);
 
             return {
-                text: `🗑️ **PERSONNAGE SUPPRIMÉ** 🗑️\n\n` +
-                      `👤 **${character.name}** a été définitivement supprimé de ${character.kingdom}.\n\n` +
-                      `✨ Tu peux maintenant créer un nouveau personnage avec /créer\n\n` +
-                      `💀 **Attention :** Cette action est irréversible !`,
+                text: `🗑️ **PERSONNAGE SUPPRIMÉ** 🗑️
+
+👤 **${character.name}** a été définitivement supprimé de ${character.kingdom}.
+
+✨ Tu peux maintenant créer un nouveau personnage avec /créer
+
+💀 **Attention :** Cette action est irréversible !`,
                 image: await imageGenerator.generateMenuImage()
             };
 
         } catch (error) {
             console.error('❌ Erreur lors de la suppression du personnage:', error);
             return {
-                text: `❌ **Erreur lors de la suppression**\n\n` +
-                      `Une erreur s'est produite. Veuillez réessayer plus tard.`
+                text: `❌ **Erreur lors de la suppression**
+
+Une erreur s'est produite. Veuillez réessayer plus tard.`
             };
         }
     }
@@ -2474,12 +2615,15 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             const parts = message.split(' ');
             if (parts.length < 2) {
                 return {
-                    text: `📋 **COMMANDE AUTORISE**\n\n` +
-                          `Usage: /autorise [nom_du_joueur] [ROYAUME_OPTIONNEL]\n\n` +
-                          `Exemples:\n` +
-                          `• /autorise Jean\n` +
-                          `• /autorise Jean AEGYRIA\n\n` +
-                          `Si aucun royaume n'est spécifié, le système détectera automatiquement le royaume pour ce groupe.`
+                    text: `📋 **COMMANDE AUTORISE**
+
+Usage: /autorise [nom_du_joueur] [ROYAUME_OPTIONNEL]
+
+**Exemples:**
+• /autorise Jean
+• /autorise Jean AEGYRIA
+
+Si aucun royaume n'est spécifié, le système détectera automatiquement le royaume pour ce groupe.`
                 };
             }
 
@@ -2497,9 +2641,12 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                     let kingdomsList = kingdoms.map((k, i) => `${i + 1}. ${k.name} (${k.id})`).join('\n');
 
                     return {
-                        text: `❌ **ROYAUME INVALIDE**\n\n` +
-                              `Le royaume "${specifiedKingdom}" n'existe pas.\n\n` +
-                              `**Royaumes disponibles:**\n${kingdomsList}`
+                        text: `❌ **ROYAUME INVALIDE**
+
+Le royaume "${specifiedKingdom}" n'existe pas.
+
+**Royaumes disponibles:**
+${kingdomsList}`
                     };
                 }
 
@@ -2517,14 +2664,17 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
                 if (!kingdom) {
                     return {
-                        text: `❌ **GROUPE NON CONFIGURÉ**\n\n` +
-                              `Ce groupe WhatsApp n'est pas encore associé à un royaume.\n\n` +
-                              `**Solutions:**\n` +
-                              `• Utilisez: /autorise ${playerName} ROYAUME_ID\n` +
-                              `• Ou configurez d'abord avec: /config_royaume ROYAUME_ID\n\n` +
-                              `**Exemples:**\n` +
-                              `• /autorise ${playerName} AEGYRIA\n` +
-                              `• /config_royaume AEGYRIA`
+                        text: `❌ **GROUPE NON CONFIGURÉ**
+
+Ce groupe WhatsApp n'est pas encore associé à un royaume.
+
+**Solutions:**
+• Utilisez: /autorise ${playerName} ROYAUME_ID
+• Ou configurez d'abord avec: /config_royaume ROYAUME_ID
+
+**Exemples:**
+• /autorise ${playerName} AEGYRIA
+• /config_royaume AEGYRIA`
                     };
                 }
             }
@@ -2534,19 +2684,23 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
             if (!character) {
                 return {
-                    text: `❌ **JOUEUR NON TROUVÉ**\n\n` +
-                          `Aucun personnage trouvé avec le nom "${playerName}".\n\n` +
-                          `Vérifiez l'orthographe ou demandez au joueur de créer son personnage avec /créer.`
+                    text: `❌ **JOUEUR NON TROUVÉ**
+
+Aucun personnage trouvé avec le nom "${playerName}".
+
+Vérifiez l'orthographe ou demandez au joueur de créer son personnage avec /créer.`
                 };
             }
 
             // Vérifier si le joueur est déjà dans le bon royaume
             if (character.kingdom === kingdom.id) {
                 return {
-                    text: `✅ **DÉJÀ AUTORISÉ**\n\n` +
-                          `Le joueur **${character.name}** est déjà membre du royaume **${kingdom.name}**.\n\n` +
-                          `🏰 Royaume actuel: ${kingdom.name}\n` +
-                          `📍 Localisation: ${character.currentLocation}`
+                    text: `✅ **DÉJÀ AUTORISÉ**
+
+Le joueur **${character.name}** est déjà membre du royaume **${kingdom.name}**.
+
+🏰 Royaume actuel: ${kingdom.name}
+📍 Localisation: ${character.currentLocation}`
                 };
             }
 
@@ -2562,22 +2716,26 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             console.log(`👑 Autorisation: ${character.name} transféré vers ${kingdom.name} via groupe ${chatId}`);
 
             return {
-                text: `👑 **AUTORISATION ACCORDÉE** 👑\n\n` +
-                      `✅ Le joueur **${character.name}** a été autorisé dans le royaume **${kingdom.name}**!\n\n` +
-                      `🏰 **Ancien royaume:** ${oldKingdom}\n` +
-                      `🏰 **Nouveau royaume:** ${kingdom.name}\n` +
-                      `📍 **Nouvelle localisation:** ${this.getStartingLocation(kingdom.id)}\n\n` +
-                      `${specifiedKingdom ? '✨ **Association groupe-royaume automatiquement enregistrée!**\n\n' : ''}` +
-                      `Le joueur peut maintenant participer aux activités de ce royaume.`,
+                text: `👑 **AUTORISATION ACCORDÉE** 👑
+
+✅ Le joueur **${character.name}** a été autorisé dans le royaume **${kingdom.name}**!
+
+🏰 **Ancien royaume:** ${oldKingdom}
+🏰 **Nouveau royaume:** ${kingdom.name}
+📍 **Nouvelle localisation:** ${this.getStartingLocation(kingdom.id)}
+
+${specifiedKingdom ? '✨ **Association groupe-royaume automatiquement enregistrée!**\n\n' : ''}Le joueur peut maintenant participer aux activités de ce royaume.`,
                 image: await imageGenerator.generateKingdomImage(kingdom.id)
             };
 
         } catch (error) {
             console.error('❌ Erreur commande autorise:', error);
             return {
-                text: `❌ **ERREUR D'AUTORISATION**\n\n` +
-                      `Une erreur s'est produite lors de l'autorisation.\n\n` +
-                      `Veuillez réessayer ou contactez un administrateur.`
+                text: `❌ **ERREUR D'AUTORISATION**
+
+Une erreur s'est produite lors de l'autorisation.
+
+Veuillez réessayer ou contactez un administrateur.`
             };
         }
     }
@@ -2611,13 +2769,20 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 let kingdomsList = kingdoms.map((k, i) => `${i + 1}. ${k.name} (${k.id})`).join('\n');
 
                 return {
-                    text: `⚙️ **CONFIGURATION ROYAUME**\n\n` +
-                          `Usage: /config_royaume [ROYAUME_ID]\n\n` +
-                          `**Royaumes disponibles:**\n${kingdomsList}\n\n` +
-                          `**Exemple:** /config_royaume AEGYRIA\n\n` +
-                          `Cette commande vous aide à configurer ce groupe WhatsApp.\n\n` +
-                          `📍 **ID du groupe actuel:** \`${chatId}\`\n\n` +
-                          `💡 **Pour les développeurs:** Copiez cet ID pour l'ajouter dans le mapping des groupes.`
+                    text: `⚙️ **CONFIGURATION ROYAUME**
+
+Usage: /config_royaume [ROYAUME_ID]
+
+**Royaumes disponibles:**
+${kingdomsList}
+
+**Exemple:** /config_royaume AEGYRIA
+
+Cette commande vous aide à configurer ce groupe WhatsApp.
+
+📍 **ID du groupe actuel:** \`${chatId}\`
+
+💡 **Pour les développeurs:** Copiez cet ID pour l'ajouter dans le mapping des groupes.`
                 };
             }
 
@@ -2626,9 +2791,11 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
             if (!kingdom) {
                 return {
-                    text: `❌ **ROYAUME INVALIDE**\n\n` +
-                          `Le royaume "${kingdomId}" n'existe pas.\n\n` +
-                          `Utilisez /config_royaume pour voir la liste des royaumes disponibles.`
+                    text: `❌ **ROYAUME INVALIDE**
+
+Le royaume "${kingdomId}" n'existe pas.
+
+Utilisez /config_royaume pour voir la liste des royaumes disponibles.`
                 };
             }
 
@@ -2637,11 +2804,14 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
             if (currentKingdom && currentKingdom.id === kingdomId) {
                 return {
-                    text: `✅ **DÉJÀ CONFIGURÉ**\n\n` +
-                          `Ce groupe est déjà associé au royaume **${kingdom.name}**!\n\n` +
-                          `🏰 **Royaume:** ${kingdom.name}\n` +
-                          `📍 **ID Groupe:** \`${chatId}\`\n\n` +
-                          `Les commandes /autorise fonctionnent déjà pour ce royaume.`
+                    text: `✅ **DÉJÀ CONFIGURÉ**
+
+Ce groupe est déjà associé au royaume **${kingdom.name}**!
+
+🏰 **Royaume:** ${kingdom.name}
+📍 **ID Groupe:** \`${chatId}\`
+
+Les commandes /autorise fonctionnent déjà pour ce royaume.`
                 };
             }
 
@@ -2652,32 +2822,41 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 console.log(`✅ Association sauvegardée: ${chatId} -> ${kingdomId}`);
 
                 return {
-                    text: `✅ **CONFIGURATION RÉUSSIE !**\n\n` +
-                          `Le groupe WhatsApp a été automatiquement associé au royaume **${kingdom.name}**!\n\n` +
-                          `🏰 **Royaume:** ${kingdom.name}\n` +
-                          `🎯 **ID Royaume:** ${kingdom.id}\n` +
-                          `📱 **ID Groupe:** \`${chatId}\`\n\n` +
-                          `✨ **L'association a été sauvegardée dans la base de données.**\n\n` +
-                          `Les commandes /autorise fonctionnent maintenant pour ce royaume !`,
+                    text: `✅ **CONFIGURATION RÉUSSIE !**
+
+Le groupe WhatsApp a été automatiquement associé au royaume **${kingdom.name}**!
+
+🏰 **Royaume:** ${kingdom.name}
+🎯 **ID Royaume:** ${kingdom.id}
+📱 **ID Groupe:** \`${chatId}\`
+
+✨ **L'association a été sauvegardée dans la base de données.**
+
+Les commandes /autorise fonctionnent maintenant pour ce royaume !`,
                     image: await imageGenerator.generateKingdomImage(kingdom.id)
                 };
             } catch (saveError) {
                 console.error('❌ Erreur sauvegarde association:', saveError);
 
                 return {
-                    text: `❌ **ERREUR DE SAUVEGARDE**\n\n` +
-                          `Impossible de sauvegarder l'association du groupe au royaume **${kingdom.name}**.\n\n` +
-                          `Erreur: ${saveError.message}\n\n` +
-                          `Veuillez réessayer ou contactez un administrateur.`
+                    text: `❌ **ERREUR DE SAUVEGARDE**
+
+Impossible de sauvegarder l'association du groupe au royaume **${kingdom.name}**.
+
+Erreur: ${saveError.message}
+
+Veuillez réessayer ou contactez un administrateur.`
                 };
             }
 
         } catch (error) {
             console.error('❌ Erreur config royaume:', error);
             return {
-                text: `❌ **ERREUR DE CONFIGURATION**\n\n` +
-                      `Une erreur s'est produite lors de la configuration.\n\n` +
-                      `Veuillez réessayer ou contactez un administrateur.`
+                text: `❌ **ERREUR DE CONFIGURATION**
+
+Une erreur s'est produite lors de la configuration.
+
+Veuillez réessayer ou contactez un administrateur.`
             };
         }
     }
@@ -2696,13 +2875,13 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 return {
                     text: `📚 **CONSULTATION DE SORT** 📚
 
-💡 Usage: \`/sort [nom du sort]\`
+Usage: /sort [nom du sort]
 
 Exemples:
-• \`/sort boule de feu\`
-• \`/sort ⫷⧉⩚⧃⧇ ⟁✦ ⫷✦⪦\` (alphabet ancien)
+• /sort boule de feu
+• /sort ⫷⧉⩚⧃⧇ ⟁✦ ⫷✦⪦ (alphabet ancien)
 
-📖 Tapez \`/sorts\` pour voir votre grimoire complet.`
+📖 Tapez /sorts pour voir votre grimoire complet.`
                 };
             }
 
@@ -2776,13 +2955,13 @@ Exemples:
                 return {
                     text: `✨ **LANCEMENT DE SORT** ✨
 
-💡 Usage: \`/lancer [nom du sort]\`
+Usage: /lancer [nom du sort]
 
 Exemples:
-• \`/lancer boule de feu\`
-• \`/lancer ⫷⧉⩚⧃⧇ ⟁✦ ⫷✦⪦\` (alphabet ancien)
+• /lancer boule de feu
+• /lancer ⫷⧉⩚⧃⧇ ⟁✦ ⫷✦⪦ (alphabet ancien)
 
-🔮 Tapez \`/sorts\` pour voir vos sorts disponibles.`
+🔮 Tapez /sorts pour voir vos sorts disponibles.`
                 };
             }
 
@@ -2812,15 +2991,15 @@ Exemples:
 
             // Créer l'animation de lancement
             const castingFrames = this.ancientAlphabetManager.createSpellCastingAnimation(
-                mockSpell, 
-                character.name, 
+                mockSpell,
+                character.name,
                 null
             );
 
             // Afficher l'animation avec des barres de chargement
             const loadingAnimation = await this.loadingBarManager.createLoadingAnimation(
-                'spell', 
-                `Lancement de ${mockSpell.name}`, 
+                'spell',
+                `Lancement de ${mockSpell.name}`,
                 character.name
             );
 
@@ -2828,7 +3007,11 @@ Exemples:
             const narration = await this.narrationImageManager.createSpellNarration(mockSpell, character);
 
             return {
-                text: `${loadingAnimation[loadingAnimation.length - 1]}\n\n${castingFrames[castingFrames.length - 1]}\n\n${narration.text}`,
+                text: `${loadingAnimation[loadingAnimation.length - 1]}
+
+${castingFrames[castingFrames.length - 1]}
+
+${narration.text}`,
                 image: narration.imagePath
             };
         } catch (error) {
@@ -2847,7 +3030,7 @@ Exemples:
                 return {
                     text: `📚 **APPRENTISSAGE DE SORT** 📚
 
-💡 Usage: \`/apprendre [nom du sort]\`
+Usage: /apprendre [nom du sort]
 
 🔮 Vous devez être près d'un maître de magie ou dans une académie pour apprendre de nouveaux sorts.
 
@@ -2879,7 +3062,7 @@ Exemples:
 🔮 **Nom mystique:** ${ancientName}
 
 📚 Le sort a été ajouté à votre grimoire.
-💫 Vous pouvez maintenant l'utiliser avec \`/lancer ${spellName}\`
+💫 Vous pouvez maintenant l'utiliser avec /lancer ${spellName}
 
 ⚡ **Conseil:** Les sorts en alphabet ancien sont plus puissants !`
             };
@@ -2902,7 +3085,7 @@ Exemples:
         const authStatus = this.adminManager.getAuthStatus(playerNumber);
 
         if (!authStatus.authenticated) {
-            return { 
+            return {
                 text: `🔐 **ACCÈS ADMIN REQUIS** 🔐
 
 ❌ Vous devez être authentifié en tant qu'administrateur
@@ -2926,8 +3109,11 @@ Exemples:
 
         const response = await this.adminManager.processAdminCommand('/admin_stats', playerNumber);
 
-        return { 
-            text: `${response}\n\n🔒 Cette commande et sa réponse seront automatiquement supprimées.\n⏰ Session expire dans ${authStatus.timeLeft} minutes.`
+        return {
+            text: `${response}
+
+🔒 Cette commande et sa réponse seront automatiquement supprimées.
+⏰ Session expire dans ${authStatus.timeLeft} minutes.`
         };
     }
 
@@ -2959,9 +3145,9 @@ Exemples:
             return {
                 text: `👑 **GESTION DES ROYAUMES** 👑
 
-💡 Usage: \`/admin_kingdom [groupeId] [royaume]\`
+Usage: /admin_kingdom [groupeId] [royaume]
 
-Exemple: \`/admin_kingdom ${chatId} AEGYRIA\`
+Exemple: /admin_kingdom ${chatId} AEGYRIA
 
 🏰 **Royaumes disponibles:**
 AEGYRIA, SOMBRENUIT, TERRAVERDE, CIELNUAGE,
@@ -3225,33 +3411,39 @@ Aucune quête n'est disponible pour votre niveau et royaume actuels.
                 };
             }
 
-            let questList = `📋 **QUÊTES DISPONIBLES** 📋\n\n`;
-            questList += `👤 **Personnage:** ${character.name}\n`;
-            questList += `🏰 **Royaume:** ${character.kingdom}\n`;
-            questList += `⭐ **Niveau:** ${character.level}\n\n`;
+            let questList = `📋 **QUÊTES DISPONIBLES** 📋
+
+👤 **Personnage:** ${character.name}
+🏰 **Royaume:** ${character.kingdom}
+⭐ **Niveau:** ${character.level}
+
+`;
 
             availableQuests.forEach((quest, index) => {
                 const typeEmoji = quest.type === 'main' ? '⭐' : '📋';
                 const difficultyEmoji = {
                     'Facile': '🟢',
-                    'Normale': '🟡', 
+                    'Normale': '🟡',
                     'Difficile': '🟠',
                     'Très Difficile': '🔴',
                     'Légendaire': '🟣'
                 }[quest.difficulty];
 
-                questList += `${index + 1}. ${typeEmoji} **${quest.title}**\n`;
-                questList += `   ${difficultyEmoji} ${quest.difficulty} • Niveau ${quest.requirements.level}\n`;
-                questList += `   ⏱️ ${quest.estimatedTime} min • 🏆 ${quest.rewards.xp} XP\n`;
+                questList += `${index + 1}. ${typeEmoji} **${quest.title}**
+   ${difficultyEmoji} ${quest.difficulty} • Niveau ${quest.requirements.level}
+   ⏱️ ${quest.estimatedTime} min • 🏆 ${quest.rewards.xp} XP
+
+`;
 
                 if (quest.type === 'main' && quest.chapter) {
-                    questList += `   📖 Chapitre ${quest.chapter}\n`;
+                    questList += `   📖 Chapitre ${quest.chapter}
+
+`;
                 }
-                questList += `\n`;
             });
 
-            questList += `💡 Utilisez \`/quete [numéro]\` pour voir les détails d'une quête\n`;
-            questList += `🎯 Utilisez \`/accepter [numéro]\` pour accepter une quête`;
+            questList += `💡 Utilisez /quete [numéro] pour voir les détails d'une quête
+🎯 Utilisez /accepter [numéro] pour accepter une quête`;
 
             return { text: questList };
         } catch (error) {
@@ -3270,11 +3462,11 @@ Aucune quête n'est disponible pour votre niveau et royaume actuels.
                 return {
                     text: `📖 **DÉTAILS DE QUÊTE**
 
-💡 Usage: \`/quete [numéro]\`
+Usage: /quete [numéro]
 
-Exemple: \`/quete 1\`
+Exemple: /quete 1
 
-📋 Utilisez \`/quetes\` pour voir la liste des quêtes disponibles.`
+📋 Utilisez /quetes pour voir la liste des quêtes disponibles.`
                 };
             }
 
@@ -3305,7 +3497,7 @@ Exemple: \`/quete 1\`
 
 Le numéro de quête ${questIndex + 1} n'existe pas.
 
-📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
+📋 Utilisez /quetes pour voir les quêtes disponibles.`
                 };
             }
 
@@ -3313,7 +3505,7 @@ Le numéro de quête ${questIndex + 1} n'existe pas.
             const questDisplay = this.questManager.formatQuestDisplay(quest);
 
             return {
-                text: questDisplay + `\n\n🎯 Utilisez \`/accepter ${questIndex + 1}\` pour accepter cette quête`
+                text: questDisplay + `\n\n🎯 Utilisez /accepter ${questIndex + 1} pour accepter cette quête`
             };
         } catch (error) {
             console.error('❌ Erreur détail quête:', error);
@@ -3331,11 +3523,11 @@ Le numéro de quête ${questIndex + 1} n'existe pas.
                 return {
                     text: `🎯 **ACCEPTER UNE QUÊTE**
 
-💡 Usage: \`/accepter [numéro]\`
+Usage: /accepter [numéro]
 
-Exemple: \`/accepter 1\`
+Exemple: /accepter 1
 
-📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
+📋 Utilisez /quetes pour voir les quêtes disponibles.`
                 };
             }
 
@@ -3365,7 +3557,7 @@ Exemple: \`/accepter 1\`
 
 Le numéro de quête ${questIndex + 1} n'existe pas.
 
-📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
+📋 Utilisez /quetes pour voir les quêtes disponibles.`
                 };
             }
 
@@ -3397,7 +3589,7 @@ ${quest.rewards.items ? quest.rewards.items.map(item => `• 🎒 ${item}`).join
 📍 **Localisation:** ${quest.location}
 ⏱️ **Temps estimé:** ${quest.estimatedTime} minutes
 
-💡 Utilisez \`/progression\` pour voir vos quêtes en cours`
+💡 Utilisez /progression pour voir vos quêtes en cours`
             };
 
         } catch (error) {
@@ -3413,11 +3605,11 @@ ${quest.rewards.items ? quest.rewards.items.map(item => `• 🎒 ${item}`).join
                 return {
                     text: `🚫 **ABANDONNER UNE QUÊTE**
 
-💡 Usage: \`/abandonner [numéro]\`
+Usage: /abandonner [numéro]
 
-Exemple: \`/abandonner 1\`
+Exemple: /abandonner 1
 
-📋 Utilisez \`/progression\` pour voir vos quêtes en cours.`
+📋 Utilisez /progression pour voir vos quêtes en cours.`
                 };
             }
 
@@ -3451,9 +3643,9 @@ Exemple: \`/abandonner 1\`
                 return {
                     text: `🔍 **RECHERCHER UNE QUÊTE**
 
-💡 Usage: \`/rechercher_quete [mot-clé]\`
+Usage: /rechercher_quete [mot-clé]
 
-Exemple: \`/rechercher_quete dragon\`
+Exemple: /rechercher_quete dragon
 
 📋 Recherchez parmi plus de 30,000 quêtes disponibles !`
                 };
@@ -3475,137 +3667,139 @@ Exemple: \`/rechercher_quete dragon\`
      * Affiche les informations d'aura du joueur
      */
     async handleAuraInfoCommand({ player, dbManager }) {
-        if (!this.auraManager) {
-            return {
-                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**\n\nLe système d'aura n'est pas encore initialisé. Réessayez plus tard.`
-            };
-        }
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
 
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
 
-        return {
-            text: this.auraManager.formatAuraInfo(player.id, character.name)
-        };
+            const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
+            return { text: auraInfo };
+
+        } catch (error) {
+            console.error('❌ Erreur commande aura info:', error);
+            return { text: "❌ Erreur lors de l'affichage des informations d'aura." };
+        }
     }
 
     /**
-     * Commande pour apprendre une nouvelle aura avec 20% de chance de maîtrise instantanée
+     * Démarre l'apprentissage d'une aura
      */
-    async handleLearnAuraCommand({ player, message, dbManager, sock, chatId }) {
-        if (!this.auraManager) {
-            return {
-                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**\n\nLe système d'aura n'est pas encore initialisé.`
-            };
-        }
-
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        const parts = message.split(' ');
-        if (parts.length < 2) {
-            const auraTypes = Object.entries(this.auraManager.auraTypes)
-                .map(([key, aura]) => `${aura.emoji} **${key}** - ${aura.name}`)
-                .join('\n');
-
-            return {
-                text: `🔮 **APPRENTISSAGE D'AURA** 🔮\n\n` +
-                      `Usage: /aura_apprendre [type]\n\n` +
-                      `**Types d'aura disponibles:**\n${auraTypes}\n\n` +
-                      `**Exemple:** \`/aura_apprendre fire\`\n\n` +
-                      `💫 **20% de chance de maîtrise instantanée !**`
-            };
-        }
-
-        const auraType = parts[1].toLowerCase();
-        if (!this.auraManager.auraTypes[auraType]) {
-            return {
-                text: `❌ Type d'aura "${auraType}" invalide !\n\nUtilisez \`/aura_apprendre\` pour voir les types disponibles.`
-            };
-        }
-
-        // Vérifier si le joueur peut commencer un entraînement
-        if (!this.auraManager.canStartTraining(player.id)) {
-            return {
-                text: `⚠️ **ENTRAÎNEMENT EN COURS**\n\nVous avez déjà un entraînement d'aura actif.\nTerminez-le avant d'en commencer un nouveau !`
-            };
-        }
-
-        // 20% de chance de maîtrise instantanée
-        const instantMasteryChance = Math.random();
-        if (instantMasteryChance < 0.2) {
-            try {
-                const result = await this.auraManager.grantInstantMastery(player.id, auraType);
+    async handleLearnAuraCommand({ player, message, dbManager }) {
+        try {
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
                 return {
-                    text: result.message
-                };
-            } catch (error) {
-                console.error('❌ Erreur maîtrise instantanée:', error);
-                return {
-                    text: `❌ Erreur lors de l'octroi de la maîtrise instantanée.`
+                    text: `🔮 **APPRENTISSAGE D'AURA** 🔮
+
+Choisissez un type d'aura à apprendre :
+
+🔥 **fire** - Aura de Flamme
+🌊 **water** - Aura Aquatique
+🌍 **earth** - Aura Tellurique
+💨 **wind** - Aura Éolienne
+⚡ **lightning** - Aura Foudroyante
+🌑 **shadow** - Aura Ténébreuse
+✨ **light** - Aura Lumineuse
+
+💡 Usage: /aura_apprendre [type]
+Exemple: /aura_apprendre fire
+
+🎲 **20% de chance de maîtrise instantanée !**`
                 };
             }
-        }
 
-        // Démarrer l'entraînement normal (10 jours)
-        try {
-            const aura = this.auraManager.auraTypes[auraType];
-            const firstTechnique = aura.techniques[0];
+            const auraType = args[0].toLowerCase();
+            const auraTypes = ['fire', 'water', 'earth', 'wind', 'lightning', 'shadow', 'light'];
 
-            const trainingResult = await this.auraManager.startAuraTraining(
-                player.id, 
-                auraType, 
-                firstTechnique
-            );
+            if (!auraTypes.includes(auraType)) {
+                return { text: `❌ Type d'aura invalide ! Types disponibles: ${auraTypes.join(', ')}` };
+            }
 
-            return {
-                text: trainingResult.message
-            };
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            // Vérifier si le joueur peut commencer un entraînement
+            if (!this.auraManager.canStartTraining(player.id)) {
+                return { text: "❌ Vous avez déjà un entraînement d'aura en cours !" };
+            }
+
+            // 20% de chance de maîtrise instantanée
+            const instantMasteryChance = Math.random();
+            if (instantMasteryChance < 0.2) { // 20% de chance
+                const result = await this.auraManager.grantInstantMastery(player.id, auraType);
+                return { text: result.message };
+            }
+
+            // Commencer l'entraînement normal
+            const techniqueNames = this.auraManager.auraTypes[auraType].techniques;
+            const randomTechnique = techniqueNames[Math.floor(Math.random() * techniqueNames.length)];
+
+            const result = await this.auraManager.startAuraTraining(player.id, auraType, randomTechnique);
+            return { text: result.message };
+
         } catch (error) {
-            console.error('❌ Erreur démarrage entraînement:', error);
-            return {
-                text: `❌ **ERREUR D'APPRENTISSAGE**\n\nUne erreur s'est produite lors du démarrage de l'entraînement.\n\n` +
-                      `**Détails:** ${error.message}\n\n` +
-                      `Veuillez réessayer ou contactez un administrateur.`
-            };
+            console.error('❌ Erreur apprentissage aura:', error);
+            return { text: "❌ Erreur lors du démarrage de l'apprentissage." };
         }
     }
 
-    /**
-     * Commande pour effectuer une session d'entraînement quotidienne
-     */
-    async handleAuraSessionCommand({ player, dbManager, sock, chatId }) {
-        if (!this.auraManager) {
-            return {
-                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
-            };
-        }
-
+    async handleAuraSessionCommand({ player, chatId, message, dbManager, imageGenerator, sock }) {
         const character = await dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+                text: `❌ Tu n'as pas encore de personnage !
+
+Utilise /créer pour créer ton personnage.`
             };
         }
 
         const activeTraining = this.auraManager.getPlayerTraining(player.id);
         if (!activeTraining) {
             return {
-                text: `❌ **AUCUN ENTRAÎNEMENT ACTIF**\n\nCommencez un entraînement avec \`/aura_apprendre [type]\` !`
+                text: `❌ **AUCUN ENTRAÎNEMENT ACTIF**
+
+Vous n'avez pas d'entraînement d'aura en cours.
+
+Utilisez /aura_apprendre [type] pour commencer.`
             };
         }
 
+        if (activeTraining.status === 'completed') {
+            return {
+                text: `✅ **ENTRAÎNEMENT TERMINÉ**
+
+Votre entraînement est déjà complété !
+
+Utilisez /aura_apprendre [type] pour un nouveau type d'aura.`
+            };
+        }
+
+        // Vérifier si le joueur a déjà fait sa session aujourd'hui
+        const lastSession = activeTraining.lastSessionAt || activeTraining.startTime;
+        const now = new Date();
+        const timeSinceLastSession = now.getTime() - new Date(lastSession).getTime();
+        const hoursGap = timeSinceLastSession / (1000 * 60 * 60);
+
+        if (hoursGap < 20) { // Au moins 20h entre les sessions
+            const remainingHours = Math.ceil(20 - hoursGap);
+            return {
+                text: `⏰ **SESSION DÉJÀ EFFECTUÉE**
+
+Vous devez attendre ${remainingHours}h avant votre prochaine session d'entraînement.`
+            };
+        }
+
+        // Démarrer l'animation d'entraînement
         try {
-            // Démarrer l'animation d'entraînement (30 secondes)
-            const animationResult = await this.auraManager.createAuraAnimation(
+            await this.auraManager.createAuraAnimation(
                 player.id,
                 activeTraining.auraType,
                 activeTraining.techniqueName,
@@ -3615,150 +3809,27 @@ Exemple: \`/rechercher_quete dragon\`
 
             // Mettre à jour le progrès
             this.auraManager.updateTrainingProgress(activeTraining.id);
+            activeTraining.lastSessionAt = now.toISOString();
 
-            return { text: '' }; // L'animation gère l'affichage
+            return { text: '' }; // Pas de réponse supplémentaire car l'animation gère tout
         } catch (error) {
             console.error('❌ Erreur session aura:', error);
             return {
-                text: `❌ Erreur lors de la session d'entraînement.`
+                text: `❌ Erreur lors de la session d'entraînement. Réessayez.`
             };
         }
     }
 
     /**
-     * Commande pour régénérer l'aura
+     * Afficher les techniques d'aura disponibles
      */
-    async handleRegenerateAuraCommand({ player, dbManager, sock, chatId }) {
-        if (!this.auraManager) {
-            return {
-                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
-            };
-        }
-
+    async handleAuraTechniquesCommand({ player, dbManager, imageGenerator }) {
         const character = await dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
+                text: `❌ Tu n'as pas encore de personnage !
 
-        try {
-            await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
-            return { text: '' }; // La régénération gère l'affichage
-        } catch (error) {
-            console.error('❌ Erreur régénération aura:', error);
-            return {
-                text: `❌ Erreur lors de la régénération d'aura.`
-            };
-        }
-    }
-
-    /**
-     * Commande pour régénérer la magie
-     */
-    async handleRegenerateMagicCommand({ player, dbManager, sock, chatId }) {
-        if (!this.auraManager) {
-            return {
-                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
-            };
-        }
-
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        try {
-            await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
-            return { text: '' }; // La régénération gère l'affichage
-        } catch (error) {
-            console.error('❌ Erreur régénération magie:', error);
-            return {
-                text: `❌ Erreur lors de la régénération de magie.`
-            };
-        }
-    }
-
-    /**
-     * Commande pour lancer une technique d'aura
-     */
-    async handleCastAuraCommand({ player, message, dbManager }) {
-        if (!this.auraManager) {
-            return {
-                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
-            };
-        }
-
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        const parts = message.split(' ');
-        if (parts.length < 3) {
-            return {
-                text: `🔮 **LANCER TECHNIQUE D'AURA** 🔮\n\n` +
-                      `Usage: /aura_cast [type] [technique]\n\n` +
-                      `**Exemple:** \`/aura_cast fire Souffle Ardent\`\n\n` +
-                      `Utilisez \`/aura\` pour voir vos techniques disponibles.`
-            };
-        }
-
-        const auraType = parts[1].toLowerCase();
-        const techniqueName = parts.slice(2).join(' ');
-
-        try {
-            const result = await this.auraManager.castAuraTechnique(player.id, auraType, techniqueName);
-            return {
-                text: result.message
-            };
-        } catch (error) {
-            console.error('❌ Erreur lancement technique:', error);
-            return {
-                text: `❌ Erreur lors du lancement de la technique.`
-            };
-        }
-    }
-
-    /**
-     * Commande de méditation
-     */
-    async handleMeditateCommand({ player, dbManager, sock, chatId }) {
-        if (!this.auraManager) {
-            return {
-                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
-            };
-        }
-
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        // Méditation = régénération d'aura
-        return await this.handleRegenerateAuraCommand({ player, dbManager, sock, chatId });
-    }
-
-    /**
-     * Commande pour voir les techniques d'aura
-     */
-    async handleAuraTechniquesCommand({ player, dbManager }) {
-        if (!this.auraManager) {
-            return {
-                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
-            };
-        }
-
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+Utilise /créer pour créer ton personnage.`
             };
         }
 
@@ -3766,33 +3837,160 @@ Exemple: \`/rechercher_quete dragon\`
 
         if (Object.keys(playerAuras).length === 0) {
             return {
-                text: `🔮 **AUCUNE TECHNIQUE D'AURA**\n\n` +
-                      `Vous ne maîtrisez encore aucune technique d'aura.\n\n` +
-                      `Utilisez \`/aura_apprendre [type]\` pour commencer !`
+                text: `🌟 **AUCUNE TECHNIQUE D'AURA**
+
+Vous n'avez pas encore appris de techniques d'aura.
+
+Utilisez /aura_apprendre [type] pour commencer votre entraînement !`
             };
         }
 
-        let techniques = `🔮 **VOS TECHNIQUES D'AURA** 🔮\n\n`;
+        let techniquesText = `⚡ **TECHNIQUES D'AURA MAÎTRISÉES** ⚡
+
+`;
 
         for (const [type, auraData] of Object.entries(playerAuras)) {
             const auraInfo = this.auraManager.auraTypes[type];
-            techniques += `${auraInfo.emoji} **${auraInfo.name}** (Niveau ${auraData.level})\n`;
+            techniquesText += `${auraInfo.emoji} **${auraInfo.name}** (Niveau ${auraData.level})
+`;
 
             if (auraData.techniques.length > 0) {
                 auraData.techniques.forEach(technique => {
-                    techniques += `   ⚡ ${technique}\n`;
+                    techniquesText += `   ⚡ ${technique}
+`;
                 });
             } else {
-                techniques += `   📝 Aucune technique maîtrisée\n`;
+                techniquesText += `   💭 Aucune technique maîtrisée
+`;
             }
-            techniques += `\n`;
+            techniquesText += `
+`;
         }
 
-        techniques += `💡 **Utilisez \`/aura_cast [type] [technique]\` pour lancer une technique !**`;
+        techniquesText += `💡 **Utilisez /aura_cast [technique] pour lancer une technique !**`;
 
-        return {
-            text: techniques
-        };
+        return { text: techniquesText };
+    }
+
+    /**
+     * Lancer une technique d'aura
+     */
+    async handleCastAuraCommand({ player, chatId, message, dbManager, imageGenerator }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage !
+
+Utilise /créer pour créer ton personnage.`
+            };
+        }
+
+        const parts = message.split(' ');
+        if (parts.length < 2) {
+            return {
+                text: `🔮 **LANCEMENT DE TECHNIQUE D'AURA** 🔮
+
+Usage: /aura_cast [nom_technique]
+
+Utilisez /aura_techniques pour voir vos techniques disponibles.`
+            };
+        }
+
+        const techniqueName = parts.slice(1).join(' ');
+
+        // Chercher la technique dans toutes les auras du joueur
+        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
+        let foundAura = null;
+
+        for (const [type, auraData] of Object.entries(playerAuras)) {
+            if (auraData.techniques.some(tech => tech.toLowerCase().includes(techniqueName.toLowerCase()))) {
+                foundAura = type;
+                break;
+            }
+        }
+
+        if (!foundAura) {
+            return {
+                text: `❌ **TECHNIQUE NON MAÎTRISÉE**
+
+Vous ne maîtrisez pas la technique "${techniqueName}".
+
+Utilisez /aura_techniques pour voir vos techniques disponibles.`
+            };
+        }
+
+        try {
+            const result = await this.auraManager.castAuraTechnique(player.id, foundAura, techniqueName);
+            return {
+                text: result.message
+            };
+        } catch (error) {
+            console.error('❌ Erreur lancement technique:', error);
+            return {
+                text: `❌ Erreur lors du lancement de la technique. Réessayez.`
+            };
+        }
+    }
+
+    /**
+     * Méditation pour récupérer l'énergie spirituelle
+     */
+    async handleMeditateCommand({ player, chatId, dbManager, sock }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage !
+
+Utilise /créer pour créer ton personnage.`
+            };
+        }
+
+        // Vérifier si le joueur a des auras
+        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
+        if (Object.keys(playerAuras).length === 0) {
+            return {
+                text: `🧘 **MÉDITATION IMPOSSIBLE**
+
+Vous devez d'abord apprendre une aura avant de pouvoir méditer.
+
+Utilisez /aura_apprendre [type] pour commencer.`
+            };
+        }
+
+        try {
+            await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
+            return { text: '' }; // La régénération gère l'affichage
+        } catch (error) {
+            console.error('❌ Erreur méditation:', error);
+            return {
+                text: `❌ Erreur lors de la méditation. Réessayez.`
+            };
+        }
+    }
+
+    async handleRegenerateAuraCommand({ player, chatId, dbManager, sock }) {
+        return await this.handleMeditateCommand({ player, chatId, dbManager, sock });
+    }
+
+    async handleRegenerateMagicCommand({ player, chatId, dbManager, sock }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage !
+
+Utilise /créer pour créer ton personnage.`
+            };
+        }
+
+        try {
+            await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
+            return { text: '', skipResponse: true }; // La régénération gère l'affichage
+        } catch (error) {
+            console.error('❌ Erreur régénération magie:', error);
+            return {
+                text: `❌ Erreur lors de la régénération magique. Réessayez.`
+            };
+        }
     }
 
 
@@ -3816,9 +4014,13 @@ Exemple: \`/rechercher_quete dragon\`
     /**
      * Affiche les informations système du temps de jeu
      */
-    async handleTimeSystemCommand({ player, dbManager }) {
+    async handleTimeSystemCommand({ imageGenerator }) {
         if (!this.timeManager) {
-            return { text: "❌ Système temporel non initialisé" };
+            return {
+                text: `⚠️ **SYSTÈME TEMPOREL NON INITIALISÉ**
+
+Le gestionnaire de temps n'est pas encore configuré.`
+            };
         }
 
         return {
@@ -3834,24 +4036,25 @@ Exemple: \`/rechercher_quete dragon\`
             const weather = this.timeManager.getCurrentWeather();
             const effects = this.timeManager.getCombinedEffects();
 
-            let weatherDisplay = `🌤️ **MÉTÉO ACTUELLE** 🌤️\n\n`;
-            weatherDisplay += `${weather.weatherInfo.emoji} **${weather.weatherInfo.name}**\n`;
-            weatherDisplay += `📖 ${weather.weatherInfo.description}\n\n`;
+            let weatherDisplay = `🌤️ **MÉTÉO ACTUELLE** 🌤️
 
-            weatherDisplay += `🌡️ **Température:** ${weather.temperature}°C\n`;
-            weatherDisplay += `💧 **Humidité:** ${weather.humidity}%\n`;
-            weatherDisplay += `💨 **Vent:** ${weather.windSpeed} km/h\n`;
-            weatherDisplay += `📊 **Pression:** ${weather.pressure} hPa\n\n`;
+${weather.weatherInfo.emoji} **${weather.weatherInfo.name}**
+📖 ${weather.weatherInfo.description}
 
-            weatherDisplay += `${weather.seasonInfo.emoji} **Saison:** ${weather.seasonInfo.name}\n`;
-            weatherDisplay += `📝 ${weather.seasonInfo.description}\n\n`;
+🌡️ **Température:** ${weather.temperature}°C
+💧 **Humidité:** ${weather.humidity}%
+💨 **Vent:** ${weather.windSpeed} km/h
+📊 **Pression:** ${weather.pressure} hPa
 
-            weatherDisplay += `⚡ **EFFETS SUR LE GAMEPLAY** ⚡\n`;
+${weather.seasonInfo.emoji} **Saison:** ${weather.seasonInfo.name}
+📝 ${weather.seasonInfo.description}
+
+⚡ **EFFETS SUR LE GAMEPLAY** ⚡`;
             for (const [effect, value] of Object.entries(effects)) {
                 if (Math.abs(value - 100) > 5) { // Seulement les effets significatifs
                     const modifier = value > 100 ? '+' : '';
                     const icon = value > 100 ? '⬆️' : '⬇️';
-                    weatherDisplay += `${icon} ${effect}: ${modifier}${Math.round(value - 100)}%\n`;
+                    weatherDisplay += `\n${icon} ${effect}: ${modifier}${Math.round(value - 100)}%`;
                 }
             }
 
@@ -3888,16 +4091,20 @@ Aucun événement spécial n'est en cours actuellement.
 
             activeEvents.forEach(event => {
                 const timeLeft = Math.max(0, Math.floor((event.endTime - Date.now()) / 60000));
-                eventsDisplay += `${event.emoji} **${event.name}**\n`;
-                eventsDisplay += `📖 ${event.description}\n`;
-                eventsDisplay += `⏳ Temps restant: ${timeLeft} minutes\n`;
-                eventsDisplay += `🌟 Rareté: ${event.rarity}\n\n`;
+                eventsDisplay += `${event.emoji} **${event.name}**
+📖 ${event.description}
+⏳ Temps restant: ${timeLeft} minutes
+🌟 Rareté: ${event.rarity}
+
+`;
 
                 if (event.effects && Object.keys(event.effects).length > 0) {
-                    eventsDisplay += `⚡ **Effets actifs:**\n`;
+                    eventsDisplay += `⚡ **Effets actifs:**
+`;
                     for (const [effect, value] of Object.entries(event.effects)) {
                         const modifier = value > 100 ? '+' : '';
-                        eventsDisplay += `• ${effect}: ${modifier}${Math.round(value - 100)}%\n`;
+                        eventsDisplay += `• ${effect}: ${modifier}${Math.round(value - 100)}%
+`;
                     }
                     eventsDisplay += `\n`;
                 }
@@ -3921,19 +4128,20 @@ Aucun événement spécial n'est en cours actuellement.
             const weather = this.timeManager.getCurrentWeather();
 
             let calendarDisplay = `📅 **CALENDRIER MONDIAL** 📅\n\n`;
-            calendarDisplay += `📆 **${currentTime.dateString}**\n`;
-            calendarDisplay += `🕐 **${currentTime.timeString}**\n`;
-            calendarDisplay += `${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**\n\n`;
+            calendarDisplay += `📆 **${currentTime.dateString}**
+🕐 **${currentTime.timeString}**
+${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**
 
-            calendarDisplay += `🌤️ **Météo:** ${weather.weatherInfo.emoji} ${weather.weatherInfo.name}\n\n`;
+🌤️ **Météo:** ${weather.weatherInfo.emoji} ${weather.weatherInfo.name}
 
-            calendarDisplay += `📊 **Cycle temporel:**\n`;
-            calendarDisplay += `• Année ${currentTime.year} de l'ère moderne\n`;
-            calendarDisplay += `• Mois ${currentTime.month}/12\n`;
-            calendarDisplay += `• Jour ${currentTime.day}/30\n`;
-            calendarDisplay += `• Heure ${currentTime.hour}:${currentTime.minute.toString().padStart(2, '0')}\n\n`;
+📊 **Cycle temporel:**
+• Année ${currentTime.year} de l'ère moderne
+• Mois ${currentTime.month}/12
+• Jour ${currentTime.day}/30
+• Heure ${currentTime.hour}:${currentTime.minute.toString().padStart(2, '0')}
 
-            calendarDisplay += `🔄 **Phases saisonnières:**\n`;
+🔄 **Phases saisonnières:**
+`;
             const seasons = ['Printemps', 'Été', 'Automne', 'Hiver'];
             const currentSeason = currentTime.seasonInfo.name;
             seasons.forEach(season => {
@@ -3941,8 +4149,8 @@ Aucun événement spécial n'est en cours actuellement.
                 calendarDisplay += `${icon} ${season}\n`;
             });
 
-            calendarDisplay += `\n⏰ **1 minute réelle = 1 heure de jeu**\n`;
-            calendarDisplay += `📈 **Le temps affecte vos capacités et les événements !**`;
+            calendarDisplay += `\n⏰ **1 minute réelle = 1 heure de jeu**
+📈 **Le temps affecte vos capacités et les événements !**`;
 
             return { text: calendarDisplay };
         } catch (error) {
@@ -3966,41 +4174,47 @@ Aucun événement spécial n'est en cours actuellement.
             });
 
             return {
-                text: `🗺️ **CARTE DU MONDE AVANCÉE - FRICTION ULTIMATE**\n\n` +
-                      `🎯 **Système de coordonnées X,Y intégré**\n` +
-                      `• Grille de déplacement 64x64\n` +
-                      `• Coordonnées fixes pour chaque royaume\n` +
-                      `• Terrain détaillé par zone\n\n` +
-                      `🏰 **Royaumes et leurs coordonnées :**\n` +
-                      `• AEGYRIA (0, 0) - Centre du monde\n` +
-                      `• SOMBRENUIT (-8, 8) - Forêts du nord-ouest\n` +
-                      `• KHELOS (15, -12) - Déserts de l'est\n` +
-                      `• ABRANTIS (20, 5) - Côtes de l'est\n` +
-                      `• VARHA (-12, 18) - Montagnes du nord\n` +
-                      `• Et 7 autres royaumes...\n\n` +
-                      `🧭 **Utilisez les coordonnées pour naviguer !**\n` +
-                      `📍 Exemple: "Je vais vers (5, -3)"`,
+                text: `🗺️ **CARTE DU MONDE AVANCÉE - FRICTION ULTIMATE**
+
+🎯 **Système de coordonnées X,Y intégré**
+• Grille de déplacement 64x64
+• Coordonnées fixes pour chaque royaume
+• Terrain détaillé par zone
+
+🏰 **Royaumes et leurs coordonnées :**
+• AEGYRIA (0, 0) - Centre du monde
+• SOMBRENUIT (-8, 8) - Forêts du nord-ouest
+• KHELOS (15, -12) - Déserts de l'est
+• ABRANTIS (20, 5) - Côtes de l'est
+• VARHA (-12, 18) - Montagnes du nord
+• Et 7 autres royaumes...
+
+🧭 **Utilisez les coordonnées pour naviguer !**
+📍 Exemple: "Je vais vers (5, -3)"`,
                 image: worldMap
             };
         } catch (error) {
             console.error('❌ Erreur génération carte avancée:', error);
             return {
-                text: `🗺️ **CARTE DU MONDE - SYSTÈME DE COORDONNÉES**\n\n` +
-                      `⚠️ Génération d'image temporairement indisponible\n\n` +
-                      `🎯 **Système de coordonnées X,Y :**\n` +
-                      `• AEGYRIA (0, 0) - Plaines centrales\n` +
-                      `• SOMBRENUIT (-8, 8) - Forêts sombres\n` +
-                      `• KHELOS (15, -12) - Désert brûlant\n` +
-                      `• ABRANTIS (20, 5) - Ports maritimes\n` +
-                      `• VARHA (-12, 18) - Montagnes enneigées\n` +
-                      `• SYLVARIA (12, 10) - Jungles luxuriantes\n` +
-                      `• ECLYPSIA (-15, -8) - Terres d'ombre\n` +
-                      `• TERRE_DESOLE (8, -18) - Wasteland\n` +
-                      `• DRAK_TARR (-20, -15) - Volcans\n` +
-                      `• URVALA (-5, -10) - Marais maudit\n` +
-                      `• OMBREFIEL (5, -5) - Plaines grises\n` +
-                      `• KHALDAR (18, -5) - Jungle tropicale\n\n` +
-                      `🧭 **Navigation par coordonnées disponible !**`
+                text: `🗺️ **CARTE DU MONDE - SYSTÈME DE COORDONNÉES**
+
+⚠️ Génération d'image temporairement indisponible
+
+🎯 **Système de coordonnées X,Y :**
+• AEGYRIA (0, 0) - Plaines centrales
+• SOMBRENUIT (-8, 8) - Forêts sombres
+• KHELOS (15, -12) - Désert brûlant
+• ABRANTIS (20, 5) - Ports maritimes
+• VARHA (-12, 18) - Montagnes enneigées
+• SYLVARIA (12, 10) - Jungles luxuriantes
+• ECLYPSIA (-15, -8) - Terres d'ombre
+• TERRE_DESOLE (8, -18) - Wasteland
+• DRAK_TARR (-20, -15) - Volcans
+• URVALA (-5, -10) - Marais maudit
+• OMBREFIEL (5, -5) - Plaines grises
+• KHALDAR (18, -5) - Jungle tropicale
+
+🧭 **Navigation par coordonnées disponible !**`
             };
         }
     }
@@ -4010,7 +4224,7 @@ Aucun événement spécial n'est en cours actuellement.
      */
     async handleCoordinatesCommand({ player, dbManager }) {
         try {
-            const character = await this.dbManager.getCharacterByPlayer(player.id);
+            const character = await dbManager.getCharacterByPlayer(player.id);
             if (!character) {
                 return { text: "❌ Tu n'as pas encore de personnage !" };
             }
@@ -4038,16 +4252,19 @@ Aucun événement spécial n'est en cours actuellement.
             const nearestKingdom = mapGen.findNearestKingdom(coordinates.x, coordinates.y);
 
             return {
-                text: `🧭 **POSITION DE ${character.name.toUpperCase()}** 🧭\n\n` +
-                      `📍 **Coordonnées actuelles :** (${coordinates.x}, ${coordinates.y})\n` +
-                      `🌍 **Terrain :** ${this.getTerrainName(terrain)}\n` +
-                      `🏰 **Royaume le plus proche :** ${nearestKingdom.kingdom.name} (${nearestKingdom.distance.toFixed(1)} unités)\n` +
-                      `📍 **Localisation :** ${character.currentLocation}\n\n` +
-                      `🎯 **Commandes de déplacement :**\n` +
-                      `• "Je vais vers (X, Y)" - Déplacement précis\n` +
-                      `• "Je me déplace de 3 vers l'est" - Mouvement relatif\n` +
-                      `• "Je voyage vers ROYAUME" - Déplacement rapide\n\n` +
-                      `⚠️ **Attention :** Chaque terrain a ses dangers !`
+                text: `🧭 **POSITION DE ${character.name.toUpperCase()}** 🧭
+
+📍 **Coordonnées actuelles :** (${coordinates.x}, ${coordinates.y})
+🌍 **Terrain :** ${this.getTerrainName(terrain)}
+🏰 **Royaume le plus proche :** ${nearestKingdom.kingdom.name} (${nearestKingdom.distance.toFixed(1)} unités)
+📍 **Localisation :** ${character.currentLocation}
+
+🎯 **Commandes de déplacement :**
+• "Je vais vers (X, Y)" - Déplacement précis
+• "Je me déplace de 3 vers l'est" - Mouvement relatif
+• "Je voyage vers ROYAUME" - Déplacement rapide
+
+⚠️ **Attention :** Chaque terrain a ses dangers !`
             };
 
         } catch (error) {
