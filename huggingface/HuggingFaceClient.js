@@ -34,92 +34,165 @@ class HuggingFaceClient {
     async generateVideoFromText(prompt, outputPath, options = {}) {
         try {
             if (!this.hasValidClient()) {
-                throw new Error('Client Hugging Face non disponible - vérifiez HF_TOKEN');
+                console.log('⚠️ Client HuggingFace non disponible - HF_TOKEN manquante');
+                return null;
             }
 
             console.log(`🤗 Génération vidéo Hugging Face avec prompt: "${prompt.substring(0, 100)}..."`);
 
             // Utiliser l'image du personnage si disponible
-            let characterImage = null;
+            let characterImageBase64 = null;
             if (options.characterImagePath) {
                 try {
-                    characterImage = await fs.readFile(options.characterImagePath);
+                    const characterImage = await fs.readFile(options.characterImagePath);
+                    characterImageBase64 = characterImage.toString('base64');
                     console.log(`📸 Image du personnage chargée: ${options.characterImagePath}`);
                 } catch (error) {
                     console.log(`⚠️ Impossible de charger l'image: ${options.characterImagePath}`);
                 }
             }
 
-            // Si pas d'image de personnage, essayer le modèle de fallback
-            if (!characterImage) {
-                console.log('⚠️ Pas d\'image de personnage disponible - utilisation du modèle fallback text-to-video');
-                return await this.generateVideoWithFallbackModel(prompt, outputPath, options);
-            }
-
             const optimizedPrompt = this.optimizePromptForImageToVideo(prompt);
             
-            console.log(`🎬 Utilisation du modèle ltxv-13b-098-distilled pour génération vidéo image-to-video...`);
+            // Préparer les données de la requête
+            const requestData = {
+                prompt: optimizedPrompt,
+                duration: Math.min(options.duration || 3, 5), // Max 5 secondes
+                fps: Math.min(options.fps || 8, 12), // Max 12 FPS
+                width: Math.min(options.width || 256, 512), // Max 512px
+                height: Math.min(options.height || 256, 512) // Max 512px
+            };
 
-            // Utiliser le nouveau modèle image-to-video
-            const response = await fetch(`${this.baseURL}?_subdomain=queue`, {
+            // Ajouter l'image si disponible
+            if (characterImageBase64) {
+                requestData.image = `data:image/png;base64,${characterImageBase64}`;
+                console.log(`🎬 Mode image-to-video avec ltxv-13b-098-distilled...`);
+            } else {
+                console.log(`🎬 Mode text-to-video avec modèle de fallback...`);
+            }
+
+            // Essayer d'abord avec l'API Inference
+            try {
+                const apiUrl = characterImageBase64 ? 
+                    'https://api-inference.huggingface.co/models/lightricks/LTX-Video' :
+                    'https://api-inference.huggingface.co/models/damo-vilab/text-to-video-ms-1.7b';
+
+                console.log(`📤 Requête vers: ${apiUrl}`);
+
+                const response = await fetch(apiUrl, {
+                    headers: {
+                        'Authorization': `Bearer ${this.apiKey}`,
+                        'Content-Type': 'application/json',
+                    },
+                    method: 'POST',
+                    body: JSON.stringify(requestData),
+                    timeout: 60000
+                });
+
+                if (!response.ok) {
+                    throw new Error(`API HuggingFace: ${response.status} ${response.statusText}`);
+                }
+
+                const contentType = response.headers.get('content-type');
+                console.log(`📥 Type de contenu: ${contentType}`);
+
+                let videoBuffer;
+                if (contentType && contentType.includes('video/')) {
+                    // Réponse directe en vidéo
+                    const arrayBuffer = await response.arrayBuffer();
+                    videoBuffer = Buffer.from(arrayBuffer);
+                } else {
+                    // Réponse JSON avec URL ou base64
+                    const result = await response.json();
+                    console.log(`📥 Réponse JSON reçue`);
+
+                    if (result.video_url) {
+                        // Télécharger depuis l'URL
+                        const videoResponse = await fetch(result.video_url, { timeout: 30000 });
+                        if (!videoResponse.ok) {
+                            throw new Error(`Erreur téléchargement: ${videoResponse.status}`);
+                        }
+                        const arrayBuffer = await videoResponse.arrayBuffer();
+                        videoBuffer = Buffer.from(arrayBuffer);
+                    } else if (result.video) {
+                        // Décoder base64
+                        videoBuffer = Buffer.from(result.video, 'base64');
+                    } else {
+                        throw new Error('Format de réponse inattendu');
+                    }
+                }
+                
+                // Vérifier que c'est bien une vidéo
+                if (!videoBuffer || videoBuffer.length < 1000) {
+                    throw new Error('Vidéo générée trop petite ou invalide');
+                }
+
+                // Créer le dossier et sauvegarder
+                const outputDir = path.dirname(outputPath);
+                await fs.mkdir(outputDir, { recursive: true });
+                await fs.writeFile(outputPath, videoBuffer);
+                
+                console.log(`✅ Vidéo HuggingFace générée: ${outputPath} (${videoBuffer.length} bytes)`);
+                
+                return outputPath;
+
+            } catch (apiError) {
+                console.log(`⚠️ Erreur API principale: ${apiError.message}`);
+                
+                // Fallback vers modèle simple
+                return await this.generateVideoWithSimpleFallback(prompt, outputPath, options);
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur génération vidéo HuggingFace:', error.message);
+            return null; // Retourner null au lieu de throw pour éviter de casser le bot
+        }
+    }
+
+    async generateVideoWithSimpleFallback(prompt, outputPath, options = {}) {
+        try {
+            console.log(`🔄 Fallback vers modèle simple text-to-video...`);
+
+            // Utiliser un modèle plus simple et fiable
+            const response = await fetch('https://api-inference.huggingface.co/models/ali-vilab/text-to-video-ms-1.7b', {
                 headers: {
                     'Authorization': `Bearer ${this.apiKey}`,
                     'Content-Type': 'application/json',
                 },
                 method: 'POST',
                 body: JSON.stringify({
-                    image_url: `data:image/png;base64,${characterImage.toString('base64')}`,
-                    prompt: optimizedPrompt,
-                    duration: options.duration || 5,
-                    fps: options.fps || 24,
-                    width: options.width || 1024,
-                    height: options.height || 768
-                })
+                    inputs: this.optimizePromptForImageToVideo(prompt),
+                    parameters: {
+                        num_inference_steps: 20, // Réduit pour plus de vitesse
+                        guidance_scale: 7.5,
+                        width: 256,
+                        height: 256,
+                        num_frames: 8 // Très court
+                    }
+                }),
+                timeout: 45000
             });
 
             if (!response.ok) {
-                throw new Error(`Erreur API HuggingFace: ${response.status} ${response.statusText}`);
+                throw new Error(`Erreur modèle fallback: ${response.status}`);
             }
 
-            const result = await response.json();
-            console.log(`📥 Réponse reçue, traitement de la vidéo...`);
-
-            // Gérer la réponse selon le format retourné
-            let videoBuffer;
-            if (result.video_url) {
-                // Télécharger la vidéo depuis l'URL
-                const videoResponse = await fetch(result.video_url);
-                if (!videoResponse.ok) {
-                    throw new Error(`Erreur téléchargement vidéo: ${videoResponse.status}`);
-                }
-                const arrayBuffer = await videoResponse.arrayBuffer();
-                videoBuffer = Buffer.from(arrayBuffer);
-            } else if (result.video) {
-                // Vidéo encodée en base64
-                videoBuffer = Buffer.from(result.video, 'base64');
-            } else {
-                throw new Error('Format de réponse vidéo inattendu');
-            }
+            const videoBuffer = Buffer.from(await response.arrayBuffer());
             
-            // Créer le dossier de sortie si nécessaire
+            if (videoBuffer.length < 500) {
+                throw new Error('Vidéo fallback trop petite');
+            }
+
             const outputDir = path.dirname(outputPath);
             await fs.mkdir(outputDir, { recursive: true });
-
             await fs.writeFile(outputPath, videoBuffer);
-            console.log(`✅ Vidéo Hugging Face générée avec ltxv-13b-098-distilled: ${outputPath} (${videoBuffer.length} bytes)`);
             
-            return {
-                success: true,
-                videoPath: outputPath,
-                duration: options.duration || 5,
-                provider: 'huggingface',
-                model: 'ltxv-13b-098-distilled',
-                fileSize: videoBuffer.length
-            };
+            console.log(`✅ Vidéo fallback générée: ${outputPath} (${videoBuffer.length} bytes)`);
+            return outputPath;
 
         } catch (error) {
-            console.error('❌ Erreur génération vidéo Hugging Face:', error.message);
-            throw new Error(`Génération vidéo échouée: ${error.message}`);
+            console.log('❌ Échec du fallback vidéo:', error.message);
+            return null;
         }
     }
 

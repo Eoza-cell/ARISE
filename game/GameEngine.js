@@ -66,18 +66,29 @@ class GameEngine {
             item: ['utilise', 'prend', 'équipe', 'boit', 'mange', 'use', 'take', 'equip']
         };
 
-        // Techniques de combat de base par défaut
+        // Techniques de combat de base par défaut - EXTRÊMEMENT FAIBLES NIVEAU 1
         this.basicCombatTechniques = {
-            'coup de poing': { name: 'Coup de Poing', power: 15, energy: 5, precision: 'medium' },
-            'coup de poing droit': { name: 'Coup de Poing Droit', power: 18, energy: 6, precision: 'high' },
-            'coup de poing gauche': { name: 'Coup de Poing Gauche', power: 16, energy: 5, precision: 'medium' },
-            'uppercut': { name: 'Uppercut', power: 22, energy: 8, precision: 'high' },
-            'direct': { name: 'Direct', power: 20, energy: 7, precision: 'high' },
-            'crochet': { name: 'Crochet', power: 19, energy: 7, precision: 'medium' },
-            'coup de pied': { name: 'Coup de Pied', power: 20, energy: 8, precision: 'medium' },
-            'balayage': { name: 'Balayage', power: 15, energy: 6, precision: 'medium' },
-            'coup de genou': { name: 'Coup de Genou', power: 25, energy: 10, precision: 'high' },
-            'coup de coude': { name: 'Coup de Coude', power: 23, energy: 9, precision: 'high' }
+            'coup de poing': { name: 'Coup de Poing Faible', power: 3, energy: 8, precision: 'very_low' },
+            'coup de poing droit': { name: 'Coup de Poing Droit Maladroit', power: 4, energy: 10, precision: 'very_low' },
+            'coup de poing gauche': { name: 'Coup de Poing Gauche Hésitant', power: 3, energy: 9, precision: 'very_low' },
+            'uppercut': { name: 'Uppercut Raté', power: 5, energy: 15, precision: 'very_low' },
+            'direct': { name: 'Direct Tremblant', power: 4, energy: 12, precision: 'very_low' },
+            'crochet': { name: 'Crochet Désespéré', power: 3, energy: 11, precision: 'very_low' },
+            'coup de pied': { name: 'Coup de Pied Pathétique', power: 4, energy: 14, precision: 'very_low' },
+            'balayage': { name: 'Balayage Inutile', power: 2, energy: 10, precision: 'very_low' },
+            'coup de genou': { name: 'Coup de Genou Faible', power: 5, energy: 16, precision: 'very_low' },
+            'coup de coude': { name: 'Coup de Coude Mou', power: 4, energy: 13, precision: 'very_low' }
+        };
+
+        // Puissance des PNJ - même les gardes sont dangereux pour les débutants
+        this.npcPowerLevels = {
+            'garde_civil': { power: 25, defense: 20, health: 80, level: 5 },
+            'garde_royal': { power: 40, defense: 35, health: 120, level: 8 },
+            'soldat': { power: 35, defense: 25, health: 100, level: 6 },
+            'bandit': { power: 20, defense: 15, health: 60, level: 4 },
+            'vagabond': { power: 12, defense: 8, health: 40, level: 2 },
+            'rat_geant': { power: 8, defense: 5, health: 25, level: 1 },
+            'gobelin': { power: 15, defense: 10, health: 35, level: 2 }
         };
 
         // Techniques spéciales par rang
@@ -209,7 +220,7 @@ class GameEngine {
         // Gestion spéciale pour l'authentification admin
         if (message && this.adminManager.containsAuthCode(message)) {
             const authResult = this.adminManager.authenticateAdmin(playerNumber, message);
-            
+
             if (authResult) {
                 // Supprimer le message d'authentification pour la sécurité
                 setTimeout(async () => {
@@ -220,7 +231,7 @@ class GameEngine {
                         console.log(`⚠️ Impossible de supprimer le message d'auth: ${error.message}`);
                     }
                 }, 2000);
-                
+
                 return {
                     text: `🔐 **AUTHENTIFICATION ADMIN RÉUSSIE** 🔐
 
@@ -337,6 +348,12 @@ class GameEngine {
 
             if (this.commandHandlers[command]) {
                 response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock });
+            } else {
+                // Vérifier les tentatives d'actions impossibles
+                const impossibleAction = await this.checkImpossibleAction(message, character);
+                if (impossibleAction) {
+                    return impossibleAction;
+                }
             }
 
             const playerId = player.id;
@@ -832,12 +849,12 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
         console.log(`💥 Action timeout: ${actionId}`);
         // Ici vous pouvez ajouter la logique pour traiter les timeouts
         // Par exemple, appliquer des dégâts, mettre à jour les stats, etc.
-        
+
         // Logique future pour traiter les conséquences des timeouts
         // - Appliquer les dégâts non défendus
         // - Mettre à jour l'état du combat
         // - Calculer les effets de l'action
-        
+
         return true;
     }
 
@@ -1382,7 +1399,7 @@ ${progressBar} ${Math.floor(percentage)}%
                 if (isRealCombat && Math.random() < 0.7) { // 70% chance d'ennemi qui réagit
                     const actionId = `combat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
                     const actionDescription = `${character.name} ${message}`;
-                    
+
                     await this.reactionTimeManager.startReactionTimer(
                         actionId,
                         'npc_' + Math.random().toString(36).substr(2, 5), // ID PNJ simulé
@@ -2051,7 +2068,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
      */
     async handleAdminStatusCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
         const authStatus = this.adminManager.getAuthStatus(playerNumber);
-        
+
         if (!authStatus.authenticated) {
             return {
                 text: `🔒 **STATUT ADMIN** 🔒
@@ -2077,7 +2094,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
      */
     async handleAdminLogoutCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
         this.adminManager.logoutAdmin(playerNumber);
-        
+
         return {
             text: `🔒 **DÉCONNEXION ADMIN** 🔒
 
@@ -2878,9 +2895,9 @@ Exemples:
      */
     async handleAdminStatsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
         console.log(`🔐 Tentative d'accès admin par: "${playerNumber}"`);
-        
+
         const authStatus = this.adminManager.getAuthStatus(playerNumber);
-        
+
         if (!authStatus.authenticated) {
             return { 
                 text: `🔐 **ACCÈS ADMIN REQUIS** 🔐
@@ -2905,7 +2922,7 @@ Exemples:
         }, 5000);
 
         const response = await this.adminManager.processAdminCommand('/admin_stats', playerNumber);
-        
+
         return { 
             text: `${response}\n\n🔒 Cette commande et sa réponse seront automatiquement supprimées.\n⏰ Session expire dans ${authStatus.timeLeft} minutes.`
         };

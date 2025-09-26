@@ -9,20 +9,21 @@ class ReactionTimeManager {
         this.sock = sock;
         this.activeReactions = new Map();
         
-        // Temps de réaction par rang (en millisecondes)
+        // Temps de réaction par rang (en millisecondes) - Les faibles ont PLUS de temps
         this.reactionTimes = {
-            'G': 360000,     // 6 minutes
-            'F': 300000,     // 5 minutes  
-            'E': 240000,     // 4 minutes
-            'D': 180000,     // 3 minutes
-            'C': 120000,     // 2 minutes
-            'B': 60000,      // 1 minute
-            'A': 30000,      // 30 secondes
-            'S': 15000,      // 15 secondes
-            'S+': 10000,     // 10 secondes
-            'SS': 8000,      // 8 secondes
-            'SSS': 5000,     // 5 secondes
-            'MONARQUE': 3000 // 3 secondes
+            'NIVEAU_1': 480000,  // 8 minutes - Extrêmement lent
+            'G': 360000,         // 6 minutes
+            'F': 300000,         // 5 minutes  
+            'E': 240000,         // 4 minutes
+            'D': 180000,         // 3 minutes
+            'C': 120000,         // 2 minutes
+            'B': 60000,          // 1 minute
+            'A': 30000,          // 30 secondes
+            'S': 15000,          // 15 secondes
+            'S+': 10000,         // 10 secondes
+            'SS': 8000,          // 8 secondes
+            'SSS': 5000,         // 5 secondes
+            'MONARQUE': 3000     // 3 secondes
         };
     }
 
