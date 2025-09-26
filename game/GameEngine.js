@@ -879,7 +879,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
     }
 
     async handleCharacterSheetCommand({ player, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
             return {
@@ -1854,7 +1854,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async handleInventoryCommand({ player, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
             return {
@@ -1902,12 +1902,12 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                   `• Déserts brûlants de Khelos\n` +
                   `• Ports fortifiés d'Abrantis\n` +
                   `• Montagnes enneigées de Varha\n` +
-                  `• Et bien d\'autres contrées dangereuses...\n\n` +
+                  `• Et bien d'autres contrées dangereuses...\n\n` +
                   `⚔️ **Les 7 Ordres ont établi leurs quartiers :**\n` +
                   `• Dans les sanctuaires profanés\n` +
                   `• Les citadelles fumantes\n` +
                   `• Les forteresses des ombres\n` +
-                  `• Et d\'autres lieux mystérieux...\n\n` +
+                  `• Et d'autres lieux mystérieux...\n\n` +
                   `💀 **Chaque région est dangereuse !**`,
             image: await imageGenerator.generateWorldMap()
         };
@@ -2186,7 +2186,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async handleModifyCharacterCommand({ player, dbManager, imageGenerator, sock, chatId }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
             return {
@@ -2216,7 +2216,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async handleOldModifyCharacterCommand({ player, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
 
         await dbManager.setTemporaryData(player.id, 'modification_started', true);
 
@@ -2246,7 +2246,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async handleModificationDescription({ player, description, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
             await dbManager.clearTemporaryData(player.id, 'modification_started');
@@ -2411,7 +2411,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
     async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
 
             if (!character) {
                 return {
@@ -3512,23 +3512,42 @@ Exemple: \`/rechercher_quete dragon\`
                           `⚡ **lightning** - Aura Foudroyante\n` +
                           `🌑 **shadow** - Aura Ténébreuse\n` +
                           `✨ **light** - Aura Lumineuse\n\n` +
-                          `Utilisez: \`/aura_apprendre [type]\``
-                };
-            }
+                          `💡 Usage: \`/aura_apprendre [type]\`\n` +
+                          `Exemple: \`/aura_apprendre fire\`\n\n` +
+                          `🎲 **20% de chance de maîtrise instantanée !**`
+            };
+        }
 
             const auraType = args[0].toLowerCase();
-            const validTypes = ['fire', 'water', 'earth', 'wind', 'lightning', 'shadow', 'light'];
+            const auraTypes = ['fire', 'water', 'earth', 'wind', 'lightning', 'shadow', 'light'];
 
-            if (!validTypes.includes(auraType)) {
-                return { text: "❌ Type d'aura invalide ! Types disponibles: " + validTypes.join(', ') };
+            if (!auraTypes.includes(auraType)) {
+                return { text: `❌ Type d'aura invalide ! Types disponibles: ${auraTypes.join(', ')}` };
             }
 
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            // Vérifier si le joueur peut commencer un entraînement
             if (!this.auraManager.canStartTraining(player.id)) {
-                return { text: "❌ Vous avez déjà un entraînement en cours !" };
+                return { text: "❌ Vous avez déjà un entraînement d'aura en cours !" };
             }
 
-            const training = await this.auraManager.startAuraTraining(player.id, auraType, 'Maîtrise de Base');
-            return { text: training.message };
+            // 20% de chance de maîtrise instantanée
+            const instantMasteryChance = Math.random();
+            if (instantMasteryChance < 0.2) { // 20% de chance
+                const result = await this.auraManager.grantInstantMastery(player.id, auraType);
+                return { text: result.message };
+            }
+
+            // Commencer l'entraînement normal
+            const techniqueNames = this.auraManager.auraTypes[auraType].techniques;
+            const randomTechnique = techniqueNames[Math.floor(Math.random() * techniqueNames.length)];
+
+            const result = await this.auraManager.startAuraTraining(player.id, auraType, randomTechnique);
+            return { text: result.message };
 
         } catch (error) {
             console.error('❌ Erreur apprentissage aura:', error);
@@ -3874,7 +3893,7 @@ Aucun événement spécial n'est en cours actuellement.
                       `• VARHA (-12, 18) - Montagnes du nord\n` +
                       `• Et 7 autres royaumes...\n\n` +
                       `🧭 **Utilisez les coordonnées pour naviguer !**\n` +
-                      `📍 Exemple: "Je me dirige vers (5, -3)"`,
+                      `📍 Exemple: "Je vais vers (5, -3)"`,
                 image: worldMap
             };
         } catch (error) {

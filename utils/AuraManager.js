@@ -608,6 +608,58 @@ ${aura.color} **Type:** ${aura.name}
     }
 
     /**
+     * Accorde une maîtrise instantanée d'aura (20% de chance)
+     */
+    async grantInstantMastery(playerId, auraType) {
+        const aura = this.auraTypes[auraType];
+        if (!aura) {
+            throw new Error('Type d\'aura invalide');
+        }
+
+        // Ajouter l'aura complète au joueur
+        if (!this.auraLevels.has(playerId)) {
+            this.auraLevels.set(playerId, {});
+        }
+
+        const playerAuras = this.auraLevels.get(playerId);
+        playerAuras[auraType] = {
+            level: aura.maxLevel,
+            techniques: [...aura.techniques], // Toutes les techniques
+            masteryPoints: aura.maxLevel * 100,
+            masteredInstantly: true
+        };
+
+        return {
+            success: true,
+            message: this.formatInstantMasteryMessage(aura)
+        };
+    }
+
+    /**
+     * Formate le message de maîtrise instantanée
+     */
+    formatInstantMasteryMessage(aura) {
+        return `${aura.emoji} **MAÎTRISE INSTANTANÉE !** ${aura.emoji}
+
+🎆 **INCROYABLE ! VOUS AVEZ EU UNE RÉVÉLATION !** 🎆
+
+✨ **${aura.name}** maîtrisée à 100% instantanément !
+📊 **Niveau:** ${aura.maxLevel}/${aura.maxLevel} (MAX)
+🎯 **Techniques apprises:** ${aura.techniques.length}/${aura.techniques.length}
+
+🌟 **Techniques disponibles:**
+${aura.techniques.map(tech => `• ${tech}`).join('\n')}
+
+💫 **Une connexion spirituelle profonde s'est établie !**
+🔥 **Vous ressentez une puissance inouïe !**
+⚡ **L'aura ${aura.name.toLowerCase()} fait maintenant partie de votre être !**
+
+🎲 **Chance de maîtrise instantanée:** 20% (RÉUSSIE !)
+
+💡 **Utilisez vos nouvelles techniques avec \`/aura_lancer [technique]\` !**`;
+    }
+
+    /**
      * Vérifie si un joueur peut commencer un entraînement
      */
     canStartTraining(playerId) {
