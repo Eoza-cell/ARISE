@@ -1997,7 +1997,8 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                   `• Photo claire et bien éclairée recommandée\n` +
                   `• Si tu n'as pas de photo, écris "SANS_PHOTO"\n\n` +
                   `📷 **Envoie ta photo maintenant...**`
-
+        };
+    }
 
     /**
      * Affiche le statut d'authentification admin
@@ -2036,9 +2037,6 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
 
 ✅ Vous avez été déconnecté avec succès
 🔑 Envoyez le code d'administration pour vous reconnecter`
-        };
-    }
-
         };
     }
 

@@ -191,34 +191,6 @@ Génère une narration ÉPIQUE et PRÉCISE qui:
 
 Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
 
-            // Ajouter une méthode d'analyse d'action
-        }
-
-        analyzeActionType(action) {
-            const lowerAction = action.toLowerCase();
-
-            if (lowerAction.includes('coup de poing droit')) {
-                return "🥊 TECHNIQUE MARTIALE: Coup de poing droit - Technique de boxe précise avec rotation du corps et extension du bras dominant.";
-            }
-            if (lowerAction.includes('coup de poing gauche')) {
-                return "🥊 TECHNIQUE MARTIALE: Coup de poing gauche - Jab rapide avec le bras non-dominant.";
-            }
-            if (lowerAction.includes('uppercut')) {
-                return "🥊 TECHNIQUE MARTIALE: Uppercut - Coup ascendant puissant visant le menton ou le plexus.";
-            }
-            if (lowerAction.includes('crochet')) {
-                return "🥊 TECHNIQUE MARTIALE: Crochet - Coup circulaire horizontal avec rotation du buste.";
-            }
-            if (lowerAction.includes('coup de pied')) {
-                return "🦵 TECHNIQUE MARTIALE: Coup de pied - Attaque utilisant la force des jambes.";
-            }
-            if (lowerAction.includes('coup de poing')) {
-                return "🥊 TECHNIQUE MARTIALE: Coup de poing basique - Frappe directe avec le poing.";
-            }
-
-            return "⚡ ACTION GÉNÉRALE: Analyser selon le contexte et les détails fournis.";
-        }
-
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: prompt }],
                 model: this.model,
@@ -244,6 +216,31 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
             throw error;
         }
     }
+
+    analyzeActionType(action) {
+            const lowerAction = action.toLowerCase();
+
+            if (lowerAction.includes('coup de poing droit')) {
+                return "🥊 TECHNIQUE MARTIALE: Coup de poing droit - Technique de boxe précise avec rotation du corps et extension du bras dominant.";
+            }
+            if (lowerAction.includes('coup de poing gauche')) {
+                return "🥊 TECHNIQUE MARTIALE: Coup de poing gauche - Jab rapide avec le bras non-dominant.";
+            }
+            if (lowerAction.includes('uppercut')) {
+                return "🥊 TECHNIQUE MARTIALE: Uppercut - Coup ascendant puissant visant le menton ou le plexus.";
+            }
+            if (lowerAction.includes('crochet')) {
+                return "🥊 TECHNIQUE MARTIALE: Crochet - Coup circulaire horizontal avec rotation du buste.";
+            }
+            if (lowerAction.includes('coup de pied')) {
+                return "🦵 TECHNIQUE MARTIALE: Coup de pied - Attaque utilisant la force des jambes.";
+            }
+            if (lowerAction.includes('coup de poing')) {
+                return "🥊 TECHNIQUE MARTIALE: Coup de poing basique - Frappe directe avec le poing.";
+            }
+
+            return "⚡ ACTION GÉNÉRAL‍E: Analyser selon le contexte et les détails fournis.";
+        }
 
     // Générer des événements dynamiques comme dans GTA
     generateDynamicEvents(location, character) {
