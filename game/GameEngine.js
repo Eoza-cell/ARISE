@@ -31,6 +31,56 @@ class GameEngine {
         this.advancedMechanics = new AdvancedGameMechanics(this.dbManager, this);
         this.characterCustomization = null;
 
+        // Système de temps de réaction par rang
+        this.reactionTimes = {
+            'G': 360000, // 6 minutes
+            'F': 300000, // 5 minutes
+            'E': 240000, // 4 minutes
+            'D': 180000, // 3 minutes
+            'C': 120000, // 2 minutes
+            'B': 60000,  // 1 minute
+            'A': 30000,  // 30 secondes
+            'S': 15000,  // 15 secondes
+            'S+': 10000, // 10 secondes
+            'SS': 8000,  // 8 secondes
+            'SSS': 5000, // 5 secondes
+            'MONARQUE': 3000 // 3 secondes
+        };
+
+        // Système de barres de régénération
+        this.regenerationSystem = new Map();
+        this.activeActions = new Map(); // Actions en attente de réponse
+        
+        // Base de données de techniques (1 million de techniques)
+        this.techniqueDatabase = new Map();
+        this.initializeTechniqueDatabase();
+
+        // Mots-clés pour détecter les intentions
+        this.intentionKeywords = {
+            attack: ['attaque', 'frappe', 'combat', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite', 'coup', 'strike', 'hit'],
+            defend: ['défend', 'bloque', 'pare', 'protection', 'bouclier', 'guard', 'block', 'parry'],
+            magic: ['sort', 'magie', 'incantation', 'sorts', 'spell', 'enchantement', 'rituel', 'invoque'],
+            movement: ['bouge', 'déplace', 'cours', 'marche', 'saute', 'vole', 'move', 'run', 'jump'],
+            technique: ['technique', 'skill', 'capacité', 'pouvoir', 'ability', 'special'],
+            item: ['utilise', 'prend', 'équipe', 'boit', 'mange', 'use', 'take', 'equip']
+        };
+
+        // Techniques spéciales par rang
+        this.rankTechniques = {
+            'G': ['Coup Basique', 'Défense Simple', 'Course'],
+            'F': ['Attaque Rapide', 'Esquive', 'Concentration'],
+            'E': ['Combo Double', 'Contre-Attaque', 'Endurance'],
+            'D': ['Frappe Précise', 'Parade Parfaite', 'Vitesse'],
+            'C': ['Attaque Élémentaire', 'Barrière', 'Agilité'],
+            'B': ['Combo Triple', 'Réflexes', 'Force'],
+            'A': ['Technique Secrète', 'Maîtrise', 'Puissance'],
+            'S': ['Art Légendaire', 'Transcendance', 'Domination'],
+            'S+': ['Technique Divine', 'Perfection', 'Absolutisme'],
+            'SS': ['Art Cosmique', 'Infinité', 'Omnipotence'],
+            'SSS': ['Technique Ultime', 'Création', 'Destruction Totale'],
+            'MONARQUE': ['Souveraineté Absolue', 'Commandement Divin', 'Règne Éternel']
+        };
+
         // Nouveaux systèmes intégrés
         this.loadingBarManager = new LoadingBarManager();
         this.ancientAlphabetManager = new AncientAlphabetManager();
@@ -557,6 +607,162 @@ Règles importantes:
         return validKingdoms.includes(kingdom) ? kingdom : 'AEGYRIA';
     }
 
+    /**
+     * Démarre une action avec temps de réaction
+     */
+    async initiateActionWithReactionTime(playerId, targetId, actionType, actionData, sock, chatId) {
+        const character = await this.dbManager.getCharacterByPlayer(playerId);
+        if (!character) return;
+
+        const target = await this.dbManager.getCharacterByPlayer(targetId);
+        if (!target) return;
+
+        const reactionTime = this.reactionTimes[target.powerLevel] || this.reactionTimes['G'];
+        const actionId = `action_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+        const actionInfo = {
+            id: actionId,
+            attackerId: playerId,
+            defenderId: targetId,
+            type: actionType,
+            data: actionData,
+            startTime: Date.now(),
+            reactionTime,
+            status: 'waiting_response',
+            chatId
+        };
+
+        this.activeActions.set(actionId, actionInfo);
+
+        // Envoyer la notification au défenseur
+        await sock.sendMessage(chatId, {
+            text: `⚔️ **COMBAT INITIÉ !**
+
+🎯 **${character.name}** (${character.powerLevel}) attaque **${target.name}** (${target.powerLevel}) !
+
+⏰ **Temps de réaction:** ${Math.floor(reactionTime / 1000)} secondes
+🛡️ ${target.name} doit répondre avant expiration !
+
+💭 **Action:** ${actionData.description}
+
+⚠️ Si aucune réponse, ${target.name} restera immobile et subira l'attaque !`
+        });
+
+        // Démarrer le compte à rebours
+        setTimeout(() => {
+            this.processActionTimeout(actionId);
+        }, reactionTime);
+
+        return actionId;
+    }
+
+    /**
+     * Traite l'expiration d'une action
+     */
+    async processActionTimeout(actionId) {
+        const action = this.activeActions.get(actionId);
+        if (!action || action.status !== 'waiting_response') {
+            return;
+        }
+
+        action.status = 'timeout';
+        
+        const attacker = await this.dbManager.getCharacterByPlayer(action.attackerId);
+        const defender = await this.dbManager.getCharacterByPlayer(action.defenderId);
+
+        // Le défenseur n'a pas réagi, il reste immobile
+        const damage = this.calculateDamage(attacker, defender, action.data, true); // true = pas de défense
+
+        defender.currentLife = Math.max(0, defender.currentLife - damage);
+        await this.dbManager.updateCharacter(defender.id, {
+            currentLife: defender.currentLife
+        });
+
+        // Envoyer le résultat
+        await this.sock.sendMessage(action.chatId, {
+            text: `💥 **ATTAQUE RÉUSSIE !**
+
+⏰ ${defender.name} n'a pas réagi à temps !
+🗿 ${defender.name} reste immobile et subit l'attaque complète !
+
+💀 **Dégâts infligés:** ${damage} PV
+❤️ **Vie restante de ${defender.name}:** ${defender.currentLife}/${defender.maxLife}
+
+${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '⚔️ Le combat continue !'}`
+        });
+
+        this.activeActions.delete(actionId);
+    }
+
+    /**
+     * Calcule les dégâts d'une attaque
+     */
+    calculateDamage(attacker, defender, actionData, noDefense = false) {
+        const attackerRankMultiplier = this.getRankMultiplier(attacker.powerLevel);
+        const defenderRankMultiplier = noDefense ? 1 : this.getRankMultiplier(defender.powerLevel);
+        
+        let baseDamage = 20 + (attacker.level * 5);
+        baseDamage *= attackerRankMultiplier;
+        
+        if (!noDefense) {
+            const defense = 10 + (defender.level * 2);
+            baseDamage = Math.max(1, baseDamage - (defense * defenderRankMultiplier));
+        }
+        
+        return Math.floor(baseDamage);
+    }
+
+    /**
+     * Obtient le multiplicateur de rang
+     */
+    getRankMultiplier(rank) {
+        const multipliers = {
+            'G': 1.0,
+            'F': 1.2,
+            'E': 1.5,
+            'D': 2.0,
+            'C': 2.5,
+            'B': 3.0,
+            'A': 4.0,
+            'S': 5.0,
+            'S+': 6.0,
+            'SS': 8.0,
+            'SSS': 10.0,
+            'MONARQUE': 15.0
+        };
+        
+        return multipliers[rank] || 1.0;
+    }
+
+    /**
+     * Vérifie si un joueur peut accéder au rang Monarque
+     */
+    async checkMonarqueEligibility(playerId) {
+        // Vérifier si le joueur a tué un boss de rang S+
+        const bossKills = await this.dbManager.getTemporaryData(playerId, 'boss_kills') || [];
+        const sPlusBossKilled = bossKills.some(kill => kill.rank === 'S+');
+        
+        return sPlusBossKilled;
+    }
+
+    /**
+     * Promeut un joueur au rang Monarque
+     */
+    async promoteToMonarque(playerId) {
+        const character = await this.dbManager.getCharacterByPlayer(playerId);
+        if (!character) return false;
+
+        const eligible = await this.checkMonarqueEligibility(playerId);
+        if (!eligible) return false;
+
+        await this.dbManager.updateCharacter(character.id, {
+            powerLevel: 'MONARQUE',
+            frictionLevel: 'MONARQUE'
+        });
+
+        return true;
+    }
+
     getStartingLocation(kingdom) {
         const locations = {
             'AEGYRIA': 'Grande Plaine d\'Honneur - Village de Valorhall',
@@ -738,14 +944,267 @@ Règles importantes:
         return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
     }
 
+    /**
+     * Initialise la base de données de techniques
+     */
+    initializeTechniqueDatabase() {
+        // Générer 1 million de techniques procéduralement
+        const elements = ['Feu', 'Eau', 'Terre', 'Air', 'Foudre', 'Glace', 'Lumière', 'Ombre', 'Poison', 'Cristal'];
+        const actions = ['Frappe', 'Lame', 'Vague', 'Explosion', 'Tornade', 'Lance', 'Bouclier', 'Barrière', 'Prison', 'Danse'];
+        const modifiers = ['Divine', 'Démoniaque', 'Céleste', 'Infernale', 'Sacrée', 'Maudite', 'Éternelle', 'Temporelle', 'Spirituelle', 'Mortelle'];
+        
+        let techniqueId = 1;
+        for (let i = 0; i < 100; i++) {
+            for (let j = 0; j < 100; j++) {
+                for (let k = 0; k < 100; k++) {
+                    const element = elements[i % elements.length];
+                    const action = actions[j % actions.length];
+                    const modifier = modifiers[k % modifiers.length];
+                    
+                    this.techniqueDatabase.set(techniqueId, {
+                        id: techniqueId,
+                        name: `${element} ${action} ${modifier}`,
+                        element: element.toLowerCase(),
+                        type: action.toLowerCase(),
+                        power: Math.floor(Math.random() * 1000) + 1,
+                        requiredRank: this.getRandomRank(),
+                        manaCost: Math.floor(Math.random() * 100) + 10,
+                        cooldown: Math.floor(Math.random() * 300) + 30
+                    });
+                    
+                    techniqueId++;
+                    if (techniqueId > 1000000) break;
+                }
+                if (techniqueId > 1000000) break;
+            }
+            if (techniqueId > 1000000) break;
+        }
+    }
+
+    /**
+     * Obtient un rang aléatoire
+     */
+    getRandomRank() {
+        const ranks = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S', 'S+', 'SS', 'SSS', 'MONARQUE'];
+        const weights = [30, 25, 20, 15, 10, 8, 5, 3, 2, 1, 0.8, 0.2]; // Plus faible = plus commun
+        
+        const random = Math.random() * 100;
+        let cumulative = 0;
+        
+        for (let i = 0; i < ranks.length; i++) {
+            cumulative += weights[i];
+            if (random <= cumulative) {
+                return ranks[i];
+            }
+        }
+        
+        return 'G';
+    }
+
+    /**
+     * Détecte les techniques dans un message
+     */
+    detectTechniques(message) {
+        const detectedTechniques = [];
+        const lowerMessage = message.toLowerCase();
+        
+        // Recherche de techniques par nom
+        for (const [id, technique] of this.techniqueDatabase) {
+            if (lowerMessage.includes(technique.name.toLowerCase())) {
+                detectedTechniques.push(technique);
+                if (detectedTechniques.length >= 5) break; // Limite à 5 techniques
+            }
+        }
+        
+        return detectedTechniques;
+    }
+
+    /**
+     * Détecte les intentions du joueur
+     */
+    detectIntentions(message) {
+        const detectedIntentions = [];
+        const lowerMessage = message.toLowerCase();
+        
+        for (const [intention, keywords] of Object.entries(this.intentionKeywords)) {
+            for (const keyword of keywords) {
+                if (lowerMessage.includes(keyword)) {
+                    detectedIntentions.push(intention);
+                    break;
+                }
+            }
+        }
+        
+        return detectedIntentions;
+    }
+
+    /**
+     * Valide si l'action est possible
+     */
+    validateAction(character, message) {
+        const errors = [];
+        
+        // Vérifier les objets mentionnés
+        const itemKeywords = ['utilise', 'prend', 'équipe', 'avec mon', 'avec ma', 'sort mon', 'sort ma'];
+        for (const keyword of itemKeywords) {
+            if (message.toLowerCase().includes(keyword)) {
+                // Extraire l'objet mentionné (logique simplifiée)
+                const words = message.toLowerCase().split(' ');
+                const keywordIndex = words.findIndex(word => keyword.includes(word));
+                if (keywordIndex !== -1 && keywordIndex < words.length - 1) {
+                    const item = words[keywordIndex + 1];
+                    if (!character.inventory?.some(inv => inv.itemId.toLowerCase().includes(item)) &&
+                        !Object.values(character.equipment || {}).some(eq => eq.toLowerCase().includes(item))) {
+                        errors.push(`❌ Vous ne possédez pas : ${item}`);
+                    }
+                }
+            }
+        }
+        
+        // Vérifier les déplacements
+        const moveKeywords = ['va à', 'se rend à', 'voyage vers', 'part pour'];
+        for (const keyword of moveKeywords) {
+            if (message.toLowerCase().includes(keyword)) {
+                const words = message.toLowerCase().split(' ');
+                const keywordIndex = words.findIndex(word => keyword.includes(word));
+                if (keywordIndex !== -1) {
+                    errors.push(`❌ Précisez comment vous vous déplacez et par quel chemin`);
+                }
+            }
+        }
+        
+        // Vérifier les techniques par rang
+        const detectedTechniques = this.detectTechniques(message);
+        for (const technique of detectedTechniques) {
+            if (!this.canUseTechnique(character, technique)) {
+                errors.push(`❌ Technique "${technique.name}" requiert le rang ${technique.requiredRank} (vous: ${character.powerLevel})`);
+            }
+        }
+        
+        return errors;
+    }
+
+    /**
+     * Vérifie si le personnage peut utiliser une technique
+     */
+    canUseTechnique(character, technique) {
+        const rankOrder = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S', 'S+', 'SS', 'SSS', 'MONARQUE'];
+        const characterRankIndex = rankOrder.indexOf(character.powerLevel);
+        const techniqueRankIndex = rankOrder.indexOf(technique.requiredRank);
+        
+        return characterRankIndex >= techniqueRankIndex;
+    }
+
+    /**
+     * Démarre le système de régénération pour un joueur
+     */
+    async startRegeneration(playerId, type, maxValue, sock, chatId) {
+        const regenKey = `${playerId}_${type}`;
+        
+        // Arrêter la régénération existante si elle existe
+        if (this.regenerationSystem.has(regenKey)) {
+            clearInterval(this.regenerationSystem.get(regenKey).interval);
+        }
+        
+        let currentValue = 0;
+        const regenData = {
+            playerId,
+            type,
+            currentValue,
+            maxValue,
+            startTime: Date.now(),
+            messageId: null
+        };
+        
+        // Envoyer le message initial
+        const initialMessage = this.generateRegenMessage(regenData);
+        const response = await sock.sendMessage(chatId, { text: initialMessage });
+        regenData.messageId = response.key.id;
+        
+        // Démarrer la régénération (60 secondes = 60 intervalles de 1 seconde)
+        const interval = setInterval(async () => {
+            currentValue++;
+            regenData.currentValue = currentValue;
+            
+            const updatedMessage = this.generateRegenMessage(regenData);
+            
+            try {
+                await sock.sendMessage(chatId, {
+                    text: updatedMessage,
+                    edit: regenData.messageId
+                });
+            } catch (error) {
+                // Si l'édition échoue, envoyer un nouveau message
+                const newResponse = await sock.sendMessage(chatId, { text: updatedMessage });
+                regenData.messageId = newResponse.key.id;
+            }
+            
+            if (currentValue >= maxValue) {
+                clearInterval(interval);
+                this.regenerationSystem.delete(regenKey);
+                
+                // Message final
+                await sock.sendMessage(chatId, {
+                    text: `✅ **${type.toUpperCase()} RECHARGÉ !**\n\n${type === 'aura' ? '🔮' : '✨'} Votre ${type} est maintenant à son maximum !`
+                });
+            }
+        }, 1000); // Chaque seconde
+        
+        regenData.interval = interval;
+        this.regenerationSystem.set(regenKey, regenData);
+    }
+
+    /**
+     * Génère le message de régénération avec barre
+     */
+    generateRegenMessage(regenData) {
+        const { type, currentValue, maxValue, startTime } = regenData;
+        const percentage = (currentValue / maxValue) * 100;
+        
+        // Générer la barre de progression
+        const totalBars = 10;
+        const filledBars = Math.floor((currentValue / maxValue) * totalBars);
+        const emptyBars = totalBars - filledBars;
+        
+        const progressBar = '▰'.repeat(filledBars) + '▱'.repeat(emptyBars);
+        const timeElapsed = Math.floor((Date.now() - startTime) / 1000);
+        const timeRemaining = Math.max(0, 60 - timeElapsed);
+        
+        const emoji = type === 'aura' ? '🔮' : '✨';
+        const typeDisplay = type.charAt(0).toUpperCase() + type.slice(1);
+        
+        return `${emoji} **RÉGÉNÉRATION ${typeDisplay.toUpperCase()}** ${emoji}
+
+${progressBar} ${Math.floor(percentage)}%
+
+⏱️ Temps écoulé: ${timeElapsed}s / 60s
+⏳ Temps restant: ${timeRemaining}s
+
+💫 Récupération en cours...`;
+    }
+
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
+            // Validation de l'action
+            const validationErrors = this.validateAction(character, message);
+            if (validationErrors.length > 0) {
+                return {
+                    text: `⚠️ **ACTION INVALIDE**\n\n${validationErrors.join('\n')}\n\n💡 Vérifiez vos capacités et votre inventaire avant d'agir.`
+                };
+            }
+
+            // Détecter les techniques et intentions
+            const detectedTechniques = this.detectTechniques(message);
+            const detectedIntentions = this.detectIntentions(message);
+
             const sessionId = `player_${player.id}`;
 
             const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
                 character: character,
                 location: character.currentLocation,
-                kingdom: character.kingdom
+                kingdom: character.kingdom,
+                detectedTechniques,
+                detectedIntentions
             }, sessionId);
 
             let narration;

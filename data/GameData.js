@@ -271,6 +271,10 @@ function getDefaultCharacterData(playerData, kingdom, gender) {
         maxLife: 100,
         currentEnergy: 100,
         maxEnergy: 100,
+        maxAura: 100,
+        currentAura: 100,
+        maxMagic: 100,
+        currentMagic: 100,
         powerLevel: 'G',
         frictionLevel: 'G',
         currentLocation: getStartingLocation(kingdom),
@@ -278,9 +282,35 @@ function getDefaultCharacterData(playerData, kingdom, gender) {
         equipment: {},
         learnedTechniques: [],
         coins: 100,
-        inventory: []
+        inventory: [],
+        bossKills: [] // Pour suivre les boss tués pour accès au rang Monarque
     };
 }
+
+// Nouveaux rangs avec MONARQUE
+const POWER_LEVELS = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S', 'S+', 'SS', 'SSS', 'MONARQUE'];
+
+// Boss de rang S+ pour débloquer MONARQUE
+const S_PLUS_BOSSES = [
+    {
+        name: 'Dragon Empereur Cosmic',
+        rank: 'S+',
+        location: 'Sanctuaire Dimensionnel',
+        reward: 'Accès au rang MONARQUE'
+    },
+    {
+        name: 'Liche Suprême Éternelle',
+        rank: 'S+',
+        location: 'Nécropole Ultime',
+        reward: 'Accès au rang MONARQUE'
+    },
+    {
+        name: 'Démon Roi des Abysses',
+        rank: 'S+',
+        location: 'Portal Infernal',
+        reward: 'Accès au rang MONARQUE'
+    }
+];
 
 module.exports = {
     KINGDOMS_DATA,

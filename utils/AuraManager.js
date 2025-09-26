@@ -218,6 +218,143 @@ class AuraManager {
     }
 
     /**
+     * Démarre la régénération d'aura (1 minute)
+     */
+    async startAuraRegeneration(playerId, sock, chatId) {
+        const regenId = `aura_${playerId}_${Date.now()}`;
+        let currentValue = 0;
+        const maxValue = 60; // 60 secondes
+
+        // Message initial
+        let initialMessage = this.generateAuraRegenMessage(0, maxValue);
+        const response = await sock.sendMessage(chatId, { text: initialMessage });
+        const messageId = response.key.id;
+
+        // Régénération seconde par seconde
+        const interval = setInterval(async () => {
+            currentValue++;
+            const updatedMessage = this.generateAuraRegenMessage(currentValue, maxValue);
+            
+            try {
+                await sock.sendMessage(chatId, {
+                    text: updatedMessage,
+                    edit: messageId
+                });
+            } catch (error) {
+                // Si l'édition échoue, envoyer un nouveau message
+                await sock.sendMessage(chatId, { text: updatedMessage });
+            }
+            
+            if (currentValue >= maxValue) {
+                clearInterval(interval);
+                
+                // Message final
+                await sock.sendMessage(chatId, {
+                    text: `✅ **AURA RECHARGÉE COMPLÈTEMENT !**\n\n🔮 Votre aura spirituelle est maintenant à son maximum !\n💫 Vous pouvez à nouveau utiliser vos techniques les plus puissantes !`
+                });
+            }
+        }, 1000);
+
+        return regenId;
+    }
+
+    /**
+     * Génère le message de régénération d'aura
+     */
+    generateAuraRegenMessage(current, max) {
+        const percentage = (current / max) * 100;
+        const barLength = 10;
+        const filledBars = Math.floor((current / max) * barLength);
+        const emptyBars = barLength - filledBars;
+        
+        // Créer la barre progressive
+        const progressBar = '▰'.repeat(filledBars) + '▱'.repeat(emptyBars);
+        
+        return `🔮 **RÉGÉNÉRATION D'AURA** 🔮
+
+${progressBar} ${Math.floor(percentage)}%
+
+⚡ **Énergie spirituelle:** ${current}/${max}
+⏱️ **Temps restant:** ${max - current} secondes
+
+✨ Votre aura se reconstitue progressivement...
+💫 Les particules d'énergie tourbillonnent autour de vous
+🌟 Vous sentez votre pouvoir revenir peu à peu`;
+    }
+
+    /**
+     * Démarre la régénération de magie (1 minute)
+     */
+    async startMagicRegeneration(playerId, sock, chatId) {
+        const regenId = `magic_${playerId}_${Date.now()}`;
+        let currentValue = 0;
+        const maxValue = 60; // 60 secondes
+
+        // Message initial
+        let initialMessage = this.generateMagicRegenMessage(0, maxValue);
+        const response = await sock.sendMessage(chatId, { text: initialMessage });
+        const messageId = response.key.id;
+
+        // Régénération seconde par seconde
+        const interval = setInterval(async () => {
+            currentValue++;
+            const updatedMessage = this.generateMagicRegenMessage(currentValue, maxValue);
+            
+            try {
+                await sock.sendMessage(chatId, {
+                    text: updatedMessage,
+                    edit: messageId
+                });
+            } catch (error) {
+                // Si l'édition échoue, envoyer un nouveau message
+                await sock.sendMessage(chatId, { text: updatedMessage });
+            }
+            
+            if (currentValue >= maxValue) {
+                clearInterval(interval);
+                
+                // Message final
+                await sock.sendMessage(chatId, {
+                    text: `✅ **MAGIE RECHARGÉE COMPLÈTEMENT !**\n\n✨ Votre énergie magique est maintenant à son maximum !\n🔥 Vos sorts retrouvent toute leur puissance !`
+                });
+            }
+        }, 1000);
+
+        return regenId;
+    }
+
+    /**
+     * Génère le message de régénération de magie
+     */
+    generateMagicRegenMessage(current, max) {
+        const percentage = (current / max) * 100;
+        const barLength = 10;
+        const filledBars = Math.floor((current / max) * barLength);
+        const emptyBars = barLength - filledBars;
+        
+        // Créer la barre progressive avec effet alternatif
+        let progressBar = '';
+        for (let i = 0; i < barLength; i++) {
+            if (i < filledBars) {
+                progressBar += i % 2 === 0 ? '▰' : '▰';
+            } else {
+                progressBar += i % 2 === 0 ? '▱' : '▱';
+            }
+        }
+        
+        return `✨ **RÉGÉNÉRATION MAGIQUE** ✨
+
+${progressBar} ${Math.floor(percentage)}%
+
+🔥 **Énergie magique:** ${current}/${max}
+⏱️ **Temps restant:** ${max - current} secondes
+
+🌟 Les flux magiques se reconstituent dans vos veines...
+💙 Vous sentez le mana circuler à nouveau en vous
+⚡ Vos capacités mystiques reviennent progressivement`;
+    }
+
+    /**
      * Crée une animation de méditation/entraînement en temps réel
      */
     async createAuraAnimation(playerId, auraType, techniqueName, sock, chatId) {
