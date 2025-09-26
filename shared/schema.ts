@@ -108,10 +108,104 @@ export const gameSessions = pgTable('game_sessions', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Table des quêtes principales et secondaires (30,000 quêtes générées)
+export const quests = pgTable('quests', {
+  id: text('id').primaryKey(), // main_1, side_1, etc.
+  type: text('type').notNull(), // 'main' ou 'side'
+  title: text('title').notNull(),
+  description: text('description').notNull(),
+  level: integer('level').notNull(),
+  chapter: integer('chapter'), // Pour les quêtes principales
+  difficulty: text('difficulty').notNull(), // 'Facile', 'Normale', etc.
+  estimatedTime: integer('estimated_time').notNull(), // en minutes
+  objectives: json('objectives').notNull(), // Array d'objectifs
+  rewards: json('rewards').notNull(), // {xp, gold, items, aura}
+  requirements: json('requirements').notNull(), // {level, kingdom, previousQuest}
+  status: text('status').default('available').notNull(), // 'available', 'completed'
+  kingdom: text('kingdom').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Table des progressions de quêtes par joueur
+export const questProgress = pgTable('quest_progress', {
+  id: serial('id').primaryKey(),
+  playerId: integer('player_id').notNull().references(() => players.id),
+  questId: text('quest_id').notNull().references(() => quests.id),
+  status: text('status').default('active').notNull(), // 'active', 'completed', 'failed'
+  progress: json('progress').notNull(), // Progrès des objectifs
+  startedAt: timestamp('started_at').defaultNow().notNull(),
+  completedAt: timestamp('completed_at'),
+});
+
+// Table des auras et entraînements (système d'aura de 10 jours)
+export const auraTraining = pgTable('aura_training', {
+  id: serial('id').primaryKey(),
+  playerId: integer('player_id').notNull().references(() => players.id),
+  auraType: text('aura_type').notNull(), // 'fire', 'water', 'earth', etc.
+  techniqueName: text('technique_name').notNull(),
+  level: integer('level').default(1).notNull(),
+  masteryPoints: integer('mastery_points').default(0).notNull(),
+  trainingStatus: text('training_status').default('not_started').notNull(), // 'not_started', 'in_progress', 'completed'
+  dailySessionsCompleted: integer('daily_sessions_completed').default(0).notNull(),
+  totalSessions: integer('total_sessions').default(10).notNull(), // 10 jours d'entraînement
+  startTime: timestamp('start_time'),
+  endTime: timestamp('end_time'),
+  lastSessionAt: timestamp('last_session_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Table des techniques d'aura apprises
+export const auraTechniques = pgTable('aura_techniques', {
+  id: serial('id').primaryKey(),
+  playerId: integer('player_id').notNull().references(() => players.id),
+  auraType: text('aura_type').notNull(),
+  techniqueName: text('technique_name').notNull(),
+  level: integer('level').default(1).notNull(),
+  power: integer('power').default(10).notNull(),
+  learnedAt: timestamp('learned_at').defaultNow().notNull(),
+});
+
+// Table des événements temporels (météo, événements spéciaux)
+export const worldEvents = pgTable('world_events', {
+  id: serial('id').primaryKey(),
+  eventType: text('event_type').notNull(), // 'weather', 'special', 'seasonal'
+  name: text('name').notNull(),
+  description: text('description').notNull(),
+  effects: json('effects').notNull(), // Effets sur le gameplay
+  rarity: text('rarity').notNull(), // 'common', 'rare', 'epic', 'legendary'
+  duration: integer('duration').notNull(), // en minutes
+  isActive: boolean('is_active').default(false).notNull(),
+  kingdom: text('kingdom'), // null pour événements globaux
+  startTime: timestamp('start_time').defaultNow().notNull(),
+  endTime: timestamp('end_time').notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});
+
+// Table de l'état du temps et météo
+export const worldTime = pgTable('world_time', {
+  id: serial('id').primaryKey(),
+  gameYear: integer('game_year').default(2847).notNull(),
+  gameMonth: integer('game_month').default(3).notNull(),
+  gameDay: integer('game_day').default(15).notNull(),
+  gameHour: integer('game_hour').default(12).notNull(),
+  gameMinute: integer('game_minute').default(0).notNull(),
+  season: text('season').default('spring').notNull(),
+  weatherType: text('weather_type').default('clear').notNull(),
+  temperature: integer('temperature').default(20).notNull(),
+  humidity: integer('humidity').default(50).notNull(),
+  windSpeed: integer('wind_speed').default(5).notNull(),
+  pressure: integer('pressure').default(1013).notNull(),
+  kingdom: text('kingdom'), // null pour météo globale
+  lastUpdated: timestamp('last_updated').defaultNow().notNull(),
+});
+
 // Relations
 export const playersRelations = relations(players, ({ many }) => ({
   characters: many(characters),
   gameSessions: many(gameSessions),
+  questProgress: many(questProgress),
+  auraTraining: many(auraTraining),
+  auraTechniques: many(auraTechniques),
 }));
 
 export const charactersRelations = relations(characters, ({ one, many }) => ({
@@ -133,6 +227,35 @@ export const gameSessionsRelations = relations(gameSessions, ({ one }) => ({
   }),
 }));
 
+export const questsRelations = relations(quests, ({ many }) => ({
+  questProgress: many(questProgress),
+}));
+
+export const questProgressRelations = relations(questProgress, ({ one }) => ({
+  player: one(players, {
+    fields: [questProgress.playerId],
+    references: [players.id],
+  }),
+  quest: one(quests, {
+    fields: [questProgress.questId],
+    references: [quests.id],
+  }),
+}));
+
+export const auraTrainingRelations = relations(auraTraining, ({ one }) => ({
+  player: one(players, {
+    fields: [auraTraining.playerId],
+    references: [players.id],
+  }),
+}));
+
+export const auraTechniquesRelations = relations(auraTechniques, ({ one }) => ({
+  player: one(players, {
+    fields: [auraTechniques.playerId],
+    references: [players.id],
+  }),
+}));
+
 // Types
 export type Player = typeof players.$inferSelect;
 export type InsertPlayer = typeof players.$inferInsert;
@@ -144,3 +267,15 @@ export type Technique = typeof techniques.$inferSelect;
 export type Equipment = typeof equipment.$inferSelect;
 export type GameSession = typeof gameSessions.$inferSelect;
 export type InsertGameSession = typeof gameSessions.$inferInsert;
+export type Quest = typeof quests.$inferSelect;
+export type InsertQuest = typeof quests.$inferInsert;
+export type QuestProgress = typeof questProgress.$inferSelect;
+export type InsertQuestProgress = typeof questProgress.$inferInsert;
+export type AuraTraining = typeof auraTraining.$inferSelect;
+export type InsertAuraTraining = typeof auraTraining.$inferInsert;
+export type AuraTechnique = typeof auraTechniques.$inferSelect;
+export type InsertAuraTechnique = typeof auraTechniques.$inferInsert;
+export type WorldEvent = typeof worldEvents.$inferSelect;
+export type InsertWorldEvent = typeof worldEvents.$inferInsert;
+export type WorldTime = typeof worldTime.$inferSelect;
+export type InsertWorldTime = typeof worldTime.$inferInsert;
