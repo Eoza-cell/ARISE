@@ -436,7 +436,7 @@ class GameEngine {
     }
 
     async handleCreateCharacterCommand({ player, dbManager, imageGenerator, sock, chatId }) {
-        const existingCharacter = await dbManager.getCharacterByPlayer(player.id);
+        const existingCharacter = await this.dbManager.getCharacterByPlayer(player.id);
 
         if (existingCharacter) {
             return {
@@ -1812,7 +1812,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async handleChallengesCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return { text: "❌ Aucun personnage trouvé !" };
         }
@@ -1914,7 +1914,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
     }
 
     async handlePlayCommand({ player, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
             return {
@@ -2045,7 +2045,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
             };
         }
 
-        const existingCharacter = await dbManager.getCharacterByName(name.trim());
+        const existingCharacter = await this.dbManager.getCharacterByName(name.trim());
         if (existingCharacter) {
             return {
                 text: `❌ Ce nom est déjà pris ! Choisis un autre nom.`
@@ -2476,7 +2476,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                 return {
                     text: `📋 **COMMANDE AUTORISE**\n\n` +
                           `Usage: /autorise [nom_du_joueur] [ROYAUME_OPTIONNEL]\n\n` +
-                          `**Exemples:**\n` +
+                          `Exemples:\n` +
                           `• /autorise Jean\n` +
                           `• /autorise Jean AEGYRIA\n\n` +
                           `Si aucun royaume n'est spécifié, le système détectera automatiquement le royaume pour ce groupe.`
@@ -3475,238 +3475,324 @@ Exemple: \`/rechercher_quete dragon\`
      * Affiche les informations d'aura du joueur
      */
     async handleAuraInfoCommand({ player, dbManager }) {
+        if (!this.auraManager) {
+            return {
+                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**\n\nLe système d'aura n'est pas encore initialisé. Réessayez plus tard.`
+            };
+        }
+
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        return {
+            text: this.auraManager.formatAuraInfo(player.id, character.name)
+        };
+    }
+
+    /**
+     * Commande pour apprendre une nouvelle aura avec 20% de chance de maîtrise instantanée
+     */
+    async handleLearnAuraCommand({ player, message, dbManager, sock, chatId }) {
+        if (!this.auraManager) {
+            return {
+                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**\n\nLe système d'aura n'est pas encore initialisé.`
+            };
+        }
+
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        const parts = message.split(' ');
+        if (parts.length < 2) {
+            const auraTypes = Object.entries(this.auraManager.auraTypes)
+                .map(([key, aura]) => `${aura.emoji} **${key}** - ${aura.name}`)
+                .join('\n');
+
+            return {
+                text: `🔮 **APPRENTISSAGE D'AURA** 🔮\n\n` +
+                      `Usage: /aura_apprendre [type]\n\n` +
+                      `**Types d'aura disponibles:**\n${auraTypes}\n\n` +
+                      `**Exemple:** \`/aura_apprendre fire\`\n\n` +
+                      `💫 **20% de chance de maîtrise instantanée !**`
+            };
+        }
+
+        const auraType = parts[1].toLowerCase();
+        if (!this.auraManager.auraTypes[auraType]) {
+            return {
+                text: `❌ Type d'aura "${auraType}" invalide !\n\nUtilisez \`/aura_apprendre\` pour voir les types disponibles.`
+            };
+        }
+
+        // Vérifier si le joueur peut commencer un entraînement
+        if (!this.auraManager.canStartTraining(player.id)) {
+            return {
+                text: `⚠️ **ENTRAÎNEMENT EN COURS**\n\nVous avez déjà un entraînement d'aura actif.\nTerminez-le avant d'en commencer un nouveau !`
+            };
+        }
+
+        // 20% de chance de maîtrise instantanée
+        const instantMasteryChance = Math.random();
+        if (instantMasteryChance < 0.2) {
+            try {
+                const result = await this.auraManager.grantInstantMastery(player.id, auraType);
+                return {
+                    text: result.message
+                };
+            } catch (error) {
+                console.error('❌ Erreur maîtrise instantanée:', error);
+                return {
+                    text: `❌ Erreur lors de l'octroi de la maîtrise instantanée.`
+                };
+            }
+        }
+
+        // Démarrer l'entraînement normal (10 jours)
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
+            const aura = this.auraManager.auraTypes[auraType];
+            const firstTechnique = aura.techniques[0];
 
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
+            const trainingResult = await this.auraManager.startAuraTraining(
+                player.id, 
+                auraType, 
+                firstTechnique
+            );
 
-            const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
-            return { text: auraInfo };
-
+            return {
+                text: trainingResult.message
+            };
         } catch (error) {
-            console.error('❌ Erreur commande aura info:', error);
-            return { text: "❌ Erreur lors de l'affichage des informations d'aura." };
+            console.error('❌ Erreur démarrage entraînement:', error);
+            return {
+                text: `❌ **ERREUR D'APPRENTISSAGE**\n\nUne erreur s'est produite lors du démarrage de l'entraînement.\n\n` +
+                      `**Détails:** ${error.message}\n\n` +
+                      `Veuillez réessayer ou contactez un administrateur.`
+            };
         }
     }
 
     /**
-     * Démarre l'apprentissage d'une aura
+     * Commande pour effectuer une session d'entraînement quotidienne
      */
-    async handleLearnAuraCommand({ player, message, dbManager }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `🔮 **APPRENTISSAGE D'AURA** 🔮\n\n` +
-                          `Choisissez un type d'aura à apprendre :\n\n` +
-                          `🔥 **fire** - Aura de Flamme\n` +
-                          `🌊 **water** - Aura Aquatique\n` +
-                          `🌍 **earth** - Aura Tellurique\n` +
-                          `💨 **wind** - Aura Éolienne\n` +
-                          `⚡ **lightning** - Aura Foudroyante\n` +
-                          `🌑 **shadow** - Aura Ténébreuse\n` +
-                          `✨ **light** - Aura Lumineuse\n\n` +
-                          `💡 Usage: \`/aura_apprendre [type]\`\n` +
-                          `Exemple: \`/aura_apprendre fire\`\n\n` +
-                          `🎲 **20% de chance de maîtrise instantanée !**`
+    async handleAuraSessionCommand({ player, dbManager, sock, chatId }) {
+        if (!this.auraManager) {
+            return {
+                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
             };
         }
 
-            const auraType = args[0].toLowerCase();
-            const auraTypes = ['fire', 'water', 'earth', 'wind', 'lightning', 'shadow', 'light'];
-
-            if (!auraTypes.includes(auraType)) {
-                return { text: `❌ Type d'aura invalide ! Types disponibles: ${auraTypes.join(', ')}` };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            // Vérifier si le joueur peut commencer un entraînement
-            if (!this.auraManager.canStartTraining(player.id)) {
-                return { text: "❌ Vous avez déjà un entraînement d'aura en cours !" };
-            }
-
-            // 20% de chance de maîtrise instantanée
-            const instantMasteryChance = Math.random();
-            if (instantMasteryChance < 0.2) { // 20% de chance
-                const result = await this.auraManager.grantInstantMastery(player.id, auraType);
-                return { text: result.message };
-            }
-
-            // Commencer l'entraînement normal
-            const techniqueNames = this.auraManager.auraTypes[auraType].techniques;
-            const randomTechnique = techniqueNames[Math.floor(Math.random() * techniqueNames.length)];
-
-            const result = await this.auraManager.startAuraTraining(player.id, auraType, randomTechnique);
-            return { text: result.message };
-
-        } catch (error) {
-            console.error('❌ Erreur apprentissage aura:', error);
-            return { text: "❌ Erreur lors du démarrage de l'apprentissage." };
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
         }
-    }
 
-    async handleAuraSessionCommand({ player, chatId, dbManager, sock }) {
+        const activeTraining = this.auraManager.getPlayerTraining(player.id);
+        if (!activeTraining) {
+            return {
+                text: `❌ **AUCUN ENTRAÎNEMENT ACTIF**\n\nCommencez un entraînement avec \`/aura_apprendre [type]\` !`
+            };
+        }
+
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            const activeTraining = this.auraManager.getPlayerTraining(player.id);
-            if (!activeTraining) {
-                return { text: "❌ Vous n'avez pas d'entraînement actif ! Utilisez `/aura_apprendre [type]` d'abord." };
-            }
-
-            // Démarrer une session d'entraînement avec animation
-            const animation = await this.auraManager.createAuraAnimation(
-                player.id, 
-                activeTraining.auraType, 
-                activeTraining.techniqueName, 
-                sock, 
+            // Démarrer l'animation d'entraînement (30 secondes)
+            const animationResult = await this.auraManager.createAuraAnimation(
+                player.id,
+                activeTraining.auraType,
+                activeTraining.techniqueName,
+                sock,
                 chatId
             );
 
             // Mettre à jour le progrès
             this.auraManager.updateTrainingProgress(activeTraining.id);
 
-            return { text: '', skipResponse: true };
-
+            return { text: '' }; // L'animation gère l'affichage
         } catch (error) {
             console.error('❌ Erreur session aura:', error);
-            return { text: "❌ Erreur lors de la session d'entraînement." };
+            return {
+                text: `❌ Erreur lors de la session d'entraînement.`
+            };
         }
     }
 
-    async handleAuraTechniquesCommand({ player, dbManager }) {
+    /**
+     * Commande pour régénérer l'aura
+     */
+    async handleRegenerateAuraCommand({ player, dbManager, sock, chatId }) {
+        if (!this.auraManager) {
+            return {
+                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
+            };
+        }
+
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-            let techniquesList = `⚡ **TECHNIQUES D'AURA MAÎTRISÉES** ⚡\n\n`;
-
-            if (Object.keys(playerAuras).length === 0) {
-                techniquesList += "❌ Aucune technique d'aura maîtrisée.\n\nCommencez votre apprentissage avec `/aura_apprendre [type]`";
-            } else {
-                for (const [type, data] of Object.entries(playerAuras)) {
-                    const auraInfo = this.auraManager.auraTypes[type];
-                    techniquesList += `${auraInfo.emoji} **${auraInfo.name}**\n`;
-                    techniquesList += `   📊 Niveau: ${data.level}\n`;
-                    techniquesList += `   🎯 Techniques: ${data.techniques.join(', ')}\n\n`;
-                }
-            }
-
-            return { text: techniquesList };
-
+            await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
+            return { text: '' }; // La régénération gère l'affichage
         } catch (error) {
-            console.error('❌ Erreur techniques aura:', error);
-            return { text: "❌ Erreur lors de l'affichage des techniques." };
+            console.error('❌ Erreur régénération aura:', error);
+            return {
+                text: `❌ Erreur lors de la régénération d'aura.`
+            };
         }
     }
 
-    async handleCastAuraCommand({ player, message, dbManager }) {
-        try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            const args = message.split(' ').slice(1);
-            if (args.length < 2) {
-                return {
-                    text: `⚡ **LANCER UNE TECHNIQUE D'AURA** ⚡\n\n` +
-                          `Utilisez: \`/aura_cast [type] [technique]\`\n\n` +
-                          `Exemple: \`/aura_cast fire Souffle Ardent\``
-                };
-            }
-
-            const auraType = args[0].toLowerCase();
-            const techniqueName = args.slice(1).join(' ');
-
-            const result = await this.auraManager.castAuraTechnique(player.id, auraType, techniqueName);
-            return { text: result.message };
-
-        } catch (error) {
-            console.error('❌ Erreur cast aura:', error);
-            return { text: "❌ Erreur lors du lancement de la technique." };
+    /**
+     * Commande pour régénérer la magie
+     */
+    async handleRegenerateMagicCommand({ player, dbManager, sock, chatId }) {
+        if (!this.auraManager) {
+            return {
+                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
+            };
         }
-    }
 
-    async handleMeditateCommand({ player, chatId, dbManager, sock }) {
-        try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            // Démarrer une méditation générale (régénération d'aura)
-            const regenId = await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
-
-            return { text: '', skipResponse: true };
-
-        } catch (error) {
-            console.error('❌ Erreur méditation:', error);
-            return { text: "❌ Erreur lors de la méditation." };
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
         }
-    }
 
-    async handleRegenerateAuraCommand({ player, chatId, dbManager, sock }) {
-        return await this.handleMeditateCommand({ player, chatId, dbManager, sock });
-    }
-
-    async handleRegenerateMagicCommand({ player, chatId, dbManager, sock }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            // Démarrer une régénération de magie
-            const regenId = await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
-
-            return { text: '', skipResponse: true };
-
+            await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
+            return { text: '' }; // La régénération gère l'affichage
         } catch (error) {
             console.error('❌ Erreur régénération magie:', error);
-            return { text: "❌ Erreur lors de la régénération magique." };
+            return {
+                text: `❌ Erreur lors de la régénération de magie.`
+            };
         }
+    }
+
+    /**
+     * Commande pour lancer une technique d'aura
+     */
+    async handleCastAuraCommand({ player, message, dbManager }) {
+        if (!this.auraManager) {
+            return {
+                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
+            };
+        }
+
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        const parts = message.split(' ');
+        if (parts.length < 3) {
+            return {
+                text: `🔮 **LANCER TECHNIQUE D'AURA** 🔮\n\n` +
+                      `Usage: /aura_cast [type] [technique]\n\n` +
+                      `**Exemple:** \`/aura_cast fire Souffle Ardent\`\n\n` +
+                      `Utilisez \`/aura\` pour voir vos techniques disponibles.`
+            };
+        }
+
+        const auraType = parts[1].toLowerCase();
+        const techniqueName = parts.slice(2).join(' ');
+
+        try {
+            const result = await this.auraManager.castAuraTechnique(player.id, auraType, techniqueName);
+            return {
+                text: result.message
+            };
+        } catch (error) {
+            console.error('❌ Erreur lancement technique:', error);
+            return {
+                text: `❌ Erreur lors du lancement de la technique.`
+            };
+        }
+    }
+
+    /**
+     * Commande de méditation
+     */
+    async handleMeditateCommand({ player, dbManager, sock, chatId }) {
+        if (!this.auraManager) {
+            return {
+                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
+            };
+        }
+
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        // Méditation = régénération d'aura
+        return await this.handleRegenerateAuraCommand({ player, dbManager, sock, chatId });
+    }
+
+    /**
+     * Commande pour voir les techniques d'aura
+     */
+    async handleAuraTechniquesCommand({ player, dbManager }) {
+        if (!this.auraManager) {
+            return {
+                text: `❌ **SYSTÈME D'AURA NON DISPONIBLE**`
+            };
+        }
+
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
+
+        if (Object.keys(playerAuras).length === 0) {
+            return {
+                text: `🔮 **AUCUNE TECHNIQUE D'AURA**\n\n` +
+                      `Vous ne maîtrisez encore aucune technique d'aura.\n\n` +
+                      `Utilisez \`/aura_apprendre [type]\` pour commencer !`
+            };
+        }
+
+        let techniques = `🔮 **VOS TECHNIQUES D'AURA** 🔮\n\n`;
+
+        for (const [type, auraData] of Object.entries(playerAuras)) {
+            const auraInfo = this.auraManager.auraTypes[type];
+            techniques += `${auraInfo.emoji} **${auraInfo.name}** (Niveau ${auraData.level})\n`;
+
+            if (auraData.techniques.length > 0) {
+                auraData.techniques.forEach(technique => {
+                    techniques += `   ⚡ ${technique}\n`;
+                });
+            } else {
+                techniques += `   📝 Aucune technique maîtrisée\n`;
+            }
+            techniques += `\n`;
+        }
+
+        techniques += `💡 **Utilisez \`/aura_cast [type] [technique]\` pour lancer une technique !**`;
+
+        return {
+            text: techniques
+        };
     }
 
 
@@ -3924,7 +4010,7 @@ Aucun événement spécial n'est en cours actuellement.
      */
     async handleCoordinatesCommand({ player, dbManager }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
             if (!character) {
                 return { text: "❌ Tu n'as pas encore de personnage !" };
             }

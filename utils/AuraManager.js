@@ -467,7 +467,7 @@ ${aura.color} **Type:** ${aura.name}
 
 ✨ **Votre aura s'est renforcée !** ✨
 
-💡 **Conseil:** Répétez l'entraînement quotidiennement pendant ${this.auraTypes[aura.name.toLowerCase()]?.trainingDays || 10} jours pour maîtriser complètement cette technique.`;
+💡 **Conseil:** Répétez l'entraînement quotidiennement pendant ${aura.trainingDays} jours pour maîtriser complètement cette technique.`;
     }
 
     /**
