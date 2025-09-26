@@ -79,28 +79,45 @@ class AdminManager {
         // Vérifier si userId est défini
         if (!userId) return false;
         
-        // Vérifier l'ID exact
-        if (this.adminUsers.includes(userId)) return true;
+        console.log(`🔍 Vérification admin pour: "${userId}"`);
+        console.log(`📋 Liste des admins:`, this.adminUsers);
         
-        // Vérifier avec le suffixe @lid ajouté
-        if (this.adminUsers.includes(userId + '@lid')) return true;
+        // Vérifier l'ID exact
+        if (this.adminUsers.includes(userId)) {
+            console.log(`✅ Admin trouvé (ID exact): ${userId}`);
+            return true;
+        }
         
         // Vérifier le numéro de téléphone
-        if (phoneNumber && this.adminUsers.includes(phoneNumber)) return true;
+        if (phoneNumber && this.adminUsers.includes(phoneNumber)) {
+            console.log(`✅ Admin trouvé (téléphone): ${phoneNumber}`);
+            return true;
+        }
         
-        // Vérifier si l'userId correspond à un numéro dans la liste (sans préfixe)
+        // Extraire et comparer les parties numériques
         if (typeof userId === 'string') {
             const cleanUserId = userId.replace(/[^0-9]/g, '');
+            
             for (const adminId of this.adminUsers) {
                 if (typeof adminId === 'string') {
                     const cleanAdminId = adminId.replace(/[^0-9]/g, '');
+                    
+                    // Comparer les parties numériques
                     if (cleanAdminId === cleanUserId && cleanUserId.length > 0) {
+                        console.log(`✅ Admin trouvé (comparaison numérique): ${userId} <-> ${adminId}`);
+                        return true;
+                    }
+                    
+                    // Vérifier si l'userId contient l'adminId ou vice versa
+                    if (userId.includes(cleanAdminId) || adminId.includes(cleanUserId)) {
+                        console.log(`✅ Admin trouvé (inclusion): ${userId} <-> ${adminId}`);
                         return true;
                     }
                 }
             }
         }
         
+        console.log(`❌ Admin non trouvé pour: ${userId}`);
         return false;
     }
 

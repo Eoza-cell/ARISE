@@ -239,14 +239,10 @@ class FrictionUltimateBot {
             let playerNumber;
             if (message.key.participant) {
                 // Message de groupe - utiliser le participant (l'utilisateur réel)
-                const participantId = message.key.participant.split('@')[0];
-                // Gérer les cas où l'ID contient des caractères non numériques
-                playerNumber = participantId.replace(/[^0-9]/g, '');
+                playerNumber = message.key.participant;
             } else {
                 // Message privé - utiliser l'expéditeur direct
-                const senderId = from.split('@')[0];
-                // Gérer les cas où l'ID contient des caractères non numériques
-                playerNumber = senderId.replace(/[^0-9]/g, '');
+                playerNumber = from;
             }
 
             // Nettoyer les formats @lid

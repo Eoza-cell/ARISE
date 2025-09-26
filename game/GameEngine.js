@@ -2727,6 +2727,8 @@ Exemples:
      * Affiche les statistiques du serveur (Admin uniquement)
      */
     async handleAdminStatsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        console.log(`🔐 Tentative d'accès admin par: ${playerNumber}`);
+        
         if (!this.adminManager.isAdmin(playerNumber)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
