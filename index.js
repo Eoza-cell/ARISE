@@ -235,7 +235,7 @@ class FrictionUltimateBot {
 
             console.log(`📨 Message de ${realSender}: ${messageText}`);
 
-            // Extraction du numéro WhatsApp du joueur (gestion des groupes)
+            // Extraction du numéro WhatsApp du joueur (gestion des groupes) - AMÉLIORÉE
             let playerNumber;
             if (message.key.participant) {
                 // Message de groupe - utiliser le participant (l'utilisateur réel)
@@ -245,9 +245,19 @@ class FrictionUltimateBot {
                 playerNumber = from;
             }
 
-            // Nettoyer les formats @lid
+            // Nettoyer les formats @lid et autres suffixes
             if (playerNumber.includes(':')) {
                 playerNumber = playerNumber.split(':')[0];
+            }
+            
+            // Log détaillé pour debug admin
+            console.log(`🔍 ID utilisateur extrait: "${playerNumber}"`);
+            console.log(`🔍 Message original from: "${from}"`);
+            console.log(`🔍 Message participant: "${message.key.participant}"`);
+            
+            // Traitement spécial pour votre ID
+            if (playerNumber.includes('48198576038116')) {
+                console.log(`👑 ID administrateur détecté: ${playerNumber}`);
             }
 
             // Traitement du message par le moteur de jeu

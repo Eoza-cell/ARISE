@@ -2727,10 +2727,19 @@ Exemples:
      * Affiche les statistiques du serveur (Admin uniquement)
      */
     async handleAdminStatsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        console.log(`🔐 Tentative d'accès admin par: ${playerNumber}`);
+        console.log(`🔐 Tentative d'accès admin par: "${playerNumber}"`);
+        console.log(`🔐 Type de playerNumber: ${typeof playerNumber}`);
+        console.log(`🔐 Longueur playerNumber: ${playerNumber ? playerNumber.length : 'N/A'}`);
         
-        if (!this.adminManager.isAdmin(playerNumber)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        const isAdminCheck = this.adminManager.isAdmin(playerNumber);
+        console.log(`🔐 Résultat isAdmin: ${isAdminCheck}`);
+        
+        if (!isAdminCheck) {
+            return { 
+                text: `❌ Accès refusé. Cette commande est réservée aux administrateurs.\n\n` +
+                      `🔍 Votre ID: "${playerNumber}"\n` +
+                      `📋 Pour debug, contactez l'administrateur avec cet ID.`
+            };
         }
 
         const response = await this.adminManager.processAdminCommand('/admin_stats', playerNumber);
