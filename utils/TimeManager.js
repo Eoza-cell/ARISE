@@ -294,15 +294,15 @@ class TimeManager {
     }
     
     /**
-     * Démarre la mise à jour du temps (1 mois de jeu = 1 semaine réelle)
-     * 1 semaine = 168 heures, 1 mois = 30 jours = 720 heures
-     * Ratio: 720/168 = 4.29, donc 1 heure réelle = 4.29 heures de jeu
-     * Intervalle: 60000ms / 4.29 ≈ 14000ms (14 secondes réelles = 1 heure de jeu)
+     * Démarre la mise à jour du temps (12 heures réelles = 1 jour de jeu)
+     * 12 heures réelles = 1 jour de jeu (24 heures)
+     * Donc 1 heure réelle = 2 heures de jeu
+     * Intervalle: 1800000ms (30 minutes réelles = 1 heure de jeu)
      */
     startTimeUpdate() {
         setInterval(() => {
             this.advanceTime();
-        }, 14000); // 14 secondes réelles = 1 heure de jeu (1 mois = 1 semaine)
+        }, 1800000); // 30 minutes réelles = 1 heure de jeu (12h réelles = 1 jour de jeu)
     }
     
     /**
@@ -324,7 +324,7 @@ class TimeManager {
     }
     
     /**
-     * Avance le temps du jeu (14 secondes réelles = 1 heure de jeu)
+     * Avance le temps du jeu (30 minutes réelles = 1 heure de jeu)
      */
     advanceTime() {
         this.gameTime.hour++; // Chaque appel = +1 heure de jeu
@@ -651,20 +651,20 @@ class TimeManager {
         return `⏰ **SYSTÈME TEMPOREL FRICTION ULTIMATE** ⏰
 
 🕐 **Correspondance temps réel ↔ temps jeu :**
-• 14 secondes réelles = 1 heure de jeu
-• 5,6 minutes réelles = 1 jour de jeu  
-• 1 semaine réelle = 1 mois de jeu
-• 1 mois réel = ~4,3 mois de jeu
-• 1 an réel = ~52 ans de jeu
+• 30 minutes réelles = 1 heure de jeu
+• 12 heures réelles = 1 jour de jeu  
+• 15 jours réels = 1 mois de jeu
+• 6 mois réels = 1 an de jeu
+• 1 an réel = 2 ans de jeu
 
-📊 **Rythme accéléré :**
-Les événements, quêtes et évolutions se déroulent à un rythme immersif permettant une progression rapide tout en gardant la cohérence narrative.
+📊 **Rythme équilibré :**
+Les événements, quêtes et évolutions se déroulent à un rythme immersif permettant une progression naturelle tout en gardant la cohérence narrative.
 
 🌍 **Impact sur le gameplay :**
-• Événements saisonniers fréquents
+• Cycles jour/nuit réalistes (12h réelles)
+• Événements saisonniers programmés
 • Économie dynamique en temps réel
-• Vieillissement des personnages accéléré
-• Cycles jour/nuit visibles`;
+• Progression cohérente des personnages`;
     }
 
     /**
