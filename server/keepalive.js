@@ -333,6 +333,14 @@ server.on('error', (error) => {
         timestamp: new Date().toISOString(),
         code: error.code
     };
+    
+    if (error.code === 'EADDRINUSE') {
+        console.error(`❌ Port ${port} déjà utilisé - Arrêt du serveur keep-alive`);
+        console.log('💡 Le bot WhatsApp peut continuer sans serveur web');
+        serverStatus = 'port_conflict';
+        return; // Ne pas essayer de redémarrer
+    }
+    
     serverStatus = 'error';
     console.error('❌ Erreur serveur keep-alive:', error);
 });

@@ -50,7 +50,7 @@ class FrictionUltimateBot {
 
         // Injecter l'ImageGenerator dans le GameEngine
         this.gameEngine.imageGenerator = this.imageGenerator;
-        
+
         // Injecter le client Groq dans l'ImageGenerator pour optimisation des prompts
         if (this.imageGenerator.setGroqClient) {
             this.imageGenerator.setGroqClient(this.gameEngine.groqClient);
@@ -111,7 +111,7 @@ class FrictionUltimateBot {
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                 console.log('❌ Connexion fermée, reconnexion:', shouldReconnect);
-                
+
                 // Vérifier si c'est un problème de clé privée invalide
                 const errorMessage = lastDisconnect?.error?.message;
                 if (errorMessage && errorMessage.includes('Invalid private key type')) {
@@ -124,13 +124,13 @@ class FrictionUltimateBot {
                     // Limiter le nombre de tentatives
                     if (!this.reconnectAttempts) this.reconnectAttempts = 0;
                     this.reconnectAttempts++;
-                    
+
                     if (this.reconnectAttempts > 5) {
                         console.log('❌ Trop de tentatives de reconnexion - arrêt');
                         console.log('💡 Le serveur web continue de fonctionner sur le port 5000');
                         return;
                     }
-                    
+
                     setTimeout(() => this.startWhatsApp(), 5000);
                 } else {
                     // Si déconnecté (loggedOut), supprimer la session pour en créer une nouvelle
@@ -184,7 +184,7 @@ class FrictionUltimateBot {
         try {
             const from = message.key.remoteJid;
             const messageId = message.key.id;
-            
+
             // CORRECTION CRITIQUE : Ignorer les messages de groupe sans participant 
             // (c'est le premier événement dupliqué de Baileys)
             if (from.includes('@g.us') && !message.key.participant) {
@@ -195,16 +195,16 @@ class FrictionUltimateBot {
             // Système de déduplication basé sur l'ID unique du message par chat
             const messageKey = `${from}:${messageId}`;
             const now = Date.now();
-            
+
             if (this.processedMessages.has(messageKey)) {
                 const lastProcessed = this.processedMessages.get(messageKey);
                 console.log(`⚠️ Message déjà traité ignoré: ${messageKey} (il y a ${now - lastProcessed}ms)`);
                 return;
             }
-            
+
             // Marquer le message comme traité
             this.processedMessages.set(messageKey, now);
-            
+
             // Nettoyage du cache - garder seulement les messages des 10 dernières minutes
             this.cleanupCache();
 
@@ -243,10 +243,10 @@ class FrictionUltimateBot {
             if (playerNumber.includes(':')) {
                 playerNumber = playerNumber.split(':')[0];
             }
-            
+
             console.log(`📨 Message de ${playerNumber}: ${messageText || '[image]'}`);
             console.log(`🔍 ID utilisateur: "${playerNumber}" | Chat: "${from}"`);
-            
+
             // Traitement spécial pour l'administrateur
             if (playerNumber.includes('48198576038116')) {
                 console.log(`👑 ID administrateur détecté: ${playerNumber}`);
@@ -479,26 +479,26 @@ class FrictionUltimateBot {
         const now = Date.now();
         const maxAge = 10 * 60 * 1000; // 10 minutes
         const sizeBefore = this.processedMessages.size;
-        
+
         // Supprimer les messages anciens
         for (const [key, timestamp] of this.processedMessages.entries()) {
             if (now - timestamp > maxAge) {
                 this.processedMessages.delete(key);
             }
         }
-        
+
         // Si le cache est encore trop grand, garder seulement les plus récents
         if (this.processedMessages.size > this.maxCacheSize) {
             const sortedEntries = Array.from(this.processedMessages.entries())
                 .sort((a, b) => b[1] - a[1]) // Trier par timestamp décroissant
                 .slice(0, this.maxCacheSize); // Garder seulement les N plus récents
-            
+
             this.processedMessages.clear();
             for (const [key, timestamp] of sortedEntries) {
                 this.processedMessages.set(key, timestamp);
             }
         }
-        
+
         const sizeAfter = this.processedMessages.size;
         if (sizeBefore !== sizeAfter) {
             console.log(`🧹 Cache nettoyé: ${sizeBefore} → ${sizeAfter} messages`);
