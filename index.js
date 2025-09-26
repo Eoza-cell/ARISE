@@ -55,6 +55,23 @@ class FrictionUltimateBot {
         if (this.imageGenerator.setGroqClient) {
             this.imageGenerator.setGroqClient(this.gameEngine.groqClient);
         }
+
+        // Initialisation de HuggingFaceClient pour génération de vidéos IA
+        try {
+            this.huggingfaceClient = new HuggingFaceClient();
+            this.hasHuggingFace = this.huggingfaceClient.hasValidClient();
+            if (this.hasHuggingFace) {
+                console.log('🤗 HuggingFaceClient initialisé - Génération de vidéos IA avec ltxv-13b-098-distilled activée');
+                console.log('🎬 Vidéos image-to-video avec images de personnages disponibles');
+            } else {
+                console.log('⚠️ HF_TOKEN non configurée - HuggingFace vidéos désactivées');
+                console.log('💡 Ajoutez HF_TOKEN dans les secrets pour activer les vidéos ltxv-13b-098-distilled');
+            }
+        } catch (error) {
+            console.error('❌ Erreur initialisation HuggingFaceClient:', error.message);
+            this.huggingfaceClient = null;
+            this.hasHuggingFace = false;
+        }
     }
 
     async initialize() {

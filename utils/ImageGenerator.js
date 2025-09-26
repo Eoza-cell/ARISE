@@ -841,10 +841,37 @@ class ImageGenerator {
             if (this.hasHuggingFace && this.huggingfaceClient) {
                 try {
                     console.log('🤗 Génération vidéo d\'action avec HuggingFace ltxv-13b-098-distilled...');
-                    const videoPrompt = `${character.name} performing ${action}, medieval fantasy RPG character in action, dynamic movement, epic fantasy scene, cinematic quality, smooth motion`;
+                    const videoPrompt = `${character.name} performing ${action}, ${narration}, medieval fantasy RPG character in action, dynamic movement, epic fantasy scene, cinematic quality, smooth motion, natural movement`;
 
-                    // Utiliser l'image du personnage
-                    const characterImagePath = imagePath || character.imagePath || character.imageUrl || `assets/custom_images/character_${character.id}.png`;
+                    // Prioriser l'image personnalisée du personnage
+                    let characterImagePath = imagePath;
+                    
+                    if (!characterImagePath) {
+                        // Essayer l'image personnalisée d'abord
+                        try {
+                            const customImage = await this.getCustomCharacterImage(character.id);
+                            if (customImage) {
+                                characterImagePath = path.join(this.assetsPath, 'custom_images', `character_${character.id}.png`);
+                                console.log(`📸 Utilisation image personnage pour vidéo: ${character.name}`);
+                            }
+                        } catch (error) {
+                            console.log('⚠️ Image personnalisée non trouvée, génération d\'une nouvelle image...');
+                        }
+                        
+                        // Si pas d'image personnalisée, en générer une
+                        if (!characterImagePath) {
+                            try {
+                                const tempImageBuffer = await this.generateCharacterImage(character, { style: '3d', perspective: 'first_person' });
+                                if (tempImageBuffer) {
+                                    characterImagePath = path.join(this.tempPath, `temp_char_${character.id}_${Date.now()}.png`);
+                                    await fs.writeFile(characterImagePath, tempImageBuffer);
+                                    console.log(`📸 Image temporaire générée pour vidéo: ${characterImagePath}`);
+                                }
+                            } catch (imageError) {
+                                console.log('⚠️ Impossible de générer image pour vidéo:', imageError.message);
+                            }
+                        }
+                    }
 
                     const result = await this.huggingfaceClient.generateVideoFromText(videoPrompt, videoPath, {
                         duration: 5,
@@ -855,7 +882,15 @@ class ImageGenerator {
                     });
 
                     if (result && result.success) {
-                        console.log('✅ Vidéo d\'action générée par HuggingFace ltxv-13b-098-distilled');
+                        console.log('✅ Vidéo d\'action générée par HuggingFace ltxv-13b-098-distilled avec image personnage');
+                        
+                        // Nettoyer l'image temporaire si créée
+                        if (characterImagePath && characterImagePath.includes('temp_char_')) {
+                            setTimeout(() => {
+                                fs.unlink(characterImagePath, () => {});
+                            }, 5000);
+                        }
+                        
                         return result.videoPath;
                     }
                 } catch (hfError) {
@@ -864,13 +899,13 @@ class ImageGenerator {
                     // Essayer le modèle de fallback text-to-video
                     try {
                         const result = await this.huggingfaceClient.generateVideoWithFallbackModel(
-                            `${character.name} performing ${action}, medieval fantasy`,
+                            `${character.name} performing ${action}, ${narration}, medieval fantasy`,
                             videoPath,
                             { duration: 4, width: 512, height: 512 }
                         );
 
                         if (result && result.success) {
-                            console.log('✅ Vidéo d\'action générée par HuggingFace (fallback)');
+                            console.log('✅ Vidéo d\'action générée par HuggingFace (fallback text-to-video)');
                             return result.videoPath;
                         }
                     } catch (fallbackError) {
