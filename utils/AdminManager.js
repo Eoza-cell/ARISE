@@ -76,8 +76,25 @@ class AdminManager {
      * @returns {boolean}
      */
     isAdmin(userId, phoneNumber = null) {
-        return this.adminUsers.includes(userId) || 
-               (phoneNumber && this.adminUsers.includes(phoneNumber));
+        // Vérifier l'ID exact
+        if (this.adminUsers.includes(userId)) return true;
+        
+        // Vérifier avec le suffixe @lid ajouté
+        if (this.adminUsers.includes(userId + '@lid')) return true;
+        
+        // Vérifier le numéro de téléphone
+        if (phoneNumber && this.adminUsers.includes(phoneNumber)) return true;
+        
+        // Vérifier si l'userId correspond à un numéro dans la liste (sans préfixe)
+        const cleanUserId = userId.replace(/[^0-9]/g, '');
+        for (const adminId of this.adminUsers) {
+            const cleanAdminId = adminId.replace(/[^0-9]/g, '');
+            if (cleanAdminId === cleanUserId && cleanUserId.length > 0) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**
