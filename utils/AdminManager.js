@@ -5,10 +5,20 @@
 
 class AdminManager {
     constructor() {
+        // Code d'authentification admin
+        this.adminAuthCode = '2011';
+        
+        // Sessions admin temporaires (validées avec le code 2011)
+        this.authenticatedSessions = new Map();
+        
+        // Durée de validité d'une session admin (en millisecondes)
+        this.sessionTimeout = 30 * 60 * 1000; // 30 minutes
+        
         // ID de l'administrateur principal
         this.adminUsers = [
             '48198576038116@lid', // ID principal
-            '+22663685468' // Numéro de téléphone
+            '48198576038116',     // Version sans @lid
+            '+22663685468'        // Numéro de téléphone
         ];
         
         // Permissions d'administration
@@ -70,76 +80,109 @@ class AdminManager {
     }
 
     /**
+     * Vérifie si un message contient le code d'authentification admin
+     * @param {string} message - Message à vérifier
+     * @returns {boolean}
+     */
+    containsAuthCode(message) {
+        return message && message.includes(this.adminAuthCode);
+    }
+
+    /**
+     * Authentifie un admin avec le code 2011
+     * @param {string} userId - ID de l'utilisateur
+     * @param {string} message - Message contenant le code
+     * @returns {boolean}
+     */
+    authenticateAdmin(userId, message) {
+        if (!userId) return false;
+        
+        // Vérifier si le message contient le code d'authentification
+        if (!this.containsAuthCode(message)) return false;
+        
+        console.log(`🔐 Tentative d'authentification admin: ${userId}`);
+        
+        // Vérifier si l'utilisateur est dans la liste des admins potentiels
+        const isValidAdmin = this.adminUsers.some(adminId => {
+            if (userId === adminId) return true;
+            
+            // Nettoyage et comparaison des IDs numériques
+            const cleanUserId = userId.replace(/[^0-9]/g, '');
+            const cleanAdminId = adminId.replace(/[^0-9]/g, '');
+            
+            return cleanUserId === cleanAdminId && cleanUserId.length > 0;
+        });
+        
+        if (isValidAdmin) {
+            // Créer une session authentifiée
+            this.authenticatedSessions.set(userId, {
+                timestamp: Date.now(),
+                authenticated: true
+            });
+            
+            console.log(`✅ Admin authentifié avec succès: ${userId}`);
+            return true;
+        }
+        
+        console.log(`❌ ID non autorisé pour l'authentification: ${userId}`);
+        return false;
+    }
+
+    /**
      * Vérifie si un utilisateur est administrateur
      * @param {string} userId - ID de l'utilisateur
-     * @param {string} phoneNumber - Numéro de téléphone
+     * @param {string} phoneNumber - Numéro de téléphone (optionnel)
      * @returns {boolean}
      */
     isAdmin(userId, phoneNumber = null) {
-        // Vérifier si userId est défini
         if (!userId) {
             console.log(`❌ userId est vide ou null`);
             return false;
         }
         
-        console.log(`🔍 Vérification admin pour: "${userId}"`);
-        console.log(`📋 Liste des admins:`, this.adminUsers);
-        console.log(`📞 Numéro de téléphone fourni: "${phoneNumber}"`);
+        console.log(`🔐 Vérification admin pour: "${userId}"`);
         
-        // Vérifier l'ID exact
-        if (this.adminUsers.includes(userId)) {
-            console.log(`✅ Admin trouvé (ID exact): ${userId}`);
-            return true;
-        }
-        
-        // Vérifier le numéro de téléphone
-        if (phoneNumber && this.adminUsers.includes(phoneNumber)) {
-            console.log(`✅ Admin trouvé (téléphone): ${phoneNumber}`);
-            return true;
-        }
-        
-        // Extraire et comparer les parties numériques
-        if (typeof userId === 'string') {
-            const cleanUserId = userId.replace(/[^0-9]/g, '');
-            console.log(`🔢 ID nettoyé: "${cleanUserId}"`);
-            
-            for (const adminId of this.adminUsers) {
-                console.log(`🔍 Comparaison avec admin: "${adminId}"`);
-                
-                if (typeof adminId === 'string') {
-                    const cleanAdminId = adminId.replace(/[^0-9]/g, '');
-                    console.log(`🔢 Admin ID nettoyé: "${cleanAdminId}"`);
-                    
-                    // Comparer les parties numériques
-                    if (cleanAdminId === cleanUserId && cleanUserId.length > 0) {
-                        console.log(`✅ Admin trouvé (comparaison numérique): ${userId} <-> ${adminId}`);
-                        return true;
-                    }
-                    
-                    // Vérifier si l'userId contient l'adminId ou vice versa
-                    if (userId.includes(cleanAdminId) || adminId.includes(cleanUserId)) {
-                        console.log(`✅ Admin trouvé (inclusion): ${userId} <-> ${adminId}`);
-                        return true;
-                    }
-                    
-                    // Vérification spéciale pour votre cas : 48198576038116
-                    if (cleanUserId === '48198576038116' || cleanAdminId === '48198576038116') {
-                        console.log(`✅ Admin trouvé (votre ID spécifique): ${userId}`);
-                        return true;
-                    }
-                }
+        // Vérifier si l'utilisateur a une session authentifiée valide
+        const session = this.authenticatedSessions.get(userId);
+        if (session) {
+            // Vérifier si la session n'a pas expiré
+            if (Date.now() - session.timestamp < this.sessionTimeout) {
+                console.log(`✅ Admin authentifié (session valide): ${userId}`);
+                return true;
+            } else {
+                // Session expirée, la supprimer
+                this.authenticatedSessions.delete(userId);
+                console.log(`⏰ Session admin expirée: ${userId}`);
             }
         }
         
-        // Vérification d'urgence pour votre ID exact
-        if (userId.includes('48198576038116')) {
-            console.log(`✅ Admin trouvé (votre ID dans la chaîne): ${userId}`);
-            return true;
-        }
-        
-        console.log(`❌ Admin non trouvé pour: ${userId}`);
-        console.log(`❌ Toutes les vérifications ont échoué`);
+        console.log(`❌ Admin non authentifié: ${userId}`);
         return false;
+    }
+
+    /**
+     * Déconnecte un admin (supprime sa session)
+     * @param {string} userId - ID de l'utilisateur
+     */
+    logoutAdmin(userId) {
+        this.authenticatedSessions.delete(userId);
+        console.log(`🔒 Admin déconnecté: ${userId}`);
+    }
+
+    /**
+     * Obtient le statut d'authentification d'un utilisateur
+     * @param {string} userId - ID de l'utilisateur
+     * @returns {Object}
+     */
+    getAuthStatus(userId) {
+        const session = this.authenticatedSessions.get(userId);
+        if (!session) return { authenticated: false, timeLeft: 0 };
+        
+        const timeLeft = this.sessionTimeout - (Date.now() - session.timestamp);
+        return {
+            authenticated: timeLeft > 0,
+            timeLeft: Math.max(0, Math.floor(timeLeft / 1000 / 60)) // minutes
+        };
     }
 
     /**

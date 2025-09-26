@@ -154,6 +154,8 @@ class GameEngine {
             '/admin_backup': this.handleAdminBackupCommand.bind(this),
             '/admin_reload': this.handleAdminReloadCommand.bind(this),
             '/admin_announce': this.handleAdminAnnounceCommand.bind(this),
+            '/admin_status': this.handleAdminStatusCommand.bind(this),
+            '/admin_logout': this.handleAdminLogoutCommand.bind(this),
             '/admin_help': this.handleAdminHelpCommand.bind(this),
 
             // Commandes de quêtes (10,000 principales + 20,000 secondaires)
@@ -202,6 +204,39 @@ class GameEngine {
     }
 
     async processPlayerMessage({ playerNumber, chatId, message, imageMessage, originalMessage, sock, dbManager, imageGenerator }) {
+        // Gestion spéciale pour l'authentification admin
+        if (message && this.adminManager.containsAuthCode(message)) {
+            const authResult = this.adminManager.authenticateAdmin(playerNumber, message);
+            
+            if (authResult) {
+                // Supprimer le message d'authentification pour la sécurité
+                setTimeout(async () => {
+                    try {
+                        await sock.sendMessage(chatId, { delete: originalMessage.key });
+                        console.log(`🗑️ Message d'authentification admin supprimé automatiquement`);
+                    } catch (error) {
+                        console.log(`⚠️ Impossible de supprimer le message d'auth: ${error.message}`);
+                    }
+                }, 2000);
+                
+                return {
+                    text: `🔐 **AUTHENTIFICATION ADMIN RÉUSSIE** 🔐
+
+✅ Vous êtes maintenant authentifié en tant qu'administrateur
+⏰ Session valide pendant 30 minutes
+🛡️ Accès complet aux commandes d'administration
+
+🔒 Ce message sera automatiquement supprimé pour la sécurité.`
+                };
+            } else {
+                return {
+                    text: `❌ **ÉCHEC D'AUTHENTIFICATION** ❌
+
+🚫 Code invalide ou utilisateur non autorisé
+🔐 Contactez l'administrateur principal si vous pensez qu'il y a une erreur`
+                };
+            }
+        }
         try {
             // Initialisation des managers avec dbManager si pas encore fait
             if (!this.questManager) {
@@ -1962,6 +1997,48 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                   `• Photo claire et bien éclairée recommandée\n` +
                   `• Si tu n'as pas de photo, écris "SANS_PHOTO"\n\n` +
                   `📷 **Envoie ta photo maintenant...**`
+
+
+    /**
+     * Affiche le statut d'authentification admin
+     */
+    async handleAdminStatusCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        const authStatus = this.adminManager.getAuthStatus(playerNumber);
+        
+        if (!authStatus.authenticated) {
+            return {
+                text: `🔒 **STATUT ADMIN** 🔒
+
+❌ Non authentifié
+🔑 Envoyez le code d'administration pour vous connecter`
+            };
+        }
+
+        return {
+            text: `🔐 **STATUT ADMIN** 🔐
+
+✅ Authentifié
+⏰ Temps restant: ${authStatus.timeLeft} minutes
+🛡️ Accès complet aux commandes d'administration
+
+💡 Utilisez \`/admin_logout\` pour vous déconnecter`
+        };
+    }
+
+    /**
+     * Déconnecte l'administrateur
+     */
+    async handleAdminLogoutCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        this.adminManager.logoutAdmin(playerNumber);
+        
+        return {
+            text: `🔒 **DÉCONNEXION ADMIN** 🔒
+
+✅ Vous avez été déconnecté avec succès
+🔑 Envoyez le code d'administration pour vous reconnecter`
+        };
+    }
+
         };
     }
 
@@ -2757,22 +2834,37 @@ Exemples:
      */
     async handleAdminStatsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
         console.log(`🔐 Tentative d'accès admin par: "${playerNumber}"`);
-        console.log(`🔐 Type de playerNumber: ${typeof playerNumber}`);
-        console.log(`🔐 Longueur playerNumber: ${playerNumber ? playerNumber.length : 'N/A'}`);
         
-        const isAdminCheck = this.adminManager.isAdmin(playerNumber);
-        console.log(`🔐 Résultat isAdmin: ${isAdminCheck}`);
+        const authStatus = this.adminManager.getAuthStatus(playerNumber);
         
-        if (!isAdminCheck) {
+        if (!authStatus.authenticated) {
             return { 
-                text: `❌ Accès refusé. Cette commande est réservée aux administrateurs.\n\n` +
-                      `🔍 Votre ID: "${playerNumber}"\n` +
-                      `📋 Pour debug, contactez l'administrateur avec cet ID.`
+                text: `🔐 **ACCÈS ADMIN REQUIS** 🔐
+
+❌ Vous devez être authentifié en tant qu'administrateur
+
+🔑 Pour vous authentifier, envoyez le code d'administration dans un message
+⏰ L'authentification sera valide pendant 30 minutes
+
+🚫 Si vous n'avez pas le code, contactez l'administrateur principal.`
             };
         }
 
+        // Auto-suppression du message de commande admin après traitement
+        setTimeout(async () => {
+            try {
+                await sock.sendMessage(chatId, { delete: originalMessage.key });
+                console.log(`🗑️ Commande admin supprimée automatiquement`);
+            } catch (error) {
+                console.log(`⚠️ Impossible de supprimer la commande admin: ${error.message}`);
+            }
+        }, 5000);
+
         const response = await this.adminManager.processAdminCommand('/admin_stats', playerNumber);
-        return { text: response };
+        
+        return { 
+            text: `${response}\n\n🔒 Cette commande et sa réponse seront automatiquement supprimées.\n⏰ Session expire dans ${authStatus.timeLeft} minutes.`
+        };
     }
 
     /**

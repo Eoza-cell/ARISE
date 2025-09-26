@@ -148,7 +148,7 @@ class GroqClient {
             const dynamicEvents = this.generateDynamicEvents(location, character);
             const npcReactions = this.generateSmartNPCReactions(character, action);
 
-            const prompt = `Tu es un narrateur IA ULTRA-PERFORMANT pour un RPG comme GTA mais médiéval-technologique. 
+            const prompt = `Tu es un narrateur IA ULTRA-PERFORMANT pour un RPG comme GTA mais médiéval-technologique.
 
 CONTEXTE AVANCÉ:
 - Personnage: ${character.name} (Niveau ${character.powerLevel})
@@ -196,7 +196,7 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
 
         analyzeActionType(action) {
             const lowerAction = action.toLowerCase();
-            
+
             if (lowerAction.includes('coup de poing droit')) {
                 return "🥊 TECHNIQUE MARTIALE: Coup de poing droit - Technique de boxe précise avec rotation du corps et extension du bras dominant.";
             }
@@ -215,7 +215,7 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
             if (lowerAction.includes('coup de poing')) {
                 return "🥊 TECHNIQUE MARTIALE: Coup de poing basique - Frappe directe avec le poing.";
             }
-            
+
             return "⚡ ACTION GÉNÉRALE: Analyser selon le contexte et les détails fournis.";
         }
 
