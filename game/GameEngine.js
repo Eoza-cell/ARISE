@@ -167,6 +167,10 @@ class GameEngine {
             '/aura_cast': this.handleCastAuraCommand.bind(this),
             '/mediter': this.handleMeditateCommand.bind(this),
             '/meditate': this.handleMeditateCommand.bind(this),
+            '/regenerer_aura': this.handleRegenerateAuraCommand.bind(this),
+            '/regenerate_aura': this.handleRegenerateAuraCommand.bind(this),
+            '/regenerer_magie': this.handleRegenerateMagicCommand.bind(this),
+            '/regenerate_magic': this.handleRegenerateMagicCommand.bind(this),
             
             // Commandes de temps et météo
             '/temps': this.handleTimeCommand.bind(this),
@@ -176,7 +180,10 @@ class GameEngine {
             '/evenements': this.handleEventsCommand.bind(this),
             '/events': this.handleEventsCommand.bind(this),
             '/calendrier': this.handleCalendarCommand.bind(this),
-            '/calendar': this.handleCalendarCommand.bind(this)
+            '/calendar': this.handleCalendarCommand.bind(this),
+            '/coordonnees': this.handleCoordinatesCommand.bind(this),
+            '/coordinates': this.handleCoordinatesCommand.bind(this),
+            '/position': this.handleCoordinatesCommand.bind(this)
         };
     }
 
@@ -2993,6 +3000,355 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
             if (!player) {
                 return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
             }
+
+
+    async handleAuraInfoCommand({ player, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
+            return { text: auraInfo };
+
+        } catch (error) {
+            console.error('❌ Erreur commande aura info:', error);
+            return { text: "❌ Erreur lors de l'affichage des informations d'aura." };
+        }
+    }
+
+    async handleLearnAuraCommand({ player, message, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
+                return {
+                    text: `🔮 **APPRENTISSAGE D'AURA** 🔮\n\n` +
+                          `Choisissez un type d'aura à apprendre :\n\n` +
+                          `🔥 **fire** - Aura de Flamme\n` +
+                          `🌊 **water** - Aura Aquatique\n` +
+                          `🌍 **earth** - Aura Tellurique\n` +
+                          `💨 **wind** - Aura Éolienne\n` +
+                          `⚡ **lightning** - Aura Foudroyante\n` +
+                          `🌑 **shadow** - Aura Ténébreuse\n` +
+                          `✨ **light** - Aura Lumineuse\n\n` +
+                          `Utilisez: \`/aura_apprendre [type]\``
+                };
+            }
+
+            const auraType = args[0].toLowerCase();
+            const validTypes = ['fire', 'water', 'earth', 'wind', 'lightning', 'shadow', 'light'];
+            
+            if (!validTypes.includes(auraType)) {
+                return { text: "❌ Type d'aura invalide ! Types disponibles: " + validTypes.join(', ') };
+            }
+
+            if (!this.auraManager.canStartTraining(player.id)) {
+                return { text: "❌ Vous avez déjà un entraînement en cours !" };
+            }
+
+            const training = await this.auraManager.startAuraTraining(player.id, auraType, 'Maîtrise de Base');
+            return { text: training.message };
+
+        } catch (error) {
+            console.error('❌ Erreur apprentissage aura:', error);
+            return { text: "❌ Erreur lors du démarrage de l'apprentissage." };
+        }
+    }
+
+    async handleAuraSessionCommand({ player, chatId, dbManager, sock }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            const activeTraining = this.auraManager.getPlayerTraining(player.id);
+            if (!activeTraining) {
+                return { text: "❌ Vous n'avez pas d'entraînement actif ! Utilisez `/aura_apprendre [type]` d'abord." };
+            }
+
+            // Démarrer une session d'entraînement avec animation
+            const animation = await this.auraManager.createAuraAnimation(
+                player.id, 
+                activeTraining.auraType, 
+                activeTraining.techniqueName, 
+                sock, 
+                chatId
+            );
+
+            // Mettre à jour le progrès
+            this.auraManager.updateTrainingProgress(activeTraining.id);
+
+            return { text: '', skipResponse: true };
+
+        } catch (error) {
+            console.error('❌ Erreur session aura:', error);
+            return { text: "❌ Erreur lors de la session d'entraînement." };
+        }
+    }
+
+    async handleAuraTechniquesCommand({ player, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
+            let techniquesList = `⚡ **TECHNIQUES D'AURA MAÎTRISÉES** ⚡\n\n`;
+
+            if (Object.keys(playerAuras).length === 0) {
+                techniquesList += "❌ Aucune technique d'aura maîtrisée.\n\nCommencez votre apprentissage avec `/aura_apprendre [type]`";
+            } else {
+                for (const [type, data] of Object.entries(playerAuras)) {
+                    const auraInfo = this.auraManager.auraTypes[type];
+                    techniquesList += `${auraInfo.emoji} **${auraInfo.name}**\n`;
+                    techniquesList += `   📊 Niveau: ${data.level}\n`;
+                    techniquesList += `   🎯 Techniques: ${data.techniques.join(', ')}\n\n`;
+                }
+            }
+
+            return { text: techniquesList };
+
+        } catch (error) {
+            console.error('❌ Erreur techniques aura:', error);
+            return { text: "❌ Erreur lors de l'affichage des techniques." };
+        }
+    }
+
+    async handleCastAuraCommand({ player, message, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            const args = message.split(' ').slice(1);
+            if (args.length < 2) {
+                return {
+                    text: `⚡ **LANCER UNE TECHNIQUE D'AURA** ⚡\n\n` +
+                          `Utilisez: \`/aura_cast [type] [technique]\`\n\n` +
+                          `Exemple: \`/aura_cast fire Souffle Ardent\``
+                };
+            }
+
+            const auraType = args[0].toLowerCase();
+            const techniqueName = args.slice(1).join(' ');
+
+            const result = await this.auraManager.castAuraTechnique(player.id, auraType, techniqueName);
+            return { text: result.message };
+
+        } catch (error) {
+            console.error('❌ Erreur cast aura:', error);
+            return { text: "❌ Erreur lors du lancement de la technique." };
+        }
+    }
+
+    async handleMeditateCommand({ player, chatId, dbManager, sock }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            // Démarrer une méditation générale (régénération d'aura)
+            const regenId = await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
+
+            return { text: '', skipResponse: true };
+
+        } catch (error) {
+            console.error('❌ Erreur méditation:', error);
+            return { text: "❌ Erreur lors de la méditation." };
+        }
+    }
+
+    async handleRegenerateAuraCommand({ player, chatId, dbManager, sock }) {
+        return await this.handleMeditateCommand({ player, chatId, dbManager, sock });
+
+
+    /**
+     * Commande pour afficher les coordonnées et la carte
+     */
+    async handleMapCommand({ imageGenerator }) {
+        try {
+            const worldMap = await imageGenerator.generateWorldMap({
+                showCoordinates: true,
+                highQuality: true
+            });
+
+            return {
+                text: `🗺️ **CARTE DU MONDE AVANCÉE - FRICTION ULTIMATE**\n\n` +
+                      `🎯 **Système de coordonnées X,Y intégré**\n` +
+                      `• Grille de déplacement 64x64\n` +
+                      `• Coordonnées fixes pour chaque royaume\n` +
+                      `• Terrain détaillé par zone\n\n` +
+                      `🏰 **Royaumes et leurs coordonnées :**\n` +
+                      `• AEGYRIA (0, 0) - Centre du monde\n` +
+                      `• SOMBRENUIT (-8, 8) - Forêts du nord-ouest\n` +
+                      `• KHELOS (15, -12) - Déserts de l'est\n` +
+                      `• ABRANTIS (20, 5) - Côtes de l'est\n` +
+                      `• VARHA (-12, 18) - Montagnes du nord\n` +
+                      `• Et 7 autres royaumes...\n\n` +
+                      `🧭 **Utilisez les coordonnées pour naviguer !**\n` +
+                      `📍 Exemple: "Je me dirige vers (5, -3)"`,
+                image: worldMap
+            };
+        } catch (error) {
+            console.error('❌ Erreur génération carte avancée:', error);
+            return {
+                text: `🗺️ **CARTE DU MONDE - SYSTÈME DE COORDONNÉES**\n\n` +
+                      `⚠️ Génération d'image temporairement indisponible\n\n` +
+                      `🎯 **Système de coordonnées X,Y :**\n` +
+                      `• AEGYRIA (0, 0) - Plaines centrales\n` +
+                      `• SOMBRENUIT (-8, 8) - Forêts sombres\n` +
+                      `• KHELOS (15, -12) - Désert brûlant\n` +
+                      `• ABRANTIS (20, 5) - Ports maritimes\n` +
+                      `• VARHA (-12, 18) - Montagnes enneigées\n` +
+                      `• SYLVARIA (12, 10) - Jungles luxuriantes\n` +
+                      `• ECLYPSIA (-15, -8) - Terres d'ombre\n` +
+                      `• TERRE_DESOLE (8, -18) - Wasteland\n` +
+                      `• DRAK_TARR (-20, -15) - Volcans\n` +
+                      `• URVALA (-5, -10) - Marais maudit\n` +
+                      `• OMBREFIEL (5, -5) - Plaines grises\n` +
+                      `• KHALDAR (18, -5) - Jungle tropicale\n\n` +
+                      `🧭 **Navigation par coordonnées disponible !**`
+            };
+        }
+    }
+
+    /**
+     * Obtient les informations de coordonnées d'un joueur
+     */
+    async handleCoordinatesCommand({ player, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            // Récupérer ou initialiser les coordonnées
+            let coordinates = character.position;
+            if (!coordinates || (!coordinates.x && !coordinates.y)) {
+                // Assigner des coordonnées basées sur le royaume
+                const WorldMapGenerator = require('../utils/WorldMapGenerator');
+                const mapGen = new WorldMapGenerator();
+                const kingdoms = mapGen.getKingdomsWithCoordinates();
+                
+                if (kingdoms[character.kingdom]) {
+                    coordinates = kingdoms[character.kingdom].coordinates;
+                    // Mettre à jour en base
+                    await dbManager.updateCharacter(character.id, {
+                        position: coordinates
+                    });
+                }
+            }
+
+            const WorldMapGenerator = require('../utils/WorldMapGenerator');
+            const mapGen = new WorldMapGenerator();
+            const terrain = mapGen.getTerrainAt(coordinates.x, coordinates.y);
+            const nearestKingdom = mapGen.findNearestKingdom(coordinates.x, coordinates.y);
+
+            return {
+                text: `🧭 **POSITION DE ${character.name.toUpperCase()}** 🧭\n\n` +
+                      `📍 **Coordonnées actuelles :** (${coordinates.x}, ${coordinates.y})\n` +
+                      `🌍 **Terrain :** ${this.getTerrainName(terrain)}\n` +
+                      `🏰 **Royaume le plus proche :** ${nearestKingdom.kingdom.name} (${nearestKingdom.distance.toFixed(1)} unités)\n` +
+                      `📍 **Localisation :** ${character.currentLocation}\n\n` +
+                      `🎯 **Commandes de déplacement :**\n` +
+                      `• "Je vais vers (X, Y)" - Déplacement précis\n` +
+                      `• "Je me déplace de 3 vers l'est" - Mouvement relatif\n` +
+                      `• "Je voyage vers ROYAUME" - Déplacement rapide\n\n` +
+                      `⚠️ **Attention :** Chaque terrain a ses dangers !`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur coordonnées:', error);
+            return { text: "❌ Erreur lors de la récupération des coordonnées." };
+        }
+    }
+
+    /**
+     * Convertit un type de terrain en nom lisible
+     */
+    getTerrainName(terrain) {
+        const names = {
+            'ocean': '🌊 Océan',
+            'plains': '🌱 Plaines',
+            'forest': '🌲 Forêt',
+            'desert': '🏜️ Désert',
+            'mountains': '🏔️ Montagnes',
+            'snow': '❄️ Terres Enneigées',
+            'swamp': '🐊 Marais',
+            'volcano': '🌋 Région Volcanique',
+            'jungle': '🌿 Jungle',
+            'wasteland': '💀 Terre Désolée',
+            'eclipse': '🌑 Terre d'Éclipse',
+            'coast': '🏖️ Côte Maritime'
+        };
+        return names[terrain] || '❓ Terrain Inconnu';
+    }
+
+    }
+
+    async handleRegenerateMagicCommand({ player, chatId, dbManager, sock }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            // Démarrer une régénération de magie
+            const regenId = await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
+
+            return { text: '', skipResponse: true };
+
+        } catch (error) {
+            console.error('❌ Erreur régénération magie:', error);
+            return { text: "❌ Erreur lors de la régénération magique." };
+        }
+    }
+
 
             const character = await dbManager.getCharacterByPlayerId(player.id);
             if (!character) {

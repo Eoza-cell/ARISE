@@ -76,6 +76,9 @@ class AdminManager {
      * @returns {boolean}
      */
     isAdmin(userId, phoneNumber = null) {
+        // Vérifier si userId est défini
+        if (!userId) return false;
+        
         // Vérifier l'ID exact
         if (this.adminUsers.includes(userId)) return true;
         
@@ -86,11 +89,15 @@ class AdminManager {
         if (phoneNumber && this.adminUsers.includes(phoneNumber)) return true;
         
         // Vérifier si l'userId correspond à un numéro dans la liste (sans préfixe)
-        const cleanUserId = userId.replace(/[^0-9]/g, '');
-        for (const adminId of this.adminUsers) {
-            const cleanAdminId = adminId.replace(/[^0-9]/g, '');
-            if (cleanAdminId === cleanUserId && cleanUserId.length > 0) {
-                return true;
+        if (typeof userId === 'string') {
+            const cleanUserId = userId.replace(/[^0-9]/g, '');
+            for (const adminId of this.adminUsers) {
+                if (typeof adminId === 'string') {
+                    const cleanAdminId = adminId.replace(/[^0-9]/g, '');
+                    if (cleanAdminId === cleanUserId && cleanUserId.length > 0) {
+                        return true;
+                    }
+                }
             }
         }
         

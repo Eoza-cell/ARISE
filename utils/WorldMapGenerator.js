@@ -1,18 +1,17 @@
-
-
+const sharp = require('sharp');
 const fs = require('fs').promises;
-const { createCanvas, loadImage } = require('canvas');
 const path = require('path');
 
 /**
- * Générateur de carte du monde style Inkarnate
- * Utilise Canvas natif (pas de dépendances externes comme Canva)
+ * Générateur de cartes du monde avancé avec coordonnées fixes X,Y
+ * Utilise Sharp pour la génération d'images de haute qualité
  */
 class WorldMapGenerator {
     constructor() {
         this.mapWidth = 2048;
         this.mapHeight = 1536;
-        this.kingdoms = this.getKingdomsData();
+        this.coordinateSystem = this.initializeCoordinateSystem();
+        this.kingdoms = this.getKingdomsWithCoordinates();
         this.terrainColors = {
             ocean: '#1e3a5f',
             plains: '#8fbc8f',
@@ -27,627 +26,416 @@ class WorldMapGenerator {
             eclipse: '#2f2f2f',
             coast: '#4682b4'
         };
+
+        // Système de coordonnées fixes pour les déplacements
+        this.worldGrid = this.createWorldGrid();
     }
 
     /**
-     * Génère une carte complète du monde avec les 12 royaumes
+     * Initialise le système de coordonnées fixes
      */
-    async generateWorldMap(outputPath = 'temp/world_map.png') {
-        console.log('🗺️ Génération de la carte du monde...');
-        
-        const canvas = createCanvas(this.mapWidth, this.mapHeight);
-        const ctx = canvas.getContext('2d');
-        
-        // 1. Arrière-plan océanique
-        this.drawOceanBackground(ctx);
-        
-        // 2. Générer et dessiner les continents
-        this.drawContinents(ctx);
-        
-        // 3. Placer les 12 royaumes avec leurs territoires
-        await this.drawKingdoms(ctx);
-        
-        // 4. Ajouter les routes commerciales
-        this.drawTradeRoutes(ctx);
-        
-        // 5. Ajouter les éléments géographiques
-        this.drawGeographicalFeatures(ctx);
-        
-        // 6. Ajouter les villes et villages
-        this.drawCitiesAndVillages(ctx);
-        
-        // 7. Ajouter la légende et les ornements
-        this.drawLegendAndOrnaments(ctx);
-        
-        // 8. Sauvegarder la carte
-        const buffer = canvas.toBuffer('image/png');
-        await fs.writeFile(outputPath, buffer);
-        
-        console.log(`✅ Carte du monde générée: ${outputPath}`);
-        return buffer;
-    }
-
-    /**
-     * Dessine l'arrière-plan océanique avec effet de vagues
-     */
-    drawOceanBackground(ctx) {
-        const gradient = ctx.createRadialGradient(
-            this.mapWidth/2, this.mapHeight/2, 0,
-            this.mapWidth/2, this.mapHeight/2, Math.max(this.mapWidth, this.mapHeight)/2
-        );
-        gradient.addColorStop(0, '#2e5984');
-        gradient.addColorStop(1, '#1e3a5f');
-        
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, this.mapWidth, this.mapHeight);
-        
-        // Ajouter des effets de vagues
-        ctx.strokeStyle = '#4682b4';
-        ctx.lineWidth = 2;
-        ctx.globalAlpha = 0.3;
-        
-        for (let i = 0; i < 50; i++) {
-            ctx.beginPath();
-            const y = Math.random() * this.mapHeight;
-            const waveLength = 100 + Math.random() * 200;
-            
-            for (let x = 0; x < this.mapWidth; x += 10) {
-                const waveY = y + Math.sin((x / waveLength) * Math.PI * 2) * 10;
-                if (x === 0) ctx.moveTo(x, waveY);
-                else ctx.lineTo(x, waveY);
+    initializeCoordinateSystem() {
+        return {
+            gridSize: 64, // Grille 64x64 pour les déplacements
+            pixelScale: 32, // 1 coordonnée = 32 pixels
+            origin: { x: 1024, y: 768 }, // Centre de la carte
+            bounds: {
+                minX: -32,
+                maxX: 32,
+                minY: -24,
+                maxY: 24
             }
-            ctx.stroke();
-        }
-        
-        ctx.globalAlpha = 1;
-    }
-
-    /**
-     * Dessine les continents principaux
-     */
-    drawContinents(ctx) {
-        // Continent principal (centre)
-        this.drawLandmass(ctx, this.mapWidth * 0.3, this.mapHeight * 0.2, 800, 600, '#8fbc8f');
-        
-        // Continent nord (montagnes)
-        this.drawLandmass(ctx, this.mapWidth * 0.1, this.mapHeight * 0.05, 400, 200, '#696969');
-        
-        // Continent sud (jungle)
-        this.drawLandmass(ctx, this.mapWidth * 0.6, this.mapHeight * 0.7, 500, 300, '#006400');
-        
-        // Îles diverses
-        for (let i = 0; i < 15; i++) {
-            const x = Math.random() * this.mapWidth;
-            const y = Math.random() * this.mapHeight;
-            const size = 20 + Math.random() * 80;
-            this.drawIsland(ctx, x, y, size);
-        }
-    }
-
-    /**
-     * Dessine une masse terrestre organique
-     */
-    drawLandmass(ctx, x, y, width, height, color) {
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        
-        const points = 20;
-        const centerX = x + width / 2;
-        const centerY = y + height / 2;
-        
-        for (let i = 0; i <= points; i++) {
-            const angle = (i / points) * Math.PI * 2;
-            const radiusX = (width / 2) * (0.7 + Math.random() * 0.6);
-            const radiusY = (height / 2) * (0.7 + Math.random() * 0.6);
-            
-            const pointX = centerX + Math.cos(angle) * radiusX;
-            const pointY = centerY + Math.sin(angle) * radiusY;
-            
-            if (i === 0) ctx.moveTo(pointX, pointY);
-            else ctx.lineTo(pointX, pointY);
-        }
-        
-        ctx.closePath();
-        ctx.fill();
-        
-        // Ajouter des détails côtiers
-        ctx.strokeStyle = '#4682b4';
-        ctx.lineWidth = 3;
-        ctx.stroke();
-    }
-
-    /**
-     * Dessine une île
-     */
-    drawIsland(ctx, x, y, radius) {
-        ctx.fillStyle = '#8fbc8f';
-        ctx.beginPath();
-        
-        const points = 8;
-        for (let i = 0; i <= points; i++) {
-            const angle = (i / points) * Math.PI * 2;
-            const r = radius * (0.8 + Math.random() * 0.4);
-            const pointX = x + Math.cos(angle) * r;
-            const pointY = y + Math.sin(angle) * r;
-            
-            if (i === 0) ctx.moveTo(pointX, pointY);
-            else ctx.lineTo(pointX, pointY);
-        }
-        
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    /**
-     * Dessine les territoires des 12 royaumes
-     */
-    async drawKingdoms(ctx) {
-        const kingdomPositions = this.getKingdomPositions();
-        
-        for (const [kingdomId, data] of Object.entries(this.kingdoms)) {
-            const position = kingdomPositions[kingdomId];
-            if (!position) continue;
-            
-            // Dessiner le territoire du royaume
-            this.drawKingdomTerritory(ctx, position, data);
-            
-            // Ajouter le nom et symbole
-            this.drawKingdomLabel(ctx, position, data);
-        }
-    }
-
-    /**
-     * Dessine le territoire d'un royaume
-     */
-    drawKingdomTerritory(ctx, position, kingdomData) {
-        const { x, y, size } = position;
-        const color = this.getKingdomColor(kingdomData.terrain);
-        
-        // Territoire principal
-        ctx.fillStyle = color;
-        ctx.globalAlpha = 0.7;
-        
-        ctx.beginPath();
-        const points = 12;
-        for (let i = 0; i <= points; i++) {
-            const angle = (i / points) * Math.PI * 2;
-            const radius = size * (0.8 + Math.random() * 0.4);
-            const pointX = x + Math.cos(angle) * radius;
-            const pointY = y + Math.sin(angle) * radius;
-            
-            if (i === 0) ctx.moveTo(pointX, pointY);
-            else ctx.lineTo(pointX, pointY);
-        }
-        ctx.closePath();
-        ctx.fill();
-        
-        // Bordure du royaume
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 2;
-        ctx.globalAlpha = 1;
-        ctx.stroke();
-    }
-
-    /**
-     * Dessine le label d'un royaume
-     */
-    drawKingdomLabel(ctx, position, kingdomData) {
-        const { x, y } = position;
-        
-        // Fond pour le texte
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
-        ctx.fillRect(x - 60, y - 15, 120, 30);
-        
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x - 60, y - 15, 120, 30);
-        
-        // Nom du royaume
-        ctx.fillStyle = '#000000';
-        ctx.font = 'bold 14px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(kingdomData.name, x, y + 5);
-        
-        // Symbole/Emblème
-        this.drawKingdomSymbol(ctx, x, y - 40, kingdomData.id);
-    }
-
-    /**
-     * Dessine le symbole d'un royaume
-     */
-    drawKingdomSymbol(ctx, x, y, kingdomId) {
-        const symbols = {
-            'AEGYRIA': '⚔️',
-            'SOMBRENUIT': '🌙',
-            'KHELOS': '🏜️',
-            'ABRANTIS': '⚓',
-            'VARHA': '🏔️',
-            'SYLVARIA': '🌲',
-            'ECLYPSIA': '🌑',
-            'TERRE_DESOLE': '💀',
-            'DRAK_TARR': '🌋',
-            'URVALA': '🧪',
-            'OMBREFIEL': '⚔️',
-            'KHALDAR': '🌿'
         };
-        
-        ctx.font = '24px serif';
-        ctx.fillText(symbols[kingdomId] || '🏰', x, y);
     }
 
     /**
-     * Dessine les routes commerciales
+     * Crée la grille de monde avec types de terrain
      */
-    drawTradeRoutes(ctx) {
-        ctx.strokeStyle = '#8b4513';
-        ctx.lineWidth = 3;
-        ctx.setLineDash([10, 5]);
-        
-        const positions = this.getKingdomPositions();
+    createWorldGrid() {
+        const grid = {};
+        const { bounds } = this.coordinateSystem;
+
+        for (let x = bounds.minX; x <= bounds.maxX; x++) {
+            for (let y = bounds.minY; y <= bounds.maxY; y++) {
+                grid[`${x},${y}`] = this.determineTerrainType(x, y);
+            }
+        }
+
+        return grid;
+    }
+
+    /**
+     * Détermine le type de terrain selon les coordonnées
+     */
+    determineTerrainType(x, y) {
+        // Distance du centre
+        const distance = Math.sqrt(x * x + y * y);
+
+        // Logique pour déterminer le terrain
+        if (distance > 28) return 'ocean';
+        if (distance > 25) return 'coast';
+        if (Math.abs(x) > 20 && y < -10) return 'desert';
+        if (y > 15) return 'snow';
+        if (y < -15) return 'wasteland';
+        if (Math.abs(x) > 15) return 'mountains';
+        if (distance < 8) return 'plains';
+        if (x < -10 && y > 5) return 'forest';
+        if (x > 10 && y > 5) return 'jungle';
+        if (y < -5 && Math.abs(x) < 10) return 'swamp';
+
+        return 'plains';
+    }
+
+    /**
+     * Convertit les coordonnées du monde en pixels
+     */
+    worldToPixel(worldX, worldY) {
+        const { origin, pixelScale } = this.coordinateSystem;
+        return {
+            x: origin.x + (worldX * pixelScale),
+            y: origin.y - (worldY * pixelScale) // Y inversé pour l'affichage
+        };
+    }
+
+    /**
+     * Convertit les pixels en coordonnées du monde
+     */
+    pixelToWorld(pixelX, pixelY) {
+        const { origin, pixelScale } = this.coordinateSystem;
+        return {
+            x: Math.round((pixelX - origin.x) / pixelScale),
+            y: Math.round((origin.y - pixelY) / pixelScale)
+        };
+    }
+
+    /**
+     * Obtient les royaumes avec leurs coordonnées fixes
+     */
+    getKingdomsWithCoordinates() {
+        return {
+            'AEGYRIA': {
+                name: 'Aegyria',
+                coordinates: { x: 0, y: 0 },
+                terrain: 'plains',
+                capital: 'Valorhall',
+                size: 4
+            },
+            'SOMBRENUIT': {
+                name: 'Sombrenuit',
+                coordinates: { x: -8, y: 8 },
+                terrain: 'forest',
+                capital: 'Lunelame',
+                size: 3
+            },
+            'KHELOS': {
+                name: 'Khelos',
+                coordinates: { x: 15, y: -12 },
+                terrain: 'desert',
+                capital: 'Sablesang',
+                size: 5
+            },
+            'ABRANTIS': {
+                name: 'Abrantis',
+                coordinates: { x: 20, y: 5 },
+                terrain: 'coast',
+                capital: 'Port-Haute-Marée',
+                size: 4
+            },
+            'VARHA': {
+                name: 'Varha',
+                coordinates: { x: -12, y: 18 },
+                terrain: 'snow',
+                capital: 'Glacierre',
+                size: 3
+            },
+            'SYLVARIA': {
+                name: 'Sylvaria',
+                coordinates: { x: 12, y: 10 },
+                terrain: 'jungle',
+                capital: 'Cercle des Anciens',
+                size: 4
+            },
+            'ECLYPSIA': {
+                name: 'Eclypsia',
+                coordinates: { x: -15, y: -8 },
+                terrain: 'eclipse',
+                capital: 'Temple Eclipse',
+                size: 3
+            },
+            'TERRE_DESOLE': {
+                name: 'Terre Désolée',
+                coordinates: { x: 8, y: -18 },
+                terrain: 'wasteland',
+                capital: 'Camp Survivants',
+                size: 6
+            },
+            'DRAK_TARR': {
+                name: 'Drak-Tarr',
+                coordinates: { x: -20, y: -15 },
+                terrain: 'volcano',
+                capital: 'Forge Volcanique',
+                size: 4
+            },
+            'URVALA': {
+                name: 'Urvala',
+                coordinates: { x: -5, y: -10 },
+                terrain: 'swamp',
+                capital: 'Labo des Morts',
+                size: 3
+            },
+            'OMBREFIEL': {
+                name: 'Ombrefiel',
+                coordinates: { x: 5, y: -5 },
+                terrain: 'plains',
+                capital: 'Citadelle Exilés',
+                size: 3
+            },
+            'KHALDAR': {
+                name: 'Khaldar',
+                coordinates: { x: 18, y: -5 },
+                terrain: 'jungle',
+                capital: 'Village Pilotis',
+                size: 4
+            }
+        };
+    }
+
+    /**
+     * Génère une carte du monde de haute qualité
+     */
+    async generateWorldMap(outputPath = 'temp/world_map_advanced.png') {
+        console.log('🗺️ Génération carte du monde avec coordonnées fixes...');
+
+        try {
+            // Créer l'image de base
+            const baseImage = await this.createBaseTerrainMap();
+
+            // Ajouter les royaumes
+            const mapWithKingdoms = await this.addKingdomsToMap(baseImage);
+
+            // Ajouter la grille de coordonnées
+            const mapWithGrid = await this.addCoordinateGrid(mapWithKingdoms);
+
+            // Ajouter les routes et POI
+            const finalMap = await this.addRoutesAndPOI(mapWithGrid);
+
+            // Sauvegarder
+            await finalMap.png().toFile(outputPath);
+
+            console.log(`✅ Carte avancée générée: ${outputPath}`);
+            const buffer = await finalMap.png().toBuffer();
+
+            return buffer;
+
+        } catch (error) {
+            console.error('❌ Erreur génération carte avancée:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Crée la carte de terrain de base
+     */
+    async createBaseTerrainMap() {
+        // Créer une image SVG pour le terrain
+        const svgTerrain = this.generateTerrainSVG();
+
+        return sharp(Buffer.from(svgTerrain))
+            .resize(this.mapWidth, this.mapHeight)
+            .png();
+    }
+
+    /**
+     * Génère le SVG du terrain
+     */
+    generateTerrainSVG() {
+        let svg = `<svg width="${this.mapWidth}" height="${this.mapHeight}" xmlns="http://www.w3.org/2000/svg">`;
+
+        // Fond océanique
+        svg += `<rect width="100%" height="100%" fill="${this.terrainColors.ocean}"/>`;
+
+        // Ajouter les zones de terrain
+        const { bounds, pixelScale } = this.coordinateSystem;
+
+        for (let x = bounds.minX; x <= bounds.maxX; x++) {
+            for (let y = bounds.minY; y <= bounds.maxY; y++) {
+                const terrain = this.worldGrid[`${x},${y}`];
+                if (terrain === 'ocean') continue;
+
+                const pixel = this.worldToPixel(x, y);
+                const color = this.terrainColors[terrain];
+
+                svg += `<rect x="${pixel.x - pixelScale/2}" y="${pixel.y - pixelScale/2}"
+                        width="${pixelScale}" height="${pixelScale}"
+                        fill="${color}" opacity="0.8"/>`;
+            }
+        }
+
+        svg += '</svg>';
+        return svg;
+    }
+
+    /**
+     * Ajoute les royaumes à la carte
+     */
+    async addKingdomsToMap(baseImage) {
+        let kingdomsSVG = '<svg width="2048" height="1536" xmlns="http://www.w3.org/2000/svg">';
+
+        Object.entries(this.kingdoms).forEach(([id, kingdom]) => {
+            const pixel = this.worldToPixel(kingdom.coordinates.x, kingdom.coordinates.y);
+            const radius = kingdom.size * this.coordinateSystem.pixelScale / 2;
+
+            // Territoire du royaume
+            kingdomsSVG += `<circle cx="${pixel.x}" cy="${pixel.y}" r="${radius}"
+                            fill="${this.terrainColors[kingdom.terrain]}"
+                            opacity="0.6" stroke="#000" stroke-width="2"/>`;
+
+            // Nom du royaume
+            kingdomsSVG += `<text x="${pixel.x}" y="${pixel.y + 5}"
+                            text-anchor="middle" font-family="Arial" font-size="14"
+                            font-weight="bold" fill="#000">${kingdom.name}</text>`;
+
+            // Coordonnées
+            kingdomsSVG += `<text x="${pixel.x}" y="${pixel.y + 25}"
+                            text-anchor="middle" font-family="Arial" font-size="10"
+                            fill="#666">(${kingdom.coordinates.x}, ${kingdom.coordinates.y})</text>`;
+        });
+
+        kingdomsSVG += '</svg>';
+
+        const kingdomsOverlay = sharp(Buffer.from(kingdomsSVG));
+
+        return sharp(await baseImage.png().toBuffer())
+            .composite([{ input: await kingdomsOverlay.png().toBuffer() }]);
+    }
+
+    /**
+     * Ajoute la grille de coordonnées
+     */
+    async addCoordinateGrid(mapImage) {
+        let gridSVG = '<svg width="2048" height="1536" xmlns="http://www.w3.org/2000/svg">';
+
+        const { bounds, pixelScale } = this.coordinateSystem;
+
+        // Lignes verticales
+        for (let x = bounds.minX; x <= bounds.maxX; x += 5) {
+            const startPixel = this.worldToPixel(x, bounds.minY);
+            const endPixel = this.worldToPixel(x, bounds.maxY);
+
+            gridSVG += `<line x1="${startPixel.x}" y1="${startPixel.y}"
+                        x2="${endPixel.x}" y2="${endPixel.y}"
+                        stroke="#333" stroke-width="1" opacity="0.3"/>`;
+
+            // Labels X
+            if (x % 10 === 0) {
+                gridSVG += `<text x="${startPixel.x}" y="${endPixel.y + 15}"
+                            text-anchor="middle" font-family="Arial" font-size="12"
+                            fill="#333">${x}</text>`;
+            }
+        }
+
+        // Lignes horizontales
+        for (let y = bounds.minY; y <= bounds.maxY; y += 5) {
+            const startPixel = this.worldToPixel(bounds.minX, y);
+            const endPixel = this.worldToPixel(bounds.maxX, y);
+
+            gridSVG += `<line x1="${startPixel.x}" y1="${startPixel.y}"
+                        x2="${endPixel.x}" y2="${endPixel.y}"
+                        stroke="#333" stroke-width="1" opacity="0.3"/>`;
+
+            // Labels Y
+            if (y % 10 === 0) {
+                gridSVG += `<text x="${startPixel.x - 15}" y="${startPixel.y + 5}"
+                            text-anchor="middle" font-family="Arial" font-size="12"
+                            fill="#333">${y}</text>`;
+            }
+        }
+
+        gridSVG += '</svg>';
+
+        const gridOverlay = sharp(Buffer.from(gridSVG));
+
+        return sharp(await mapImage.png().toBuffer())
+            .composite([{ input: await gridOverlay.png().toBuffer() }]);
+    }
+
+    /**
+     * Ajoute les routes et points d'intérêt
+     */
+    async addRoutesAndPOI(mapImage) {
+        let routesSVG = '<svg width="2048" height="1536" xmlns="http://www.w3.org/2000/svg">';
+
+        // Routes commerciales
         const routes = [
             ['AEGYRIA', 'SOMBRENUIT'],
             ['AEGYRIA', 'ABRANTIS'],
             ['KHELOS', 'DRAK_TARR'],
-            ['VARHA', 'SYLVARIA'],
-            ['ECLYPSIA', 'URVALA'],
-            ['OMBREFIEL', 'KHALDAR']
+            ['VARHA', 'SYLVARIA']
         ];
-        
+
         routes.forEach(([from, to]) => {
-            const fromPos = positions[from];
-            const toPos = positions[to];
-            if (fromPos && toPos) {
-                ctx.beginPath();
-                ctx.moveTo(fromPos.x, fromPos.y);
-                ctx.lineTo(toPos.x, toPos.y);
-                ctx.stroke();
+            const fromKingdom = this.kingdoms[from];
+            const toKingdom = this.kingdoms[to];
+
+            const startPixel = this.worldToPixel(fromKingdom.coordinates.x, fromKingdom.coordinates.y);
+            const endPixel = this.worldToPixel(toKingdom.coordinates.x, toKingdom.coordinates.y);
+
+            routesSVG += `<line x1="${startPixel.x}" y1="${startPixel.y}"
+                          x2="${endPixel.x}" y2="${endPixel.y}"
+                          stroke="#8B4513" stroke-width="3" stroke-dasharray="10,5"/>`;
+        });
+
+        // Légende
+        routesSVG += `<rect x="50" y="50" width="300" height="150" fill="rgba(255,255,255,0.9)" stroke="#000"/>`;
+        routesSVG += `<text x="70" y="80" font-family="Arial" font-size="16" font-weight="bold">FRICTION ULTIMATE</text>`;
+        routesSVG += `<text x="70" y="100" font-family="Arial" font-size="12">Système de coordonnées X,Y</text>`;
+        routesSVG += `<text x="70" y="120" font-family="Arial" font-size="10">🏰 Royaumes avec positions fixes</text>`;
+        routesSVG += `<text x="70" y="135" font-family="Arial" font-size="10">--- Routes commerciales</text>`;
+        routesSVG += `<text x="70" y="150" font-family="Arial" font-size="10">📍 Grille de déplacement</text>`;
+
+        routesSVG += '</svg>';
+
+        const routesOverlay = sharp(Buffer.from(routesSVG));
+
+        return sharp(await mapImage.png().toBuffer())
+            .composite([{ input: await routesOverlay.png().toBuffer() }]);
+    }
+
+    /**
+     * Obtient le terrain à des coordonnées spécifiques
+     */
+    getTerrainAt(x, y) {
+        return this.worldGrid[`${x},${y}`] || 'ocean';
+    }
+
+    /**
+     * Vérifie si des coordonnées sont valides
+     */
+    isValidCoordinate(x, y) {
+        const { bounds } = this.coordinateSystem;
+        return x >= bounds.minX && x <= bounds.maxX && y >= bounds.minY && y <= bounds.maxY;
+    }
+
+    /**
+     * Trouve le royaume le plus proche de coordonnées données
+     */
+    findNearestKingdom(x, y) {
+        let nearest = null;
+        let minDistance = Infinity;
+
+        Object.entries(this.kingdoms).forEach(([id, kingdom]) => {
+            const distance = Math.sqrt(
+                Math.pow(x - kingdom.coordinates.x, 2) +
+                Math.pow(y - kingdom.coordinates.y, 2)
+            );
+
+            if (distance < minDistance) {
+                minDistance = distance;
+                nearest = { id, kingdom, distance };
             }
         });
-        
-        ctx.setLineDash([]);
-    }
 
-    /**
-     * Dessine les caractéristiques géographiques
-     */
-    drawGeographicalFeatures(ctx) {
-        // Chaînes de montagnes
-        this.drawMountainRange(ctx, 100, 150, 400, 'Monts du Nord');
-        this.drawMountainRange(ctx, 1400, 800, 300, 'Pics du Dragon');
-        
-        // Rivières
-        this.drawRiver(ctx, 500, 200, 800, 600);
-        this.drawRiver(ctx, 1200, 300, 1600, 900);
-        
-        // Forêts
-        this.drawForest(ctx, 600, 400, 200);
-        this.drawForest(ctx, 1100, 600, 150);
-    }
-
-    /**
-     * Dessine une chaîne de montagnes
-     */
-    drawMountainRange(ctx, x, y, length, name) {
-        ctx.fillStyle = '#696969';
-        
-        for (let i = 0; i < length; i += 20) {
-            const peakX = x + i;
-            const peakY = y + Math.sin(i * 0.1) * 30;
-            const height = 40 + Math.random() * 60;
-            
-            // Dessiner un pic
-            ctx.beginPath();
-            ctx.moveTo(peakX, peakY);
-            ctx.lineTo(peakX - 15, peakY + height);
-            ctx.lineTo(peakX + 15, peakY + height);
-            ctx.closePath();
-            ctx.fill();
-            
-            // Neige sur le sommet
-            ctx.fillStyle = '#ffffff';
-            ctx.beginPath();
-            ctx.moveTo(peakX, peakY);
-            ctx.lineTo(peakX - 8, peakY + 15);
-            ctx.lineTo(peakX + 8, peakY + 15);
-            ctx.closePath();
-            ctx.fill();
-            
-            ctx.fillStyle = '#696969';
-        }
-        
-        // Nom de la chaîne
-        ctx.fillStyle = '#000000';
-        ctx.font = '12px serif';
-        ctx.fillText(name, x, y - 10);
-    }
-
-    /**
-     * Dessine une rivière
-     */
-    drawRiver(ctx, startX, startY, endX, endY) {
-        ctx.strokeStyle = '#4169e1';
-        ctx.lineWidth = 8;
-        ctx.lineCap = 'round';
-        
-        ctx.beginPath();
-        ctx.moveTo(startX, startY);
-        
-        const segments = 20;
-        for (let i = 1; i <= segments; i++) {
-            const t = i / segments;
-            const x = startX + (endX - startX) * t + Math.sin(t * Math.PI * 4) * 50;
-            const y = startY + (endY - startY) * t + Math.cos(t * Math.PI * 6) * 30;
-            ctx.lineTo(x, y);
-        }
-        
-        ctx.stroke();
-    }
-
-    /**
-     * Dessine une forêt
-     */
-    drawForest(ctx, centerX, centerY, radius) {
-        ctx.fillStyle = '#228b22';
-        
-        for (let i = 0; i < 30; i++) {
-            const angle = Math.random() * Math.PI * 2;
-            const distance = Math.random() * radius;
-            const x = centerX + Math.cos(angle) * distance;
-            const y = centerY + Math.sin(angle) * distance;
-            
-            // Dessiner un arbre simple
-            ctx.beginPath();
-            ctx.arc(x, y, 5 + Math.random() * 8, 0, Math.PI * 2);
-            ctx.fill();
-        }
-    }
-
-    /**
-     * Dessine les villes et villages
-     */
-    drawCitiesAndVillages(ctx) {
-        const positions = this.getKingdomPositions();
-        
-        Object.entries(positions).forEach(([kingdomId, pos]) => {
-            // Capitale (plus grande)
-            this.drawCity(ctx, pos.x, pos.y, 'capitale', this.kingdoms[kingdomId].capital);
-            
-            // Villages satellites
-            for (let i = 0; i < 3; i++) {
-                const angle = (Math.PI * 2 * i) / 3;
-                const distance = 80 + Math.random() * 40;
-                const villageX = pos.x + Math.cos(angle) * distance;
-                const villageY = pos.y + Math.sin(angle) * distance;
-                this.drawCity(ctx, villageX, villageY, 'village', `Village ${i + 1}`);
-            }
-        });
-    }
-
-    /**
-     * Dessine une ville ou village
-     */
-    drawCity(ctx, x, y, type, name) {
-        const size = type === 'capitale' ? 12 : 6;
-        const color = type === 'capitale' ? '#ffd700' : '#8b4513';
-        
-        // Icône de la ville
-        ctx.fillStyle = color;
-        ctx.fillRect(x - size/2, y - size/2, size, size);
-        
-        ctx.strokeStyle = '#000000';
-        ctx.lineWidth = 1;
-        ctx.strokeRect(x - size/2, y - size/2, size, size);
-        
-        // Nom (seulement pour les capitales)
-        if (type === 'capitale') {
-            ctx.fillStyle = '#000000';
-            ctx.font = '10px serif';
-            ctx.fillText(name, x + 15, y + 3);
-        }
-    }
-
-    /**
-     * Dessine la légende et les ornements
-     */
-    drawLegendAndOrnaments(ctx) {
-        // Cadre décoratif
-        ctx.strokeStyle = '#8b4513';
-        ctx.lineWidth = 8;
-        ctx.strokeRect(10, 10, this.mapWidth - 20, this.mapHeight - 20);
-        
-        // Titre
-        ctx.fillStyle = '#8b0000';
-        ctx.font = 'bold 32px serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('FRICTION ULTIMATE', this.mapWidth / 2, 60);
-        ctx.fillText('Carte du Monde des 12 Royaumes', this.mapWidth / 2, 100);
-        
-        // Rose des vents
-        this.drawCompassRose(ctx, this.mapWidth - 150, 150);
-        
-        // Légende des symboles
-        this.drawLegend(ctx, 50, this.mapHeight - 200);
-    }
-
-    /**
-     * Dessine une rose des vents
-     */
-    drawCompassRose(ctx, centerX, centerY) {
-        const radius = 60;
-        
-        // Cercle principal
-        ctx.strokeStyle = '#8b4513';
-        ctx.lineWidth = 3;
-        ctx.beginPath();
-        ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-        ctx.stroke();
-        
-        // Points cardinaux
-        const directions = ['N', 'E', 'S', 'O'];
-        const angles = [0, Math.PI/2, Math.PI, 3*Math.PI/2];
-        
-        directions.forEach((dir, i) => {
-            const angle = angles[i] - Math.PI/2;
-            const x = centerX + Math.cos(angle) * (radius + 20);
-            const y = centerY + Math.sin(angle) * (radius + 20);
-            
-            ctx.fillStyle = '#8b0000';
-            ctx.font = 'bold 16px serif';
-            ctx.textAlign = 'center';
-            ctx.fillText(dir, x, y + 5);
-        });
-        
-        // Flèche Nord
-        ctx.fillStyle = '#8b0000';
-        ctx.beginPath();
-        ctx.moveTo(centerX, centerY - radius + 10);
-        ctx.lineTo(centerX - 8, centerY - radius + 25);
-        ctx.lineTo(centerX + 8, centerY - radius + 25);
-        ctx.closePath();
-        ctx.fill();
-    }
-
-    /**
-     * Dessine la légende
-     */
-    drawLegend(ctx, x, y) {
-        // Fond de la légende
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-        ctx.fillRect(x, y, 300, 150);
-        ctx.strokeStyle = '#000000';
-        ctx.strokeRect(x, y, 300, 150);
-        
-        // Titre
-        ctx.fillStyle = '#8b0000';
-        ctx.font = 'bold 16px serif';
-        ctx.textAlign = 'left';
-        ctx.fillText('LÉGENDE', x + 10, y + 25);
-        
-        // Éléments de la légende
-        const legendItems = [
-            { symbol: '🏰', text: 'Capitales des Royaumes' },
-            { symbol: '🏘️', text: 'Villages et Villes' },
-            { symbol: '🏔️', text: 'Chaînes de Montagnes' },
-            { symbol: '🌊', text: 'Rivières et Lacs' },
-            { symbol: '🌲', text: 'Forêts Denses' },
-            { symbol: '---', text: 'Routes Commerciales' }
-        ];
-        
-        ctx.fillStyle = '#000000';
-        ctx.font = '12px serif';
-        
-        legendItems.forEach((item, i) => {
-            const itemY = y + 50 + (i * 18);
-            ctx.fillText(item.symbol, x + 15, itemY);
-            ctx.fillText(item.text, x + 40, itemY);
-        });
-    }
-
-    /**
-     * Retourne les données des royaumes
-     */
-    getKingdomsData() {
-        return {
-            'AEGYRIA': { 
-                name: 'Aegyria', 
-                terrain: 'plains', 
-                capital: 'Valorhall',
-                id: 'AEGYRIA'
-            },
-            'SOMBRENUIT': { 
-                name: 'Sombrenuit', 
-                terrain: 'forest', 
-                capital: 'Lunelame',
-                id: 'SOMBRENUIT'
-            },
-            'KHELOS': { 
-                name: 'Khelos', 
-                terrain: 'desert', 
-                capital: 'Sablesang',
-                id: 'KHELOS'
-            },
-            'ABRANTIS': { 
-                name: 'Abrantis', 
-                terrain: 'coast', 
-                capital: 'Port-Haute-Marée',
-                id: 'ABRANTIS'
-            },
-            'VARHA': { 
-                name: 'Varha', 
-                terrain: 'snow', 
-                capital: 'Glacierre',
-                id: 'VARHA'
-            },
-            'SYLVARIA': { 
-                name: 'Sylvaria', 
-                terrain: 'jungle', 
-                capital: 'Cercle des Anciens',
-                id: 'SYLVARIA'
-            },
-            'ECLYPSIA': { 
-                name: 'Eclypsia', 
-                terrain: 'eclipse', 
-                capital: 'Temple Eclipse',
-                id: 'ECLYPSIA'
-            },
-            'TERRE_DESOLE': { 
-                name: 'Terre Désolée', 
-                terrain: 'wasteland', 
-                capital: 'Camp Survivants',
-                id: 'TERRE_DESOLE'
-            },
-            'DRAK_TARR': { 
-                name: 'Drak-Tarr', 
-                terrain: 'volcano', 
-                capital: 'Forge Volcanique',
-                id: 'DRAK_TARR'
-            },
-            'URVALA': { 
-                name: 'Urvala', 
-                terrain: 'swamp', 
-                capital: 'Labo des Morts',
-                id: 'URVALA'
-            },
-            'OMBREFIEL': { 
-                name: 'Ombrefiel', 
-                terrain: 'plains', 
-                capital: 'Citadelle Exilés',
-                id: 'OMBREFIEL'
-            },
-            'KHALDAR': { 
-                name: 'Khaldar', 
-                terrain: 'jungle', 
-                capital: 'Village Pilotis',
-                id: 'KHALDAR'
-            }
-        };
-    }
-
-    /**
-     * Retourne les positions des royaumes sur la carte
-     */
-    getKingdomPositions() {
-        return {
-            'AEGYRIA': { x: 500, y: 300, size: 100 },
-            'SOMBRENUIT': { x: 300, y: 200, size: 90 },
-            'KHELOS': { x: 1200, y: 400, size: 110 },
-            'ABRANTIS': { x: 700, y: 500, size: 95 },
-            'VARHA': { x: 200, y: 150, size: 85 },
-            'SYLVARIA': { x: 800, y: 250, size: 100 },
-            'ECLYPSIA': { x: 1000, y: 600, size: 90 },
-            'TERRE_DESOLE': { x: 1400, y: 200, size: 120 },
-            'DRAK_TARR': { x: 1500, y: 800, size: 95 },
-            'URVALA': { x: 400, y: 700, size: 85 },
-            'OMBREFIEL': { x: 900, y: 800, size: 90 },
-            'KHALDAR': { x: 1200, y: 1000, size: 100 }
-        };
-    }
-
-    /**
-     * Retourne la couleur selon le terrain
-     */
-    getKingdomColor(terrain) {
-        return this.terrainColors[terrain] || this.terrainColors.plains;
+        return nearest;
     }
 }
 
