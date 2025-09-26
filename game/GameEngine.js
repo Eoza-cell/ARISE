@@ -3,6 +3,10 @@ const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
 const GeminiClient = require('../gemini/GeminiClient');
 const AdvancedGameMechanics = require('./AdvancedMechanics');
+const LoadingBarManager = require('../utils/LoadingBarManager');
+const AncientAlphabetManager = require('../utils/AncientAlphabetManager');
+const AdminManager = require('../utils/AdminManager');
+const NarrationImageManager = require('../utils/NarrationImageManager');
 const path = require('path');
 
 class GameEngine {
@@ -22,6 +26,12 @@ class GameEngine {
         this.geminiClient = new GeminiClient();
         this.advancedMechanics = new AdvancedGameMechanics(this.dbManager, this);
         this.characterCustomization = null;
+
+        // Nouveaux systèmes intégrés
+        this.loadingBarManager = new LoadingBarManager();
+        this.ancientAlphabetManager = new AncientAlphabetManager();
+        this.adminManager = new AdminManager();
+        this.narrationImageManager = new NarrationImageManager();
 
         this.commandHandlers = {
             '/menu': this.handleMenuCommand.bind(this),
@@ -47,7 +57,33 @@ class GameEngine {
             '/meteo': this.handleWeatherCommand.bind(this),
             '/marché': this.handleMarketCommand.bind(this),
             '/factions': this.handleFactionsCommand.bind(this),
-            '/defis': this.handleChallengesCommand.bind(this)
+            '/defis': this.handleChallengesCommand.bind(this),
+            
+            // Commandes pour les sorts avec alphabet ancien
+            '/sort': this.handleSpellCommand.bind(this),
+            '/sorts': this.handleSpellbookCommand.bind(this),
+            '/lancer': this.handleCastSpellCommand.bind(this),
+            '/grimoire': this.handleSpellbookCommand.bind(this),
+            '/apprendre': this.handleLearnSpellCommand.bind(this),
+            
+            // Commandes d'administration (réservées aux admins)
+            '/admin_stats': this.handleAdminStatsCommand.bind(this),
+            '/admin_give': this.handleAdminGiveCommand.bind(this),
+            '/admin_level': this.handleAdminLevelCommand.bind(this),
+            '/admin_teleport': this.handleAdminTeleportCommand.bind(this),
+            '/admin_heal': this.handleAdminHealCommand.bind(this),
+            '/admin_power': this.handleAdminPowerCommand.bind(this),
+            '/admin_time': this.handleAdminTimeCommand.bind(this),
+            '/admin_weather': this.handleAdminWeatherCommand.bind(this),
+            '/admin_event': this.handleAdminEventCommand.bind(this),
+            '/admin_kingdom': this.handleAdminKingdomCommand.bind(this),
+            '/admin_groups': this.handleAdminGroupsCommand.bind(this),
+            '/admin_reset_kingdom': this.handleAdminResetKingdomCommand.bind(this),
+            '/admin_debug': this.handleAdminDebugCommand.bind(this),
+            '/admin_backup': this.handleAdminBackupCommand.bind(this),
+            '/admin_reload': this.handleAdminReloadCommand.bind(this),
+            '/admin_announce': this.handleAdminAnnounceCommand.bind(this),
+            '/admin_help': this.handleAdminHelpCommand.bind(this)
         };
     }
 
@@ -1950,6 +1986,481 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                       `Une erreur s'est produite lors de la configuration.\n\n` +
                       `Veuillez réessayer ou contactez un administrateur.`
             };
+        }
+    }
+
+    // ===========================================
+    // NOUVELLES MÉTHODES POUR LES SORTS ET L'ALPHABET ANCIEN
+    // ===========================================
+
+    /**
+     * Affiche les détails d'un sort spécifique
+     */
+    async handleSpellCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
+                return {
+                    text: `📚 **CONSULTATION DE SORT** 📚
+
+💡 Usage: \`/sort [nom du sort]\`
+
+Exemples:
+• \`/sort boule de feu\`
+• \`/sort ⫷⧉⩚⧃⧇ ⟁✦ ⫷✦⪦\` (alphabet ancien)
+
+📖 Tapez \`/sorts\` pour voir votre grimoire complet.`
+                };
+            }
+
+            const spellInput = args.join(' ');
+            const parsedInput = this.ancientAlphabetManager.parseSpellInput(spellInput);
+            
+            // Simulation d'un sort - dans la vraie version, cela viendrait de la base de données
+            const mockSpell = {
+                name: parsedInput.modern,
+                type: 'fire',
+                level: 3,
+                description: 'Lance une boule de feu dévastatrice sur vos ennemis.',
+                manaCost: 25,
+                damage: 45,
+                effect: 'Brûlure pendant 3 tours'
+            };
+
+            const spellDisplay = this.ancientAlphabetManager.createSpellDisplay(mockSpell);
+            
+            return {
+                text: spellDisplay,
+                image: null
+            };
+        } catch (error) {
+            console.error('❌ Erreur sort:', error);
+            return { text: '❌ Erreur lors de la consultation du sort.' };
+        }
+    }
+
+    /**
+     * Affiche le grimoire du joueur avec tous ses sorts
+     */
+    async handleSpellbookCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
+            if (!player) {
+                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
+            }
+
+            const character = await dbManager.getCharacterByPlayerId(player.id);
+            if (!character) {
+                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
+            }
+
+            // Simulation des sorts appris - dans la vraie version, cela viendrait de la base de données
+            const learnedSpells = [
+                { name: 'Boule de Feu', type: 'fire', level: 2, manaCost: 20 },
+                { name: 'Éclair Mystique', type: 'lightning', level: 1, manaCost: 15 },
+                { name: 'Soin Mineur', type: 'healing', level: 1, manaCost: 10 }
+            ];
+
+            const spellbookDisplay = this.ancientAlphabetManager.createSpellbook(learnedSpells, character.name);
+            
+            return {
+                text: spellbookDisplay,
+                image: null
+            };
+        } catch (error) {
+            console.error('❌ Erreur grimoire:', error);
+            return { text: '❌ Erreur lors de l\'affichage du grimoire.' };
+        }
+    }
+
+    /**
+     * Lance un sort en combat ou hors combat
+     */
+    async handleCastSpellCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
+                return {
+                    text: `✨ **LANCEMENT DE SORT** ✨
+
+💡 Usage: \`/lancer [nom du sort]\`
+
+Exemples:
+• \`/lancer boule de feu\`
+• \`/lancer ⫷⧉⩚⧃⧇ ⟁✦ ⫷✦⪦\` (alphabet ancien)
+
+🔮 Tapez \`/sorts\` pour voir vos sorts disponibles.`
+                };
+            }
+
+            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
+            if (!player) {
+                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
+            }
+
+            const character = await dbManager.getCharacterByPlayerId(player.id);
+            if (!character) {
+                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
+            }
+
+            const spellInput = args.join(' ');
+            const parsedInput = this.ancientAlphabetManager.parseSpellInput(spellInput);
+
+            // Simulation de lancement de sort
+            const mockSpell = {
+                name: parsedInput.modern,
+                type: 'fire',
+                level: 3,
+                manaCost: 25,
+                damage: 45,
+                effects: 'Dégâts de feu critiques !',
+                incantation: this.ancientAlphabetManager.createIncantation(parsedInput.modern, 'fire', 3)
+            };
+
+            // Créer l'animation de lancement
+            const castingFrames = this.ancientAlphabetManager.createSpellCastingAnimation(
+                mockSpell, 
+                character.name, 
+                null
+            );
+
+            // Afficher l'animation avec des barres de chargement
+            const loadingAnimation = await this.loadingBarManager.createLoadingAnimation(
+                'spell', 
+                `Lancement de ${mockSpell.name}`, 
+                character.name
+            );
+
+            // Créer une narration complète avec image
+            const narration = await this.narrationImageManager.createSpellNarration(mockSpell, character);
+
+            return {
+                text: `${loadingAnimation[loadingAnimation.length - 1]}\n\n${castingFrames[castingFrames.length - 1]}\n\n${narration.text}`,
+                image: narration.imagePath
+            };
+        } catch (error) {
+            console.error('❌ Erreur lancement sort:', error);
+            return { text: '❌ Erreur lors du lancement du sort.' };
+        }
+    }
+
+    /**
+     * Permet d'apprendre un nouveau sort
+     */
+    async handleLearnSpellCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
+                return {
+                    text: `📚 **APPRENTISSAGE DE SORT** 📚
+
+💡 Usage: \`/apprendre [nom du sort]\`
+
+🔮 Vous devez être près d'un maître de magie ou dans une académie pour apprendre de nouveaux sorts.
+
+📍 Rendez-vous dans les lieux suivants :
+• Académie Mystique d'AEGYRIA
+• Tour des Mages de SOMBRENUIT
+• Sanctuaire Élémentaire de TERRAVERDE`
+                };
+            }
+
+            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
+            if (!player) {
+                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
+            }
+
+            const character = await dbManager.getCharacterByPlayerId(player.id);
+            if (!character) {
+                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
+            }
+
+            const spellName = args.join(' ');
+            const ancientName = this.ancientAlphabetManager.toAncientText(spellName);
+
+            return {
+                text: `✨ **SORT APPRIS !** ✨
+
+🎓 **${character.name}** a appris le sort **${spellName}** !
+
+🔮 **Nom mystique:** ${ancientName}
+
+📚 Le sort a été ajouté à votre grimoire.
+💫 Vous pouvez maintenant l'utiliser avec \`/lancer ${spellName}\`
+
+⚡ **Conseil:** Les sorts en alphabet ancien sont plus puissants !`
+            };
+        } catch (error) {
+            console.error('❌ Erreur apprentissage sort:', error);
+            return { text: '❌ Erreur lors de l\'apprentissage du sort.' };
+        }
+    }
+
+    // ===========================================
+    // MÉTHODES D'ADMINISTRATION
+    // ===========================================
+
+    /**
+     * Affiche les statistiques du serveur (Admin uniquement)
+     */
+    async handleAdminStatsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = await this.adminManager.processAdminCommand('/admin_stats', playerNumber);
+        return { text: response };
+    }
+
+    /**
+     * Modifie l'heure du jeu (Admin uniquement)
+     */
+    async handleAdminTimeCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_time', args);
+        
+        const response = await this.adminManager.processAdminCommand('/admin_time', playerNumber, params);
+        return { text: response };
+    }
+
+    /**
+     * Assigne un groupe à un royaume (Admin uniquement)
+     */
+    async handleAdminKingdomCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const args = message.split(' ').slice(1);
+        if (args.length < 2) {
+            return {
+                text: `👑 **GESTION DES ROYAUMES** 👑
+
+💡 Usage: \`/admin_kingdom [groupeId] [royaume]\`
+
+Exemple: \`/admin_kingdom ${chatId} AEGYRIA\`
+
+🏰 **Royaumes disponibles:**
+AEGYRIA, SOMBRENUIT, TERRAVERDE, CIELNUAGE,
+FLAMMEBOURG, GELOPOLIS, VENTARIA, AURORALIS,
+OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
+            };
+        }
+
+        const params = { groupId: args[0], kingdom: args[1] };
+        const response = await this.adminManager.processAdminCommand('/admin_kingdom', playerNumber, params);
+        
+        // Mettre à jour le mapping local également
+        this.adminManager.assignKingdomToGroup(params.groupId, params.kingdom);
+        
+        return { text: response };
+    }
+
+    /**
+     * Liste tous les groupes et leurs royaumes (Admin uniquement)
+     */
+    async handleAdminGroupsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = await this.adminManager.processAdminCommand('/admin_groups', playerNumber);
+        return { text: response };
+    }
+
+    /**
+     * Donne un objet à un joueur (Admin uniquement)
+     */
+    async handleAdminGiveCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_give', args);
+        
+        const response = await this.adminManager.processAdminCommand('/admin_give', playerNumber, params);
+        return { text: response };
+    }
+
+    /**
+     * Modifie le niveau d'un joueur (Admin uniquement)
+     */
+    async handleAdminLevelCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_level', args);
+        
+        const response = await this.adminManager.processAdminCommand('/admin_level', playerNumber, params);
+        return { text: response };
+    }
+
+    /**
+     * Téléporte un joueur (Admin uniquement)
+     */
+    async handleAdminTeleportCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_teleport', args);
+        
+        const response = await this.adminManager.processAdminCommand('/admin_teleport', playerNumber, params);
+        return { text: response };
+    }
+
+    /**
+     * Soigne complètement un joueur (Admin uniquement)
+     */
+    async handleAdminHealCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_heal', args);
+        
+        const response = await this.adminManager.processAdminCommand('/admin_heal', playerNumber, params);
+        return { text: response };
+    }
+
+    /**
+     * Ajoute un pouvoir à un joueur (Admin uniquement)
+     */
+    async handleAdminPowerCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_power', args);
+        
+        const response = await this.adminManager.processAdminCommand('/admin_power', playerNumber, params);
+        return { text: response };
+    }
+
+    /**
+     * Change la météo (Admin uniquement)
+     */
+    async handleAdminWeatherCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = await this.adminManager.processAdminCommand('/admin_weather', playerNumber);
+        return { text: response };
+    }
+
+    /**
+     * Lance un événement spécial (Admin uniquement)
+     */
+    async handleAdminEventCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = await this.adminManager.processAdminCommand('/admin_event', playerNumber);
+        return { text: response };
+    }
+
+    /**
+     * Remet à zéro un royaume (Admin uniquement)
+     */
+    async handleAdminResetKingdomCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = await this.adminManager.processAdminCommand('/admin_reset_kingdom', playerNumber);
+        return { text: response };
+    }
+
+    /**
+     * Active/désactive le mode debug (Admin uniquement)
+     */
+    async handleAdminDebugCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = await this.adminManager.processAdminCommand('/admin_debug', playerNumber);
+        return { text: response };
+    }
+
+    /**
+     * Crée une sauvegarde (Admin uniquement)
+     */
+    async handleAdminBackupCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = await this.adminManager.processAdminCommand('/admin_backup', playerNumber);
+        return { text: response };
+    }
+
+    /**
+     * Recharge les données du jeu (Admin uniquement)
+     */
+    async handleAdminReloadCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = await this.adminManager.processAdminCommand('/admin_reload', playerNumber);
+        return { text: response };
+    }
+
+    /**
+     * Envoie une annonce à tous les joueurs (Admin uniquement)
+     */
+    async handleAdminAnnounceCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_announce', args);
+        
+        const response = await this.adminManager.processAdminCommand('/admin_announce', playerNumber, params);
+        return { text: response };
+    }
+
+    /**
+     * Affiche l'aide pour les commandes d'administration (Admin uniquement)
+     */
+    async handleAdminHelpCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
+        }
+
+        const response = this.adminManager.getAdminHelp();
+        return { text: response };
+    }
+
+    /**
+     * Vérifie la position d'un joueur dans un groupe/royaume
+     */
+    async validatePlayerKingdomLocation(playerNumber, chatId, dbManager) {
+        try {
+            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
+            if (!player) return { valid: true, message: null };
+
+            const character = await dbManager.getCharacterByPlayerId(player.id);
+            if (!character) return { valid: true, message: null };
+
+            return this.adminManager.validatePlayerLocation(chatId, character.kingdom);
+        } catch (error) {
+            console.error('❌ Erreur validation position:', error);
+            return { valid: true, message: null };
         }
     }
 }
