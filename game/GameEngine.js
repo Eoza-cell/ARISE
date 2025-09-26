@@ -11,6 +11,7 @@ const CharacterCustomizationManager = require('../utils/CharacterCustomizationMa
 const QuestManager = require('../utils/QuestManager');
 const AuraManager = require('../utils/AuraManager');
 const TimeManager = require('../utils/TimeManager');
+const ReactionTimeManager = require('../utils/ReactionTimeManager');
 const path = require('path');
 
 class GameEngine {
@@ -103,6 +104,7 @@ class GameEngine {
         this.questManager = null; // Initialisé avec dbManager
         this.auraManager = null; // Initialisé avec dbManager
         this.timeManager = null; // Initialisé avec dbManager
+        this.reactionTimeManager = null; // Initialisé avec sock
 
         this.commandHandlers = {
             '/menu': this.handleMenuCommand.bind(this),
@@ -250,6 +252,10 @@ class GameEngine {
             if (!this.timeManager) {
                 const TimeManager = require('../utils/TimeManager');
                 this.timeManager = new TimeManager(dbManager);
+            }
+
+            if (!this.reactionTimeManager && sock) {
+                this.reactionTimeManager = new ReactionTimeManager(this, sock);
             }
 
             if (!this.characterCustomization && sock) {
@@ -819,6 +825,22 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
         return true;
     }
 
+    /**
+     * Traite l'expiration d'une action de combat
+     */
+    processActionTimeout(actionId) {
+        console.log(`💥 Action timeout: ${actionId}`);
+        // Ici vous pouvez ajouter la logique pour traiter les timeouts
+        // Par exemple, appliquer des dégâts, mettre à jour les stats, etc.
+        
+        // Logique future pour traiter les conséquences des timeouts
+        // - Appliquer les dégâts non défendus
+        // - Mettre à jour l'état du combat
+        // - Calculer les effets de l'action
+        
+        return true;
+    }
+
     getStartingLocation(kingdom) {
         const locations = {
             'AEGYRIA': 'Grande Plaine d\'Honneur - Village de Valorhall',
@@ -1346,6 +1368,30 @@ ${progressBar} ${Math.floor(percentage)}%
             const isRealCombat = realCombatKeywords.some(keyword =>
                 message.toLowerCase().includes(keyword)
             );
+
+            // Vérifier si le joueur est en temps de réaction
+            if (this.reactionTimeManager) {
+                const reactionCheck = this.reactionTimeManager.isInReactionTime(player.id);
+                if (reactionCheck) {
+                    // Le joueur réagit - annuler le timer
+                    this.reactionTimeManager.cancelReactionTimer(reactionCheck.actionId);
+                    console.log(`⚡ Réaction détectée pour ${character.name} - Timer annulé`);
+                }
+
+                // Si c'est un combat réel, démarrer un temps de réaction pour les PNJ
+                if (isRealCombat && Math.random() < 0.7) { // 70% chance d'ennemi qui réagit
+                    const actionId = `combat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                    const actionDescription = `${character.name} ${message}`;
+                    
+                    await this.reactionTimeManager.startReactionTimer(
+                        actionId,
+                        'npc_' + Math.random().toString(36).substr(2, 5), // ID PNJ simulé
+                        chatId,
+                        actionDescription
+                    );
+                    console.log(`⏰ Temps de réaction démarré pour PNJ - Action: ${actionDescription}`);
+                }
+            }
 
             if (isRealCombat && actionAnalysis.combatAdvantage === 'counter_attacked') {
                 shouldTakeDamage = true;

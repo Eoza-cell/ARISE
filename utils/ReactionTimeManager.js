@@ -30,10 +30,30 @@ class ReactionTimeManager {
      * Démarre un compte à rebours de réaction
      */
     async startReactionTimer(actionId, defenderId, chatId, actionDescription) {
-        const character = await this.gameEngine.dbManager.getCharacterByPlayer(defenderId);
+        let character;
+        let reactionTime;
+        
+        // Gérer les PNJ simulés (ID commençant par 'npc_')
+        if (defenderId.startsWith('npc_')) {
+            // PNJ simulé - utiliser des valeurs par défaut
+            const npcPowerLevels = ['G', 'F', 'E', 'D', 'C', 'B', 'A'];
+            const randomPowerLevel = npcPowerLevels[Math.floor(Math.random() * npcPowerLevels.length)];
+            
+            character = {
+                name: `PNJ-${defenderId.slice(-5)}`,
+                powerLevel: randomPowerLevel
+            };
+            reactionTime = this.reactionTimes[randomPowerLevel];
+            console.log(`🤖 PNJ simulé créé: ${character.name} (${character.powerLevel}) - ${Math.floor(reactionTime/1000)}s`);
+        } else {
+            // Joueur réel
+            character = await this.gameEngine.dbManager.getCharacterByPlayer(defenderId);
+            if (!character) return false;
+            reactionTime = this.reactionTimes[character.powerLevel] || this.reactionTimes['G'];
+        }
+
         if (!character) return false;
 
-        const reactionTime = this.reactionTimes[character.powerLevel] || this.reactionTimes['G'];
         const endTime = Date.now() + reactionTime;
 
         const reactionData = {
@@ -158,10 +178,39 @@ class ReactionTimeManager {
 
         reactionData.status = 'timeout';
 
-        const character = await this.gameEngine.dbManager.getCharacterByPlayer(reactionData.defenderId);
+        let character;
+        let isNPC = false;
         
-        await this.sock.sendMessage(reactionData.chatId, {
-            text: `⏰ **TEMPS ÉCOULÉ !** ⏰
+        // Vérifier si c'est un PNJ simulé
+        if (reactionData.defenderId.startsWith('npc_')) {
+            isNPC = true;
+            const npcPowerLevels = ['G', 'F', 'E', 'D', 'C', 'B', 'A'];
+            const randomPowerLevel = npcPowerLevels[Math.floor(Math.random() * npcPowerLevels.length)];
+            character = {
+                name: `PNJ-${reactionData.defenderId.slice(-5)}`,
+                powerLevel: randomPowerLevel
+            };
+        } else {
+            character = await this.gameEngine.dbManager.getCharacterByPlayer(reactionData.defenderId);
+        }
+        
+        if (!character) {
+            console.log(`⚠️ Personnage introuvable pour timeout: ${reactionData.defenderId}`);
+            this.activeReactions.delete(actionId);
+            return;
+        }
+
+        const timeoutMessage = isNPC ? 
+            `⏰ **TEMPS ÉCOULÉ !** ⏰
+
+🤖 **${character.name}** (PNJ ${character.powerLevel}) n'a pas réagi à temps !
+💀 Il reste immobile face à l'attaque !
+
+⚡ Rang ${character.powerLevel} = ${Math.floor(reactionData.reactionTime / 1000)} secondes max
+❌ Aucune défense ne sera appliquée !
+
+💥 L'attaque continue sans opposition...` :
+            `⏰ **TEMPS ÉCOULÉ !** ⏰
 
 🗿 **${character.name}** n'a pas réagi à temps !
 💀 Il reste immobile face à l'attaque !
@@ -169,11 +218,17 @@ class ReactionTimeManager {
 ⚡ Rang ${character.powerLevel} = ${Math.floor(reactionData.reactionTime / 1000)} secondes max
 ❌ Aucune défense ne sera appliquée !
 
-💥 L'attaque va maintenant être traitée...`
-        });
+💥 L'attaque va maintenant être traitée...`;
+        
+        await this.sock.sendMessage(reactionData.chatId, { text: timeoutMessage });
 
-        // Notifier le système de combat
-        this.gameEngine.processActionTimeout(actionId);
+        // Notifier le système de combat si la méthode existe
+        if (typeof this.gameEngine.processActionTimeout === 'function') {
+            this.gameEngine.processActionTimeout(actionId);
+        } else {
+            console.log(`💥 Action timeout traité: ${actionId} - ${character.name} (${isNPC ? 'PNJ' : 'Joueur'})`);
+        }
+        
         this.activeReactions.delete(actionId);
     }
 
