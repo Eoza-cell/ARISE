@@ -163,6 +163,15 @@ ${dynamicEvents}
 RÉACTIONS PNJ INTELLIGENTES:
 ${npcReactions}
 
+ANALYSE SPÉCIALE DE L'ACTION:
+${this.analyzeActionType(action)}
+
+RÈGLES DE NARRATION COMBAT:
+🥊 Si l'action contient "coup de poing", "uppercut", "crochet" = DÉCRIRE la technique martial précise
+🎯 Si c'est une technique de combat nommée = RESPECTER le nom et décrire l'exécution
+⚔️ Éviter d'inventer des détails non mentionnés par le joueur
+🔥 Se concentrer sur l'ACTION EXACTE demandée par le joueur
+
 SYSTÈME IA RÉACTIVE GTA-STYLE:
 1. 🌍 MONDE VIVANT - Les PNJ continuent leur vie même sans le joueur
 2. 🎯 CONSÉQUENCES RÉALISTES - Chaque action a des répercussions à long terme
@@ -172,15 +181,43 @@ SYSTÈME IA RÉACTIVE GTA-STYLE:
 6. 👥 IA SOCIALE - Relations complexes entre personnages
 7. 🔄 ADAPTATION - L'environnement s'adapte au style de jeu
 
-Génère une narration ÉPIQUE et INTERACTIVE qui:
+Génère une narration ÉPIQUE et PRÉCISE qui:
+- RESPECTE exactement l'action demandée (si "coup de poing droit" = décrire un coup de poing droit)
 - Intègre les événements dynamiques en cours
 - Montre les réactions intelligentes des PNJ
 - Crée des opportunités et des défis inattendus
 - Utilise la mémoire du monde pour la cohérence
-- Propose des choix multiples implicites
 - Maintient le suspense et l'engagement
 
-Style: Immersif, cinématographique, avec des détails sensoriels riches.`;
+Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
+
+            // Ajouter une méthode d'analyse d'action
+        }
+
+        analyzeActionType(action) {
+            const lowerAction = action.toLowerCase();
+            
+            if (lowerAction.includes('coup de poing droit')) {
+                return "🥊 TECHNIQUE MARTIALE: Coup de poing droit - Technique de boxe précise avec rotation du corps et extension du bras dominant.";
+            }
+            if (lowerAction.includes('coup de poing gauche')) {
+                return "🥊 TECHNIQUE MARTIALE: Coup de poing gauche - Jab rapide avec le bras non-dominant.";
+            }
+            if (lowerAction.includes('uppercut')) {
+                return "🥊 TECHNIQUE MARTIALE: Uppercut - Coup ascendant puissant visant le menton ou le plexus.";
+            }
+            if (lowerAction.includes('crochet')) {
+                return "🥊 TECHNIQUE MARTIALE: Crochet - Coup circulaire horizontal avec rotation du buste.";
+            }
+            if (lowerAction.includes('coup de pied')) {
+                return "🦵 TECHNIQUE MARTIALE: Coup de pied - Attaque utilisant la force des jambes.";
+            }
+            if (lowerAction.includes('coup de poing')) {
+                return "🥊 TECHNIQUE MARTIALE: Coup de poing basique - Frappe directe avec le poing.";
+            }
+            
+            return "⚡ ACTION GÉNÉRALE: Analyser selon le contexte et les détails fournis.";
+        }
 
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: prompt }],

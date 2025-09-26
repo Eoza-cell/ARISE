@@ -331,24 +331,26 @@ ${recentHistory.slice(-5).map(h => `${h.role}: ${h.content.substring(0, 100)}`).
 Action: "${action}"
 Contexte: ${JSON.stringify(gameContext, null, 2)}
 
-RÈGLES STRICTES D'ANALYSE DARK SOULS :
-🔥 DIFFICULTÉ MAXIMALE - Punir SÉVÈREMENT toute imprécision
-🗡️ COMBAT TECHNIQUE - Exiger distance exacte, angle d'attaque, partie du corps visée  
+RÈGLES D'ANALYSE AMÉLIORÉES :
+🥊 COMBAT DE BASE - Reconnaître les techniques martiales simples comme valides
+🗡️ COMBAT TECHNIQUE - Les techniques précises (coup de poing droit, uppercut) sont BONNES
 ⚡ GESTION STAMINA - Actions coûteuses en énergie, récupération lente
-💀 MORT PERMANENTE - Une erreur = dégâts critiques potentiels
-🎯 PRÉCISION TOTALE - "J'attaque" = ÉCHEC automatique (manque détails)
-🔍 VIGILANCE ENNEMIE - Bruits, mouvements détectés facilement
-⚔️ ÉQUIPEMENT CRUCIAL - Sans bonne arme/armure = vulnérabilité extrême
+💀 RISQUE GRADUEL - Erreur = dégâts selon le niveau de détail
+🎯 PRÉCISION ADAPTATIVE - Plus de détails = meilleur résultat
 
-EXEMPLES D'ACTIONS PRÉCISES VALIDES :
+EXEMPLES D'ACTIONS VALIDES (NOUVELLES RÈGLES) :
+✅ "Je donne un coup de poing droit" (technique de base précise)
+✅ "J'exécute un uppercut" (technique martiale reconnue)
+✅ "Je frappe avec un crochet du gauche" (boxe précise)
 ✅ "J'avance de 2 mètres en silence vers l'ombre, épée dans la main droite"
 ✅ "J'attaque la jambe gauche du gobelin avec mon épée en diagonal descendant"
-✅ "Je bloque avec mon bouclier et contre-attaque immédiatement à la gorge"
 
-EXEMPLES D'ACTIONS IMPRÉCISES = ECHEC :
-❌ "J'attaque" (aucun détail)
+EXEMPLES D'ACTIONS IMPRÉCISES = ÉCHEC :
+❌ "J'attaque" (aucun détail, aucune technique)
+❌ "Je frappe" (trop vague, pas de technique)
 ❌ "Je me déplace" (pas de distance/direction)
-❌ "Je me cache" (pas de méthode/position)
+
+COMBAT MARTIAL DE BASE = PRÉCISION MEDIUM/HIGH automatiquement
 
 Analyse strictement et réponds en JSON:
 {

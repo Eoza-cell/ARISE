@@ -57,12 +57,26 @@ class GameEngine {
 
         // Mots-clés pour détecter les intentions
         this.intentionKeywords = {
-            attack: ['attaque', 'frappe', 'combat', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite', 'coup', 'strike', 'hit'],
-            defend: ['défend', 'bloque', 'pare', 'protection', 'bouclier', 'guard', 'block', 'parry'],
+            attack: ['attaque', 'frappe', 'combat', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite', 'coup', 'strike', 'hit', 'poing', 'gifle', 'claque', 'bourre', 'cogne', 'tape'],
+            defend: ['défend', 'bloque', 'pare', 'protection', 'bouclier', 'guard', 'block', 'parry', 'esquive', 'recule'],
             magic: ['sort', 'magie', 'incantation', 'sorts', 'spell', 'enchantement', 'rituel', 'invoque'],
-            movement: ['bouge', 'déplace', 'cours', 'marche', 'saute', 'vole', 'move', 'run', 'jump'],
+            movement: ['bouge', 'déplace', 'cours', 'marche', 'saute', 'vole', 'move', 'run', 'jump', 'avance', 'recule'],
             technique: ['technique', 'skill', 'capacité', 'pouvoir', 'ability', 'special'],
             item: ['utilise', 'prend', 'équipe', 'boit', 'mange', 'use', 'take', 'equip']
+        };
+
+        // Techniques de combat de base par défaut
+        this.basicCombatTechniques = {
+            'coup de poing': { name: 'Coup de Poing', power: 15, energy: 5, precision: 'medium' },
+            'coup de poing droit': { name: 'Coup de Poing Droit', power: 18, energy: 6, precision: 'high' },
+            'coup de poing gauche': { name: 'Coup de Poing Gauche', power: 16, energy: 5, precision: 'medium' },
+            'uppercut': { name: 'Uppercut', power: 22, energy: 8, precision: 'high' },
+            'direct': { name: 'Direct', power: 20, energy: 7, precision: 'high' },
+            'crochet': { name: 'Crochet', power: 19, energy: 7, precision: 'medium' },
+            'coup de pied': { name: 'Coup de Pied', power: 20, energy: 8, precision: 'medium' },
+            'balayage': { name: 'Balayage', power: 15, energy: 6, precision: 'medium' },
+            'coup de genou': { name: 'Coup de Genou', power: 25, energy: 10, precision: 'high' },
+            'coup de coude': { name: 'Coup de Coude', power: 23, energy: 9, precision: 'high' }
         };
 
         // Techniques spéciales par rang
@@ -1015,7 +1029,22 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
         const detectedTechniques = [];
         const lowerMessage = message.toLowerCase();
 
-        // Recherche de techniques par nom
+        // D'abord vérifier les techniques de combat de base
+        for (const [key, technique] of Object.entries(this.basicCombatTechniques)) {
+            if (lowerMessage.includes(key) || lowerMessage.includes(technique.name.toLowerCase())) {
+                detectedTechniques.push({
+                    id: key,
+                    name: technique.name,
+                    power: technique.power,
+                    requiredRank: 'G', // Techniques de base accessibles à tous
+                    manaCost: technique.energy,
+                    precision: technique.precision,
+                    type: 'combat_basic'
+                });
+            }
+        }
+
+        // Ensuite rechercher dans la base de données avancée
         for (const [id, technique] of this.techniqueDatabase) {
             if (lowerMessage.includes(technique.name.toLowerCase())) {
                 detectedTechniques.push(technique);
@@ -1050,13 +1079,25 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
      */
     validateAction(character, message) {
         const errors = [];
+        const lowerMessage = message.toLowerCase();
 
-        // Vérifier les objets mentionnés
+        // Vérifier les techniques de combat de base (toujours autorisées)
+        const basicTechniqueDetected = Object.keys(this.basicCombatTechniques).some(key => 
+            lowerMessage.includes(key)
+        );
+
+        // Si c'est une technique de combat de base, pas d'erreur
+        if (basicTechniqueDetected) {
+            console.log(`✅ Technique de combat de base détectée: ${message}`);
+            return []; // Les techniques de base sont toujours valides
+        }
+
+        // Vérifier les objets mentionnés seulement si ce n'est pas du combat de base
         const itemKeywords = ['utilise', 'prend', 'équipe', 'avec mon', 'avec ma', 'sort mon', 'sort ma'];
         for (const keyword of itemKeywords) {
-            if (message.toLowerCase().includes(keyword)) {
+            if (lowerMessage.includes(keyword)) {
                 // Extraire l'objet mentionné (logique simplifiée)
-                const words = message.toLowerCase().split(' ');
+                const words = lowerMessage.split(' ');
                 const keywordIndex = words.findIndex(word => keyword.includes(word));
                 if (keywordIndex !== -1 && keywordIndex < words.length - 1) {
                     const item = words[keywordIndex + 1];
@@ -1068,22 +1109,10 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
             }
         }
 
-        // Vérifier les déplacements
-        const moveKeywords = ['va à', 'se rend à', 'voyage vers', 'part pour'];
-        for (const keyword of moveKeywords) {
-            if (message.toLowerCase().includes(keyword)) {
-                const words = message.toLowerCase().split(' ');
-                const keywordIndex = words.findIndex(word => keyword.includes(word));
-                if (keywordIndex !== -1) {
-                    errors.push(`❌ Précisez comment vous vous déplacez et par quel chemin`);
-                }
-            }
-        }
-
-        // Vérifier les techniques par rang
+        // Vérifier les techniques avancées par rang
         const detectedTechniques = this.detectTechniques(message);
         for (const technique of detectedTechniques) {
-            if (!this.canUseTechnique(character, technique)) {
+            if (technique.type !== 'combat_basic' && !this.canUseTechnique(character, technique)) {
                 errors.push(`❌ Technique "${technique.name}" requiert le rang ${technique.requiredRank} (vous: ${character.powerLevel})`);
             }
         }
