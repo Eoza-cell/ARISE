@@ -230,17 +230,75 @@ class HuggingFaceClient {
         });
     }
 
-    async generateVideoFromImage(imagePath, prompt, outputPath, options = {}) {
+    async generateVideoFromImage(imagePath, prompt, outputPath) {
         try {
-            console.log(`🎬 Génération vidéo depuis image: ${imagePath}`);
+            if (!this.hasValidClient()) {
+                throw new Error('HuggingFace client non disponible - vérifiez HF_TOKEN');
+            }
 
-            return await this.generateVideoFromText(prompt, outputPath, {
-                ...options,
-                characterImagePath: imagePath
+            console.log(`🎬 Génération vidéo HuggingFace depuis image: ${imagePath}`);
+            console.log(`🎯 Prompt: "${prompt}"`);
+
+            // Lire l'image
+            const imageBuffer = await fs.readFile(imagePath);
+
+            // Utiliser le modèle LTX-Video comme configuré
+            const video = await this.client.imageToVideo({
+                provider: "fal-ai",
+                model: "Lightricks/LTX-Video",
+                inputs: imageBuffer,
+                parameters: { 
+                    prompt: prompt,
+                    num_frames: 121,
+                    height: 704,
+                    width: 1216,
+                    fps: 25,
+                    seed: Math.floor(Math.random() * 1000000)
+                }
             });
+
+            // Sauvegarder la vidéo
+            let videoBuffer;
+            if (video instanceof Blob) {
+                videoBuffer = Buffer.from(await video.arrayBuffer());
+            } else if (Buffer.isBuffer(video)) {
+                videoBuffer = video;
+            } else {
+                throw new Error('Format de vidéo non supporté');
+            }
+
+            await fs.writeFile(outputPath, videoBuffer);
+
+            console.log(`✅ Vidéo HuggingFace générée: ${outputPath} (${videoBuffer.length} bytes)`);
+            return outputPath;
+
         } catch (error) {
-            console.error('❌ Erreur génération vidéo depuis image:', error);
-            throw error;
+            console.error('❌ Erreur génération vidéo HuggingFace:', error);
+
+            // Fallback avec un modèle alternatif
+            try {
+                console.log('🔄 Tentative avec modèle alternatif...');
+                const video = await this.client.imageToVideo({
+                    model: "stabilityai/stable-video-diffusion-img2vid-xt",
+                    inputs: imageBuffer,
+                    parameters: {
+                        height: 576,
+                        width: 1024,
+                        num_frames: 25,
+                        motion_bucket_id: 127,
+                        fps: 6
+                    }
+                });
+
+                const videoBuffer = Buffer.from(await video.arrayBuffer());
+                await fs.writeFile(outputPath, videoBuffer);
+
+                console.log(`✅ Vidéo HuggingFace générée (fallback): ${outputPath}`);
+                return outputPath;
+            } catch (fallbackError) {
+                console.error('❌ Échec fallback:', fallbackError);
+                throw error;
+            }
         }
     }
 }

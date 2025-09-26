@@ -356,6 +356,7 @@ Tu es maintenant enregistré en tant que : **${username}**
                 response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock });
             } else {
                 // Vérifier les tentatives d'actions impossibles
+                const character = await dbManager.getCharacterByPlayer(player.id); // Récupérer le personnage ici pour la vérification
                 const impossibleAction = await this.checkImpossibleAction(message, character);
                 if (impossibleAction) {
                     return impossibleAction;
@@ -1344,295 +1345,124 @@ ${progressBar} ${Math.floor(percentage)}%
 
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
-            // Validation de l'action
-            const validationErrors = this.validateAction(character, message);
-            if (validationErrors.length > 0) {
+            // Vérifier que le personnage a assez d'énergie pour agir
+            if (character.currentEnergy <= 0) {
                 return {
-                    text: `⚠️ **ACTION INVALIDE**
+                    text: `⚡ **ÉPUISEMENT TOTAL** ⚡
 
-${validationErrors.join('\n')}
+${character.name} est complètement épuisé ! Vous devez vous reposer avant d'agir.
 
-💡 Vérifiez vos capacités et votre inventaire avant d'agir.`
+❤️ PV: ${character.currentLife}/${character.maxLife}
+⚡ Énergie: ${character.currentEnergy}/${character.maxEnergy}
+
+💡 **Utilisez /regenerer_aura ou attendez la régénération naturelle.**`
                 };
             }
 
-            // Détecter les techniques et intentions
-            const detectedTechniques = this.detectTechniques(message);
-            const detectedIntentions = this.detectIntentions(message);
-
-            const sessionId = `player_${player.id}`;
-
-            const actionAnalysis = await this.openAIClient.analyzePlayerAction(message, {
-                character: character,
-                location: character.currentLocation,
-                kingdom: character.kingdom,
-                detectedTechniques,
-                detectedIntentions
-            }, sessionId);
-
-            let narration;
+            // Générer une narration immersive avec l'IA
+            let narrationResponse;
             try {
-                if (this.groqClient && this.groqClient.hasValidClient()) {
-                    console.log('🚀 Génération narration avec Groq (ultra-rapide)...');
-                    narration = await this.groqClient.generateExplorationNarration(character.currentLocation, message, sessionId, character);
-
-                    console.log('✅ Narration générée avec Groq');
-                } else {
-                    throw new Error('Groq non disponible, essai Ollama');
-                }
-            } catch (groqError) {
-                try {
-                    if (this.ollamaClient.hasValidClient()) {
-                        narration = await this.ollamaClient.generateNarration({}, message, character);
-                        console.log('✅ Narration générée avec Ollama');
-                    } else {
-                        throw new Error('Ollama non disponible, essai Gemini');
-                    }
-                } catch (ollamaError) {
-                    try {
-                        console.log('🎭 Génération narration avec Gemini...');
-                        const context = {
-                            character: character,
-                            location: character.currentLocation,
-                            action: message,
-                            gameState: {
-                                life: character.currentLife,
-                                energy: character.currentEnergy,
-                                powerLevel: character.powerLevel,
-                                kingdom: character.kingdom
-                            }
-                        };
-                        narration = await this.geminiClient.generateNarration(context, sessionId);
-                        console.log('✅ Narration générée avec Gemini');
-                    } catch (geminiError) {
-                        console.log('⚠️ Fallback OpenAI pour narration:', geminiError.message);
-                        narration = await this.openAIClient.generateNarration({
-                            character: character,
-                            location: character.currentLocation,
-                            action: message,
-                            gameState: {
-                                life: character.currentLife,
-                                energy: character.currentEnergy,
-                                powerLevel: character.powerLevel
-                            }
-                        }, sessionId);
-                    }
-                }
+                narrationResponse = await this.groqClient.generateNarration({
+                    character,
+                    action: message,
+                    location: character.currentLocation || 'Zone Inconnue',
+                    previousActions: character.actionHistory || []
+                });
+            } catch (narrationError) {
+                console.error('❌ Erreur narration Groq:', narrationError);
+                narrationResponse = {
+                    narration: `${character.name} tente l'action : "${message}". L'aventure continue dans ce monde mystérieux...`
+                };
             }
 
-            const energyCost = Math.max(0, Math.min(character.currentEnergy, actionAnalysis.energyCost || 10));
-            const staminaRecovery = Math.max(-15, Math.min(3, actionAnalysis.staminaRecovery || 0));
-            const equipmentStress = Math.max(-3, Math.min(0, actionAnalysis.equipmentStress || 0));
+            const narration = narrationResponse.narration || narrationResponse;
 
-            const validCombatAdvantages = ['critical_hit', 'normal_hit', 'glancing_blow', 'miss', 'counter_attacked'];
-            actionAnalysis.combatAdvantage = validCombatAdvantages.includes(actionAnalysis.combatAdvantage)
-                ? actionAnalysis.combatAdvantage
-                : 'miss';
-
-            character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
-
-            let damageText = '';
-            let shouldTakeDamage = false;
-
-            const realCombatKeywords = ['attaque', 'combat', 'frappe', 'tue', 'massacre', 'poignarde', 'tranche', 'décapite'];
-            const isRealCombat = realCombatKeywords.some(keyword =>
-                message.toLowerCase().includes(keyword)
-            );
-
-            // Vérifier si le joueur est en temps de réaction
-            if (this.reactionTimeManager) {
-                const reactionCheck = this.reactionTimeManager.isInReactionTime(player.id);
-                if (reactionCheck) {
-                    // Le joueur réagit - annuler le timer
-                    this.reactionTimeManager.cancelReactionTimer(reactionCheck.actionId);
-                    console.log(`⚡ Réaction détectée pour ${character.name} - Timer annulé`);
-                }
-
-                // Si c'est un combat réel, démarrer un temps de réaction pour les PNJ
-                if (isRealCombat && Math.random() < 0.7) { // 70% chance d'ennemi qui réagit
-                    const actionId = `combat_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                    const actionDescription = `${character.name} ${message}`;
-
-                    await this.reactionTimeManager.startReactionTimer(
-                        actionId,
-                        'npc_' + Math.random().toString(36).substr(2, 5), // ID PNJ simulé
-                        chatId,
-                        actionDescription
-                    );
-                    console.log(`⏰ Temps de réaction démarré pour PNJ - Action: ${actionDescription}`);
-                }
-            }
-
-            if (isRealCombat && actionAnalysis.combatAdvantage === 'counter_attacked') {
-                shouldTakeDamage = true;
-            } else if (isRealCombat && actionAnalysis.riskLevel === 'extreme' && Math.random() < 0.3) {
-                shouldTakeDamage = true;
-            }
-
-            if (character.currentEnergy <= 0) {
-                damageText = `\n⚡ **ÉPUISEMENT** - Vous êtes trop fatigué pour être efficace`;
-            }
-
-            if (shouldTakeDamage && actionAnalysis.potentialDamage > 0) {
-                const baseDamage = Math.max(1, Math.min(8, actionAnalysis.potentialDamage || 3));
-                const damage = Math.min(baseDamage, character.currentLife);
-                character.currentLife = Math.max(0, character.currentLife - damage);
-                damageText = `\n💀 **DÉGÂTS SUBIS :** -${damage} PV (combat risqué)`;
-
-                console.log(`⚔️ Dégâts appliqués: ${damage} PV (action: ${message}, situation: ${actionAnalysis.combatAdvantage})`);
-            }
-
-            if (staminaRecovery !== 0) {
-                if (staminaRecovery > 0) {
-                    character.currentEnergy = Math.min(character.maxEnergy, character.currentEnergy + staminaRecovery);
-                } else {
-                    character.currentEnergy = Math.max(0, character.currentEnergy + staminaRecovery);
-                }
-            }
-
-            let equipmentWarning = '';
-            if (equipmentStress < 0) {
-                equipmentWarning = `\n⚔️ **USURE ÉQUIPEMENT :** Votre équipement s'abîme (${Math.abs(equipmentStress)})`;
-            }
-
-            let deathText = '';
-            let isAlive = true;
-            if (character.currentLife <= 0) {
-                isAlive = false;
-
-                const coinsBefore = character.coins;
-                const coinsLost = Math.floor(coinsBefore * 0.1);
-
-                character.currentLife = Math.ceil(character.maxLife * 0.3);
-                character.currentEnergy = Math.floor(character.maxEnergy * 0.5);
-                character.coins = Math.max(0, coinsBefore - coinsLost);
-                character.currentLocation = 'Lieu de Respawn - Sanctuaire des Âmes Perdues';
-
-                deathText = `\n💀 **MORT** - Vous avez succombé à vos blessures...
-🕊️ **RESPAWN** - Votre âme trouve refuge au Sanctuaire
-💰 **PERTE** - ${coinsLost} pièces perdues dans la mort
-❤️ **RÉSURRECTION** - Vous renaissez avec ${character.currentLife} PV`;
-            }
-
-            await dbManager.updateCharacter(character.id, {
-                currentEnergy: character.currentEnergy,
-                currentLife: character.currentLife,
-                coins: character.coins,
-                currentLocation: character.currentLocation
+            // Analyser l'action pour déterminer les conséquences
+            const actionAnalysis = await this.analyzePlayerAction({
+                character,
+                action: message,
+                narration,
+                dbManager
             });
 
-            const riskEmoji = {
-                'low': '🟢',
-                'medium': '🟡',
-                'high': '🟠',
-                'extreme': '🔴'
-            }[actionAnalysis.riskLevel] || '⚪';
-
-            const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
-            const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
-
-            const combatEmoji = {
-                'critical_hit': '🎯',
-                'normal_hit': '⚔️',
-                'glancing_blow': '🛡️',
-                'miss': '❌',
-                'counter_attacked': '💀'
-            }[actionAnalysis.combatAdvantage] || '⚪';
-
-            let detectionWarning = '';
-            if (actionAnalysis.detectionRisk) {
-                detectionWarning = `\n👁️ **DÉTECTION** - Vos mouvements ont pu être repérés !`;
+            // Appliquer les conséquences sur le personnage
+            if (actionAnalysis.energyCost) {
+                character.currentEnergy = Math.max(0, character.currentEnergy - actionAnalysis.energyCost);
+                await dbManager.updateCharacter(character.id, {
+                    currentEnergy: character.currentEnergy
+                });
             }
 
-            let consequencesText = '';
-            if (actionAnalysis.consequences && actionAnalysis.consequences.length > 0) {
-                const mainConsequence = actionAnalysis.consequences[0];
-                if (mainConsequence && !mainConsequence.includes('Erreur')) {
-                    consequencesText = `\n⚠️ **CONSÉQUENCES :** ${mainConsequence}`;
-                }
-            }
-
-            const precisionEmoji = {
-                'high': '🎯',
-                'medium': '⚪',
-                'low': '❌'
-            }[actionAnalysis.precision] || '❓';
-
-            const staminaText = staminaRecovery !== 0
-                ? `\n⚡ **RÉCUP. ENDURANCE :** ${staminaRecovery > 0 ? '+' : ''}${staminaRecovery}`
-                : '';
-
-            const responseText = `╔══════════════════════════════════╗
-║ 🏰 **${character.kingdom}** | 🎯 **${character.name}**
-║ ⚡ Niveau ${character.level} • Grade ${character.powerLevel} • Friction ${character.frictionLevel}
-╠══════════════════════════════════╣
-║ ❤️ Vie: ${character.currentLife}/${character.maxLife} (-${energyCost})${staminaText}
-║ 💰 Or: ${character.coins} pièces
-╠══════════════════════════════════╣
-║ ${precisionEmoji} Précision: ${actionAnalysis.precision.toUpperCase()}
-║ ${riskEmoji} Risque: ${actionAnalysis.riskLevel.toUpperCase()}
-║ 🎯 Action: ${actionAnalysis.actionType}
-║ ${combatEmoji} Combat: ${actionAnalysis.combatAdvantage?.replace('_', ' ') || 'N/A'}
-╚══════════════════════════════════╝
-
-${deathText}
-📜 **NARRATION:**
-${narration}
-
-${equipmentWarning}${detectionWarning}${consequencesText}
-
-${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire... Que faites-vous ?*'}`;
-
+            // Générer l'image d'action
             let actionImage = null;
-            let actionAudio = null;
+            try {
+                actionImage = await imageGenerator.generateCharacterActionImage(
+                    character,
+                    message,
+                    narration,
+                    { style: '3d', perspective: 'first_person' }
+                );
+            } catch (imageError) {
+                console.log('⚠️ Erreur génération image action:', imageError.message);
+            }
+
+            // Essayer de générer une vidéo si disponible
             let actionVideo = null;
             try {
-                const mediaResult = await imageGenerator.generateCharacterActionImageWithVoice(character, message, narration);
-                actionImage = mediaResult.image;
-                actionAudio = mediaResult.audio;
+                if (this.imageGenerator.hasHuggingFace && actionImage) {
+                    const videoPath = path.join(__dirname, '../temp', `action_video_${character.id}_${Date.now()}.mp4`);
+                    const videoPrompt = `${character.name} performing: ${message}, fantasy RPG action scene, cinematic movement`;
 
-                // Générer la vidéo d'action avec HuggingFace en priorité
-                actionVideo = await imageGenerator.generateActionVideo(character, message, narration);
-                if (actionVideo) {
-                    console.log('✅ Vidéo d\'action prête pour envoi:', actionVideo);
+                    actionVideo = await this.imageGenerator.huggingfaceClient.generateVideoFromImage(
+                        actionImage,
+                        videoPrompt,
+                        videoPath
+                    );
                 }
-
-            } catch (mediaError) {
-                console.error('❌ Erreur génération média:', mediaError.message);
+            } catch (videoError) {
+                console.log('⚠️ Erreur génération vidéo action:', videoError.message);
             }
 
+            // Combiner la narration avec les conséquences
+            let finalText = `🎮 **${character.name}** - ${character.kingdom} 🎮\n\n`;
+            finalText += narration + '\n\n';
+
+            if (actionAnalysis.consequences) {
+                finalText += `📊 **Conséquences :**\n${actionAnalysis.consequences}\n\n`;
+            }
+
+            // Barres de statut visuelles
+            const healthBar = this.loadingBarManager.createHealthBar(
+                character.currentLife, 
+                character.maxLife, 
+                'life'
+            );
+            const energyBar = this.loadingBarManager.createHealthBar(
+                character.currentEnergy, 
+                character.maxEnergy, 
+                'energy'
+            );
+
+            finalText += `📊 **ÉTAT DU PERSONNAGE**\n`;
+            finalText += healthBar + '\n';
+            finalText += energyBar + '\n\n';
+
+            finalText += `⚔️ **Niveau :** ${character.level} (${character.powerLevel})`;
+
             return {
-                text: responseText,
+                text: finalText,
                 image: actionImage,
-                audio: actionAudio,
                 video: actionVideo
             };
 
         } catch (error) {
-            console.error('❌ Erreur lors du traitement IA:', error);
-
-            const energyCost = 10;
-            character.currentEnergy = Math.max(0, character.currentEnergy - energyCost);
-
-            await dbManager.updateCharacter(character.id, {
-                currentEnergy: character.currentEnergy
-            });
-
-            const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
-            const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
-
+            console.error('❌ Erreur traitement action IA:', error);
             return {
-                text: `🎮 **${character.name}** - *${character.currentLocation}*
+                text: `❌ Erreur lors du traitement de votre action.
 
-📖 **Action :** "${message}"
+**Action :** ${message}
 
-❤️ **Vie :** ${lifeBar}
-⚡ **Énergie :** ${energyBar} (-${energyCost})
-💰 **Argent :** ${character.coins} pièces d'or
-
-⚠️ Le narrateur analyse ton action... Les systèmes IA sont temporairement instables.
-
-💭 *Continue ton aventure...*`
+Le monde de Friction Ultimate semble instable en ce moment. Réessayez dans quelques instants ou utilisez /aide pour voir les commandes disponibles.`
             };
         }
     }
@@ -1843,7 +1673,7 @@ Durée : ${socialEvent.duration}
     }
 
     async handleWeatherCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return { text: "❌ Aucun personnage trouvé !" };
         }
@@ -3023,7 +2853,7 @@ ${narration.text}`,
     /**
      * Permet d'apprendre un nouveau sort
      */
-    async handleLearnSpellCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+    async handleLearnSpellCommand({ playerNumber, chatId, message, dbManager, imageGenerator }) {
         try {
             const args = message.split(' ').slice(1);
             if (args.length === 0) {
@@ -3690,64 +3520,73 @@ Exemple: /rechercher_quete dragon
     /**
      * Démarre l'apprentissage d'une aura
      */
-    async handleLearnAuraCommand({ player, message, dbManager }) {
+    async handleLearnAuraCommand({ player, chatId, message, dbManager, sock }) {
         try {
             const args = message.split(' ').slice(1);
             if (args.length === 0) {
                 return {
                     text: `🔮 **APPRENTISSAGE D'AURA** 🔮
 
-Choisissez un type d'aura à apprendre :
+📚 **Types d'aura disponibles :**
+🔥 fire - Aura de Flamme
+🌊 water - Aura Aquatique  
+🌍 earth - Aura Tellurique
+💨 wind - Aura Éolienne
+⚡ lightning - Aura Foudroyante
+🌑 shadow - Aura Ténébreuse
+✨ light - Aura Lumineuse
 
-🔥 **fire** - Aura de Flamme
-🌊 **water** - Aura Aquatique
-🌍 **earth** - Aura Tellurique
-💨 **wind** - Aura Éolienne
-⚡ **lightning** - Aura Foudroyante
-🌑 **shadow** - Aura Ténébreuse
-✨ **light** - Aura Lumineuse
+💡 **Usage :** \`/aura_apprendre [type]\`
+**Exemple :** \`/aura_apprendre fire\`
 
-💡 Usage: /aura_apprendre [type]
-Exemple: /aura_apprendre fire
-
+⏰ **Durée :** 10 jours d'entraînement par aura
 🎲 **20% de chance de maîtrise instantanée !**`
                 };
             }
 
             const auraType = args[0].toLowerCase();
-            const auraTypes = ['fire', 'water', 'earth', 'wind', 'lightning', 'shadow', 'light'];
+            if (!this.auraManager.auraTypes[auraType]) {
+                return {
+                    text: `❌ Type d'aura invalide : "${auraType}"
 
-            if (!auraTypes.includes(auraType)) {
-                return { text: `❌ Type d'aura invalide ! Types disponibles: ${auraTypes.join(', ')}` };
+Types disponibles : fire, water, earth, wind, lightning, shadow, light`
+                };
             }
 
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            // Vérifier si le joueur peut commencer un entraînement
             if (!this.auraManager.canStartTraining(player.id)) {
-                return { text: "❌ Vous avez déjà un entraînement d'aura en cours !" };
+                const activeTraining = this.auraManager.getPlayerTraining(player.id);
+                return {
+                    text: `⚠️ Vous avez déjà un entraînement en cours !
+
+${activeTraining.techniqueName} (${Math.floor(activeTraining.progress)}%)`
+                };
             }
 
             // 20% de chance de maîtrise instantanée
             const instantMasteryChance = Math.random();
             if (instantMasteryChance < 0.2) { // 20% de chance
-                const result = await this.auraManager.grantInstantMastery(player.id, auraType);
-                return { text: result.message };
+                const instantResult = await this.auraManager.grantInstantMastery(player.id, auraType);
+                return {
+                    text: instantResult.message
+                };
             }
 
-            // Commencer l'entraînement normal
-            const techniqueNames = this.auraManager.auraTypes[auraType].techniques;
-            const randomTechnique = techniqueNames[Math.floor(Math.random() * techniqueNames.length)];
+            // Sinon, démarrer l'entraînement normal
+            const result = await this.auraManager.startAuraTraining(
+                player.id, 
+                auraType, 
+                this.auraManager.auraTypes[auraType].techniques[0]
+            );
 
-            const result = await this.auraManager.startAuraTraining(player.id, auraType, randomTechnique);
-            return { text: result.message };
+            return {
+                text: result.message
+            };
 
         } catch (error) {
             console.error('❌ Erreur apprentissage aura:', error);
-            return { text: "❌ Erreur lors du démarrage de l'apprentissage." };
+            return {
+                text: '❌ Erreur lors de l\'apprentissage d\'aura. Réessayez plus tard.'
+            };
         }
     }
 
