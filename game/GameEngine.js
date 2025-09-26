@@ -50,7 +50,7 @@ class GameEngine {
         // Système de barres de régénération
         this.regenerationSystem = new Map();
         this.activeActions = new Map(); // Actions en attente de réponse
-        
+
         // Base de données de techniques (1 million de techniques)
         this.techniqueDatabase = new Map();
         this.initializeTechniqueDatabase();
@@ -115,14 +115,14 @@ class GameEngine {
             '/marché': this.handleMarketCommand.bind(this),
             '/factions': this.handleFactionsCommand.bind(this),
             '/defis': this.handleChallengesCommand.bind(this),
-            
+
             // Commandes pour les sorts avec alphabet ancien
             '/sort': this.handleSpellCommand.bind(this),
             '/sorts': this.handleSpellbookCommand.bind(this),
             '/lancer': this.handleCastSpellCommand.bind(this),
             '/grimoire': this.handleSpellbookCommand.bind(this),
             '/apprendre': this.handleLearnSpellCommand.bind(this),
-            
+
             // Commandes d'administration (réservées aux admins)
             '/admin_stats': this.handleAdminStatsCommand.bind(this),
             '/admin_give': this.handleAdminGiveCommand.bind(this),
@@ -141,7 +141,7 @@ class GameEngine {
             '/admin_reload': this.handleAdminReloadCommand.bind(this),
             '/admin_announce': this.handleAdminAnnounceCommand.bind(this),
             '/admin_help': this.handleAdminHelpCommand.bind(this),
-            
+
             // Commandes de quêtes (10,000 principales + 20,000 secondaires)
             '/quetes': this.handleQuestsCommand.bind(this),
             '/quests': this.handleQuestsCommand.bind(this),
@@ -155,7 +155,7 @@ class GameEngine {
             '/progress': this.handleQuestProgressCommand.bind(this),
             '/rechercher_quete': this.handleSearchQuestCommand.bind(this),
             '/search_quest': this.handleSearchQuestCommand.bind(this),
-            
+
             // Commandes d'aura (système de 10 jours d'entraînement)
             '/aura': this.handleAuraInfoCommand.bind(this),
             '/aura_info': this.handleAuraInfoCommand.bind(this),
@@ -171,7 +171,7 @@ class GameEngine {
             '/regenerate_aura': this.handleRegenerateAuraCommand.bind(this),
             '/regenerer_magie': this.handleRegenerateMagicCommand.bind(this),
             '/regenerate_magic': this.handleRegenerateMagicCommand.bind(this),
-            
+
             // Commandes de temps et météo
             '/temps': this.handleTimeCommand.bind(this),
             '/time': this.handleTimeCommand.bind(this),
@@ -202,7 +202,7 @@ class GameEngine {
                 const TimeManager = require('../utils/TimeManager');
                 this.timeManager = new TimeManager(dbManager);
             }
-            
+
             if (!this.characterCustomization && sock) {
                 this.characterCustomization = new CharacterCustomizationManager(dbManager, imageGenerator, sock);
             }
@@ -673,7 +673,7 @@ Règles importantes:
         }
 
         action.status = 'timeout';
-        
+
         const attacker = await this.dbManager.getCharacterByPlayer(action.attackerId);
         const defender = await this.dbManager.getCharacterByPlayer(action.defenderId);
 
@@ -707,15 +707,15 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
     calculateDamage(attacker, defender, actionData, noDefense = false) {
         const attackerRankMultiplier = this.getRankMultiplier(attacker.powerLevel);
         const defenderRankMultiplier = noDefense ? 1 : this.getRankMultiplier(defender.powerLevel);
-        
+
         let baseDamage = 20 + (attacker.level * 5);
         baseDamage *= attackerRankMultiplier;
-        
+
         if (!noDefense) {
             const defense = 10 + (defender.level * 2);
             baseDamage = Math.max(1, baseDamage - (defense * defenderRankMultiplier));
         }
-        
+
         return Math.floor(baseDamage);
     }
 
@@ -737,7 +737,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
             'SSS': 10.0,
             'MONARQUE': 15.0
         };
-        
+
         return multipliers[rank] || 1.0;
     }
 
@@ -748,7 +748,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
         // Vérifier si le joueur a tué un boss de rang S+
         const bossKills = await this.dbManager.getTemporaryData(playerId, 'boss_kills') || [];
         const sPlusBossKilled = bossKills.some(kill => kill.rank === 'S+');
-        
+
         return sPlusBossKilled;
     }
 
@@ -959,7 +959,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
         const elements = ['Feu', 'Eau', 'Terre', 'Air', 'Foudre', 'Glace', 'Lumière', 'Ombre', 'Poison', 'Cristal'];
         const actions = ['Frappe', 'Lame', 'Vague', 'Explosion', 'Tornade', 'Lance', 'Bouclier', 'Barrière', 'Prison', 'Danse'];
         const modifiers = ['Divine', 'Démoniaque', 'Céleste', 'Infernale', 'Sacrée', 'Maudite', 'Éternelle', 'Temporelle', 'Spirituelle', 'Mortelle'];
-        
+
         let techniqueId = 1;
         for (let i = 0; i < 100; i++) {
             for (let j = 0; j < 100; j++) {
@@ -967,7 +967,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                     const element = elements[i % elements.length];
                     const action = actions[j % actions.length];
                     const modifier = modifiers[k % modifiers.length];
-                    
+
                     this.techniqueDatabase.set(techniqueId, {
                         id: techniqueId,
                         name: `${element} ${action} ${modifier}`,
@@ -978,7 +978,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                         manaCost: Math.floor(Math.random() * 100) + 10,
                         cooldown: Math.floor(Math.random() * 300) + 30
                     });
-                    
+
                     techniqueId++;
                     if (techniqueId > 1000000) break;
                 }
@@ -994,17 +994,17 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
     getRandomRank() {
         const ranks = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S', 'S+', 'SS', 'SSS', 'MONARQUE'];
         const weights = [30, 25, 20, 15, 10, 8, 5, 3, 2, 1, 0.8, 0.2]; // Plus faible = plus commun
-        
+
         const random = Math.random() * 100;
         let cumulative = 0;
-        
+
         for (let i = 0; i < ranks.length; i++) {
             cumulative += weights[i];
             if (random <= cumulative) {
                 return ranks[i];
             }
         }
-        
+
         return 'G';
     }
 
@@ -1014,7 +1014,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
     detectTechniques(message) {
         const detectedTechniques = [];
         const lowerMessage = message.toLowerCase();
-        
+
         // Recherche de techniques par nom
         for (const [id, technique] of this.techniqueDatabase) {
             if (lowerMessage.includes(technique.name.toLowerCase())) {
@@ -1022,7 +1022,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                 if (detectedTechniques.length >= 5) break; // Limite à 5 techniques
             }
         }
-        
+
         return detectedTechniques;
     }
 
@@ -1032,7 +1032,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
     detectIntentions(message) {
         const detectedIntentions = [];
         const lowerMessage = message.toLowerCase();
-        
+
         for (const [intention, keywords] of Object.entries(this.intentionKeywords)) {
             for (const keyword of keywords) {
                 if (lowerMessage.includes(keyword)) {
@@ -1041,7 +1041,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                 }
             }
         }
-        
+
         return detectedIntentions;
     }
 
@@ -1050,7 +1050,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
      */
     validateAction(character, message) {
         const errors = [];
-        
+
         // Vérifier les objets mentionnés
         const itemKeywords = ['utilise', 'prend', 'équipe', 'avec mon', 'avec ma', 'sort mon', 'sort ma'];
         for (const keyword of itemKeywords) {
@@ -1067,7 +1067,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                 }
             }
         }
-        
+
         // Vérifier les déplacements
         const moveKeywords = ['va à', 'se rend à', 'voyage vers', 'part pour'];
         for (const keyword of moveKeywords) {
@@ -1079,7 +1079,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                 }
             }
         }
-        
+
         // Vérifier les techniques par rang
         const detectedTechniques = this.detectTechniques(message);
         for (const technique of detectedTechniques) {
@@ -1087,7 +1087,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                 errors.push(`❌ Technique "${technique.name}" requiert le rang ${technique.requiredRank} (vous: ${character.powerLevel})`);
             }
         }
-        
+
         return errors;
     }
 
@@ -1098,7 +1098,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
         const rankOrder = ['G', 'F', 'E', 'D', 'C', 'B', 'A', 'S', 'S+', 'SS', 'SSS', 'MONARQUE'];
         const characterRankIndex = rankOrder.indexOf(character.powerLevel);
         const techniqueRankIndex = rankOrder.indexOf(technique.requiredRank);
-        
+
         return characterRankIndex >= techniqueRankIndex;
     }
 
@@ -1107,12 +1107,12 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
      */
     async startRegeneration(playerId, type, maxValue, sock, chatId) {
         const regenKey = `${playerId}_${type}`;
-        
+
         // Arrêter la régénération existante si elle existe
         if (this.regenerationSystem.has(regenKey)) {
             clearInterval(this.regenerationSystem.get(regenKey).interval);
         }
-        
+
         let currentValue = 0;
         const regenData = {
             playerId,
@@ -1122,19 +1122,19 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
             startTime: Date.now(),
             messageId: null
         };
-        
+
         // Envoyer le message initial
         const initialMessage = this.generateRegenMessage(regenData);
         const response = await sock.sendMessage(chatId, { text: initialMessage });
         regenData.messageId = response.key.id;
-        
+
         // Démarrer la régénération (60 secondes = 60 intervalles de 1 seconde)
         const interval = setInterval(async () => {
             currentValue++;
             regenData.currentValue = currentValue;
-            
+
             const updatedMessage = this.generateRegenMessage(regenData);
-            
+
             try {
                 await sock.sendMessage(chatId, {
                     text: updatedMessage,
@@ -1145,18 +1145,18 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
                 const newResponse = await sock.sendMessage(chatId, { text: updatedMessage });
                 regenData.messageId = newResponse.key.id;
             }
-            
+
             if (currentValue >= maxValue) {
                 clearInterval(interval);
                 this.regenerationSystem.delete(regenKey);
-                
+
                 // Message final
                 await sock.sendMessage(chatId, {
                     text: `✅ **${type.toUpperCase()} RECHARGÉ !**\n\n${type === 'aura' ? '🔮' : '✨'} Votre ${type} est maintenant à son maximum !`
                 });
             }
         }, 1000); // Chaque seconde
-        
+
         regenData.interval = interval;
         this.regenerationSystem.set(regenKey, regenData);
     }
@@ -1167,19 +1167,19 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
     generateRegenMessage(regenData) {
         const { type, currentValue, maxValue, startTime } = regenData;
         const percentage = (currentValue / maxValue) * 100;
-        
+
         // Générer la barre de progression
         const totalBars = 10;
         const filledBars = Math.floor((currentValue / maxValue) * totalBars);
         const emptyBars = totalBars - filledBars;
-        
+
         const progressBar = '▰'.repeat(filledBars) + '▱'.repeat(emptyBars);
         const timeElapsed = Math.floor((Date.now() - startTime) / 1000);
         const timeRemaining = Math.max(0, 60 - timeElapsed);
-        
+
         const emoji = type === 'aura' ? '🔮' : '✨';
         const typeDisplay = type.charAt(0).toUpperCase() + type.slice(1);
-        
+
         return `${emoji} **RÉGÉNÉRATION ${typeDisplay.toUpperCase()}** ${emoji}
 
 ${progressBar} ${Math.floor(percentage)}%
@@ -1767,10 +1767,10 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
         return {
             text: `🗺️ **CARTE DU MONDE - FRICTION ULTIMATE**\n\n` +
                   `🏰 **Les 12 Royaumes sont dispersés à travers :**\n` +
-                  `• Plaines fertiles d\'Aegyria\n` +
+                  `• Plaines fertiles d'Aegyria\n` +
                   `• Forêts sombres de Sombrenuit\n` +
                   `• Déserts brûlants de Khelos\n` +
-                  `• Ports fortifiés d\'Abrantis\n` +
+                  `• Ports fortifiés d'Abrantis\n` +
                   `• Montagnes enneigées de Varha\n` +
                   `• Et bien d\'autres contrées dangereuses...\n\n` +
                   `⚔️ **Les 7 Ordres ont établi leurs quartiers :**\n` +
@@ -1808,14 +1808,14 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                   `❤️ **Vie :** ${character.currentLife}/${character.maxLife}\n` +
                   `⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}\n\n` +
                   `🎯 **Tes prochains messages seront interprétés comme des actions de jeu.**\n\n` +
-                  `📝 **Exemples d\'actions :**\n` +
+                  `📝 **Exemples d'actions :**\n` +
                   `• "Je regarde autour de moi"\n` +
-                  `• "J\'avance vers le nord"\n` +
+                  `• "J'avance vers le nord"\n` +
                   `• "Je cherche des ennemis"\n` +
-                  `• "J\'attaque avec mon épée"\n\n` +
-                  `💬 **Besoin d\'aide :** utilise /aide pour voir toutes les commandes\n` +
+                  `• "Je attaque avec mon épée"\n\n` +
+                  `💬 **Besoin d'aide :** utilise /aide pour voir toutes les commandes\n` +
                   `⚙️ **Pour sortir du mode jeu :** utilise /menu\n\n` +
-                  `🔥 **L\'aventure commence maintenant !**`,
+                  `🔥 **L'aventure commence maintenant !**`,
             image: await imageGenerator.generateCharacterImage(character)
         };
     }
@@ -1931,7 +1931,7 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                   `⚠️ **Important :**\n` +
                   `• Seule la zone du visage sera utilisée\n` +
                   `• Photo claire et bien éclairée recommandée\n` +
-                  `• Si tu n\'as pas de photo, écris "SANS_PHOTO"\n\n` +
+                  `• Si tu n'as pas de photo, écris "SANS_PHOTO"\n\n` +
                   `📷 **Envoie ta photo maintenant...**`
         };
     }
@@ -2538,7 +2538,7 @@ Exemples:
 
             const spellInput = args.join(' ');
             const parsedInput = this.ancientAlphabetManager.parseSpellInput(spellInput);
-            
+
             // Simulation d'un sort - dans la vraie version, cela viendrait de la base de données
             const mockSpell = {
                 name: parsedInput.modern,
@@ -2551,7 +2551,7 @@ Exemples:
             };
 
             const spellDisplay = this.ancientAlphabetManager.createSpellDisplay(mockSpell);
-            
+
             return {
                 text: spellDisplay,
                 image: null
@@ -2585,7 +2585,7 @@ Exemples:
             ];
 
             const spellbookDisplay = this.ancientAlphabetManager.createSpellbook(learnedSpells, character.name);
-            
+
             return {
                 text: spellbookDisplay,
                 image: null
@@ -2745,7 +2745,7 @@ Exemples:
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_time', args);
-        
+
         const response = await this.adminManager.processAdminCommand('/admin_time', playerNumber, params);
         return { text: response };
     }
@@ -2776,10 +2776,10 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
         const params = { groupId: args[0], kingdom: args[1] };
         const response = await this.adminManager.processAdminCommand('/admin_kingdom', playerNumber, params);
-        
+
         // Mettre à jour le mapping local également
         this.adminManager.assignKingdomToGroup(params.groupId, params.kingdom);
-        
+
         return { text: response };
     }
 
@@ -2805,7 +2805,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_give', args);
-        
+
         const response = await this.adminManager.processAdminCommand('/admin_give', playerNumber, params);
         return { text: response };
     }
@@ -2820,7 +2820,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_level', args);
-        
+
         const response = await this.adminManager.processAdminCommand('/admin_level', playerNumber, params);
         return { text: response };
     }
@@ -2835,7 +2835,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_teleport', args);
-        
+
         const response = await this.adminManager.processAdminCommand('/admin_teleport', playerNumber, params);
         return { text: response };
     }
@@ -2850,7 +2850,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_heal', args);
-        
+
         const response = await this.adminManager.processAdminCommand('/admin_heal', playerNumber, params);
         return { text: response };
     }
@@ -2865,7 +2865,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_power', args);
-        
+
         const response = await this.adminManager.processAdminCommand('/admin_power', playerNumber, params);
         return { text: response };
     }
@@ -2952,7 +2952,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_announce', args);
-        
+
         const response = await this.adminManager.processAdminCommand('/admin_announce', playerNumber, params);
         return { text: response };
     }
@@ -3001,7 +3001,283 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
                 return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
             }
 
+            const character = await dbManager.getCharacterByPlayerId(player.id);
+            if (!character) {
+                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
+            }
 
+            // Générer les quêtes si pas encore fait
+            await this.questManager.generateAllQuests();
+
+            // Obtenir les quêtes disponibles pour ce joueur
+            const availableQuests = this.questManager.getAvailableQuests(
+                character.level,
+                character.kingdom,
+                10
+            );
+
+            if (availableQuests.length === 0) {
+                return {
+                    text: `📋 **AUCUNE QUÊTE DISPONIBLE**
+
+Aucune quête n'est disponible pour votre niveau et royaume actuels.
+
+💡 **Conseils:**
+• Augmentez votre niveau pour débloquer plus de quêtes
+• Explorez d'autres royaumes
+• Terminez vos quêtes en cours`
+                };
+            }
+
+            let questList = `📋 **QUÊTES DISPONIBLES** 📋\n\n`;
+            questList += `👤 **Personnage:** ${character.name}\n`;
+            questList += `🏰 **Royaume:** ${character.kingdom}\n`;
+            questList += `⭐ **Niveau:** ${character.level}\n\n`;
+
+            availableQuests.forEach((quest, index) => {
+                const typeEmoji = quest.type === 'main' ? '⭐' : '📋';
+                const difficultyEmoji = {
+                    'Facile': '🟢',
+                    'Normale': '🟡', 
+                    'Difficile': '🟠',
+                    'Très Difficile': '🔴',
+                    'Légendaire': '🟣'
+                }[quest.difficulty];
+
+                questList += `${index + 1}. ${typeEmoji} **${quest.title}**\n`;
+                questList += `   ${difficultyEmoji} ${quest.difficulty} • Niveau ${quest.requirements.level}\n`;
+                questList += `   ⏱️ ${quest.estimatedTime} min • 🏆 ${quest.rewards.xp} XP\n`;
+
+                if (quest.type === 'main' && quest.chapter) {
+                    questList += `   📖 Chapitre ${quest.chapter}\n`;
+                }
+                questList += `\n`;
+            });
+
+            questList += `💡 Utilisez \`/quete [numéro]\` pour voir les détails d'une quête\n`;
+            questList += `🎯 Utilisez \`/accepter [numéro]\` pour accepter une quête`;
+
+            return { text: questList };
+        } catch (error) {
+            console.error('❌ Erreur quêtes:', error);
+            return { text: '❌ Erreur lors du chargement des quêtes.' };
+        }
+    }
+
+    /**
+     * Affiche les détails d'une quête spécifique
+     */
+    async handleQuestDetailsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
+                return {
+                    text: `📖 **DÉTAILS DE QUÊTE**
+
+💡 Usage: \`/quete [numéro]\`
+
+Exemple: \`/quete 1\`
+
+📋 Utilisez \`/quetes\` pour voir la liste des quêtes disponibles.`
+                };
+            }
+
+            const questIndex = parseInt(args[0]) - 1;
+
+            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
+            if (!player) {
+                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
+            }
+
+            const character = await dbManager.getCharacterByPlayerId(player.id);
+            if (!character) {
+                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
+            }
+
+            // Générer les quêtes si pas encore fait
+            await this.questManager.generateAllQuests();
+
+            const availableQuests = this.questManager.getAvailableQuests(
+                character.level,
+                character.kingdom,
+                20
+            );
+
+            if (questIndex < 0 || questIndex >= availableQuests.length) {
+                return {
+                    text: `❌ **QUÊTE INTROUVABLE**
+
+Le numéro de quête ${questIndex + 1} n'existe pas.
+
+📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
+                };
+            }
+
+            const quest = availableQuests[questIndex];
+            const questDisplay = this.questManager.formatQuestDisplay(quest);
+
+            return {
+                text: questDisplay + `\n\n🎯 Utilisez \`/accepter ${questIndex + 1}\` pour accepter cette quête`
+            };
+        } catch (error) {
+            console.error('❌ Erreur détail quête:', error);
+            return { text: '❌ Erreur lors du chargement des détails de la quête.' };
+        }
+    }
+
+    /**
+     * Accepte une quête
+     */
+    async handleAcceptQuestCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
+                return {
+                    text: `🎯 **ACCEPTER UNE QUÊTE**
+
+💡 Usage: \`/accepter [numéro]\`
+
+Exemple: \`/accepter 1\`
+
+📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
+                };
+            }
+
+            const questIndex = parseInt(args[0]) - 1;
+
+            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
+            if (!player) {
+                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
+            }
+
+            const character = await dbManager.getCharacterByPlayerId(player.id);
+            if (!character) {
+                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
+            }
+
+            await this.questManager.generateAllQuests();
+
+            const availableQuests = this.questManager.getAvailableQuests(
+                character.level,
+                character.kingdom,
+                20
+            );
+
+            if (questIndex < 0 || questIndex >= availableQuests.length) {
+                return {
+                    text: `❌ **QUÊTE INTROUVABLE**
+
+Le numéro de quête ${questIndex + 1} n'existe pas.
+
+📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
+                };
+            }
+
+            const quest = availableQuests[questIndex];
+
+            // Animation d'acceptation de quête
+            const loadingAnimation = await this.loadingBarManager.createLoadingAnimation(
+                'quest_accept',
+                `Acceptation de "${quest.title}"`,
+                character.name
+            );
+
+            return {
+                text: `${loadingAnimation[loadingAnimation.length - 1]}
+
+✅ **QUÊTE ACCEPTÉE !**
+
+📋 **${quest.title}**
+📖 ${quest.description}
+
+🎯 **Objectifs:**
+${quest.objectives.map(obj => `• ${obj}`).join('\n')}
+
+🏆 **Récompenses:**
+• 💰 ${quest.rewards.gold} pièces d'or
+• ⭐ ${quest.rewards.xp} points d'expérience
+${quest.rewards.items ? quest.rewards.items.map(item => `• 🎒 ${item}`).join('\n') : ''}
+
+📍 **Localisation:** ${quest.location}
+⏱️ **Temps estimé:** ${quest.estimatedTime} minutes
+
+💡 Utilisez \`/progression\` pour voir vos quêtes en cours`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur acceptation quête:', error);
+            return { text: '❌ Erreur lors de l\'acceptation de la quête.' };
+        }
+    }
+
+    async handleAbandonQuestCommand({ player, message, dbManager }) {
+        try {
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
+                return {
+                    text: `🚫 **ABANDONNER UNE QUÊTE**
+
+💡 Usage: \`/abandonner [numéro]\`
+
+Exemple: \`/abandonner 1\`
+
+📋 Utilisez \`/progression\` pour voir vos quêtes en cours.`
+                };
+            }
+
+            return { text: "🚫 Fonctionnalité d'abandon de quête en développement." };
+
+        } catch (error) {
+            console.error('❌ Erreur abandon quête:', error);
+            return { text: "❌ Erreur lors de l'abandon de la quête." };
+        }
+    }
+
+    async handleQuestProgressCommand({ player, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            return { text: "📊 Système de progression des quêtes en développement." };
+
+        } catch (error) {
+            console.error('❌ Erreur progression quête:', error);
+            return { text: "❌ Erreur lors de l'affichage de la progression." };
+        }
+    }
+
+    async handleSearchQuestCommand({ player, message, dbManager }) {
+        try {
+            const args = message.split(' ').slice(1);
+            if (args.length === 0) {
+                return {
+                    text: `🔍 **RECHERCHER UNE QUÊTE**
+
+💡 Usage: \`/rechercher_quete [mot-clé]\`
+
+Exemple: \`/rechercher_quete dragon\`
+
+📋 Recherchez parmi plus de 30,000 quêtes disponibles !`
+                };
+            }
+
+            return { text: "🔍 Système de recherche de quête en développement." };
+
+        } catch (error) {
+            console.error('❌ Erreur recherche quête:', error);
+            return { text: "❌ Erreur lors de la recherche de quête." };
+        }
+    }
+
+    // ===========================================
+    // MÉTHODES POUR LE SYSTÈME D'AURA
+    // ===========================================
+
+    /**
+     * Affiche les informations d'aura du joueur
+     */
     async handleAuraInfoCommand({ player, dbManager }) {
         try {
             const character = await dbManager.getCharacterByPlayer(player.id);
@@ -3023,18 +3299,11 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
         }
     }
 
+    /**
+     * Démarre l'apprentissage d'une aura
+     */
     async handleLearnAuraCommand({ player, message, dbManager }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
             const args = message.split(' ').slice(1);
             if (args.length === 0) {
                 return {
@@ -3053,7 +3322,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
             const auraType = args[0].toLowerCase();
             const validTypes = ['fire', 'water', 'earth', 'wind', 'lightning', 'shadow', 'light'];
-            
+
             if (!validTypes.includes(auraType)) {
                 return { text: "❌ Type d'aura invalide ! Types disponibles: " + validTypes.join(', ') };
             }
@@ -3200,7 +3469,177 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
 
     async handleRegenerateAuraCommand({ player, chatId, dbManager, sock }) {
         return await this.handleMeditateCommand({ player, chatId, dbManager, sock });
+    }
 
+    async handleRegenerateMagicCommand({ player, chatId, dbManager, sock }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return { text: "❌ Tu n'as pas encore de personnage !" };
+            }
+
+            if (!this.auraManager) {
+                const AuraManager = require('../utils/AuraManager');
+                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
+            }
+
+            // Démarrer une régénération de magie
+            const regenId = await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
+
+            return { text: '', skipResponse: true };
+
+        } catch (error) {
+            console.error('❌ Erreur régénération magie:', error);
+            return { text: "❌ Erreur lors de la régénération magique." };
+        }
+    }
+
+
+    // ===========================================
+    // MÉTHODES POUR LE TEMPS, LA MÉTÉO ET LES ÉVÉNEMENTS
+    // ===========================================
+
+    /**
+     * Affiche l'heure et la date actuelles du monde
+     */
+    async handleTimeCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const timeDisplay = this.timeManager.formatTimeDisplay();
+            return { text: timeDisplay };
+        } catch (error) {
+            console.error('❌ Erreur temps:', error);
+            return { text: '❌ Erreur lors du chargement du temps.' };
+        }
+    }
+
+    /**
+     * Affiche les informations météo actuelles
+     */
+    async handleWeatherCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const weather = this.timeManager.getCurrentWeather();
+            const effects = this.timeManager.getCombinedEffects();
+
+            let weatherDisplay = `🌤️ **MÉTÉO ACTUELLE** 🌤️\n\n`;
+            weatherDisplay += `${weather.weatherInfo.emoji} **${weather.weatherInfo.name}**\n`;
+            weatherDisplay += `📖 ${weather.weatherInfo.description}\n\n`;
+
+            weatherDisplay += `🌡️ **Température:** ${weather.temperature}°C\n`;
+            weatherDisplay += `💧 **Humidité:** ${weather.humidity}%\n`;
+            weatherDisplay += `💨 **Vent:** ${weather.windSpeed} km/h\n`;
+            weatherDisplay += `📊 **Pression:** ${weather.pressure} hPa\n\n`;
+
+            weatherDisplay += `${weather.seasonInfo.emoji} **Saison:** ${weather.seasonInfo.name}\n`;
+            weatherDisplay += `📝 ${weather.seasonInfo.description}\n\n`;
+
+            weatherDisplay += `⚡ **EFFETS SUR LE GAMEPLAY** ⚡\n`;
+            for (const [effect, value] of Object.entries(effects)) {
+                if (Math.abs(value - 100) > 5) { // Seulement les effets significatifs
+                    const modifier = value > 100 ? '+' : '';
+                    const icon = value > 100 ? '⬆️' : '⬇️';
+                    weatherDisplay += `${icon} ${effect}: ${modifier}${Math.round(value - 100)}%\n`;
+                }
+            }
+
+            return { text: weatherDisplay };
+        } catch (error) {
+            console.error('❌ Erreur météo:', error);
+            return { text: '❌ Erreur lors du chargement de la météo.' };
+        }
+    }
+
+    /**
+     * Affiche les événements actifs
+     */
+    async handleEventsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const activeEvents = this.timeManager.getActiveEvents();
+
+            if (activeEvents.length === 0) {
+                return {
+                    text: `🎆 **AUCUN ÉVÉNEMENT ACTIF** 🎆
+
+Aucun événement spécial n'est en cours actuellement.
+
+⏰ **Événements à venir:**
+• Les événements se déclenchent aléatoirement
+• Éclipses, pluies de météores, aurores boréales
+• Festivals saisonniers
+
+🔮 Restez connecté pour ne rien manquer !`
+                };
+            }
+
+            let eventsDisplay = `🎆 **ÉVÉNEMENTS ACTIFS** 🎆\n\n`;
+
+            activeEvents.forEach(event => {
+                const timeLeft = Math.max(0, Math.floor((event.endTime - Date.now()) / 60000));
+                eventsDisplay += `${event.emoji} **${event.name}**\n`;
+                eventsDisplay += `📖 ${event.description}\n`;
+                eventsDisplay += `⏳ Temps restant: ${timeLeft} minutes\n`;
+                eventsDisplay += `🌟 Rareté: ${event.rarity}\n\n`;
+
+                if (event.effects && Object.keys(event.effects).length > 0) {
+                    eventsDisplay += `⚡ **Effets actifs:**\n`;
+                    for (const [effect, value] of Object.entries(event.effects)) {
+                        const modifier = value > 100 ? '+' : '';
+                        eventsDisplay += `• ${effect}: ${modifier}${Math.round(value - 100)}%\n`;
+                    }
+                    eventsDisplay += `\n`;
+                }
+            });
+
+            eventsDisplay += `💡 Profitez des événements pour booster vos capacités !`;
+
+            return { text: eventsDisplay };
+        } catch (error) {
+            console.error('❌ Erreur événements:', error);
+            return { text: '❌ Erreur lors du chargement des événements.' };
+        }
+    }
+
+    /**
+     * Affiche un calendrier avec les phases temporelles
+     */
+    async handleCalendarCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        try {
+            const currentTime = this.timeManager.getCurrentTime();
+            const weather = this.timeManager.getCurrentWeather();
+
+            let calendarDisplay = `📅 **CALENDRIER MONDIAL** 📅\n\n`;
+            calendarDisplay += `📆 **${currentTime.dateString}**\n`;
+            calendarDisplay += `🕐 **${currentTime.timeString}**\n`;
+            calendarDisplay += `${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**\n\n`;
+
+            calendarDisplay += `🌤️ **Météo:** ${weather.weatherInfo.emoji} ${weather.weatherInfo.name}\n\n`;
+
+            calendarDisplay += `📊 **Cycle temporel:**\n`;
+            calendarDisplay += `• Année ${currentTime.year} de l'ère moderne\n`;
+            calendarDisplay += `• Mois ${currentTime.month}/12\n`;
+            calendarDisplay += `• Jour ${currentTime.day}/30\n`;
+            calendarDisplay += `• Heure ${currentTime.hour}:${currentTime.minute.toString().padStart(2, '0')}\n\n`;
+
+            calendarDisplay += `🔄 **Phases saisonnières:**\n`;
+            const seasons = ['Printemps', 'Été', 'Automne', 'Hiver'];
+            const currentSeason = currentTime.seasonInfo.name;
+            seasons.forEach(season => {
+                const icon = season === currentSeason ? '🔸' : '🔹';
+                calendarDisplay += `${icon} ${season}\n`;
+            });
+
+            calendarDisplay += `\n⏰ **1 minute réelle = 1 heure de jeu**\n`;
+            calendarDisplay += `📈 **Le temps affecte vos capacités et les événements !**`;
+
+            return { text: calendarDisplay };
+        } catch (error) {
+            console.error('❌ Erreur calendrier:', error);
+            return { text: '❌ Erreur lors du chargement du calendrier.' };
+        }
+    }
+
+    // ===========================================
+    // MÉTHODES POUR LES COORDONNÉES ET LA CARTE
+    // ===========================================
 
     /**
      * Commande pour afficher les coordonnées et la carte
@@ -3269,7 +3708,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
                 const WorldMapGenerator = require('../utils/WorldMapGenerator');
                 const mapGen = new WorldMapGenerator();
                 const kingdoms = mapGen.getKingdomsWithCoordinates();
-                
+
                 if (kingdoms[character.kingdom]) {
                     coordinates = kingdoms[character.kingdom].coordinates;
                     // Mettre à jour en base
@@ -3318,855 +3757,10 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
             'volcano': '🌋 Région Volcanique',
             'jungle': '🌿 Jungle',
             'wasteland': '💀 Terre Désolée',
-            'eclipse': '🌑 Terre d'Éclipse',
+            'eclipse': '🌑 Terre d\'Éclipse',
             'coast': '🏖️ Côte Maritime'
         };
         return names[terrain] || '❓ Terrain Inconnu';
-    }
-
-    }
-
-    async handleRegenerateMagicCommand({ player, chatId, dbManager, sock }) {
-        try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            // Démarrer une régénération de magie
-            const regenId = await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
-
-            return { text: '', skipResponse: true };
-
-        } catch (error) {
-            console.error('❌ Erreur régénération magie:', error);
-            return { text: "❌ Erreur lors de la régénération magique." };
-        }
-    }
-
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            // Générer les quêtes si pas encore fait
-            await this.questManager.generateAllQuests();
-
-            // Obtenir les quêtes disponibles pour ce joueur
-            const availableQuests = this.questManager.getAvailableQuests(
-                character.level,
-                character.kingdom,
-                10
-            );
-
-            if (availableQuests.length === 0) {
-                return {
-                    text: `📋 **AUCUNE QUÊTE DISPONIBLE**
-
-Aucune quête n'est disponible pour votre niveau et royaume actuels.
-
-💡 **Conseils:**
-• Augmentez votre niveau pour débloquer plus de quêtes
-• Explorez d'autres royaumes
-• Terminez vos quêtes en cours`
-                };
-            }
-
-            let questList = `📋 **QUÊTES DISPONIBLES** 📋\n\n`;
-            questList += `👤 **Personnage:** ${character.name}\n`;
-            questList += `🏰 **Royaume:** ${character.kingdom}\n`;
-            questList += `⭐ **Niveau:** ${character.level}\n\n`;
-
-            availableQuests.forEach((quest, index) => {
-                const typeEmoji = quest.type === 'main' ? '⭐' : '📋';
-                const difficultyEmoji = {
-                    'Facile': '🟢',
-                    'Normale': '🟡', 
-                    'Difficile': '🟠',
-                    'Très Difficile': '🔴',
-                    'Légendaire': '🟣'
-                }[quest.difficulty];
-
-                questList += `${index + 1}. ${typeEmoji} **${quest.title}**\n`;
-                questList += `   ${difficultyEmoji} ${quest.difficulty} • Niveau ${quest.requirements.level}\n`;
-                questList += `   ⏱️ ${quest.estimatedTime} min • 🏆 ${quest.rewards.xp} XP\n`;
-                
-                if (quest.type === 'main' && quest.chapter) {
-                    questList += `   📖 Chapitre ${quest.chapter}\n`;
-                }
-                questList += `\n`;
-            });
-
-            questList += `💡 Utilisez \`/quete [numéro]\` pour voir les détails d'une quête\n`;
-            questList += `🎯 Utilisez \`/accepter [numéro]\` pour accepter une quête`;
-
-            return { text: questList };
-        } catch (error) {
-            console.error('❌ Erreur quêtes:', error);
-            return { text: '❌ Erreur lors du chargement des quêtes.' };
-        }
-    }
-
-    /**
-     * Affiche les détails d'une quête spécifique
-     */
-    async handleQuestDetailsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `📖 **DÉTAILS DE QUÊTE**
-
-💡 Usage: \`/quete [numéro]\`
-
-Exemple: \`/quete 1\`
-
-📋 Utilisez \`/quetes\` pour voir la liste des quêtes disponibles.`
-                };
-            }
-
-            const questIndex = parseInt(args[0]) - 1;
-            
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            // Générer les quêtes si pas encore fait
-            await this.questManager.generateAllQuests();
-
-            const availableQuests = this.questManager.getAvailableQuests(
-                character.level,
-                character.kingdom,
-                20
-            );
-
-            if (questIndex < 0 || questIndex >= availableQuests.length) {
-                return {
-                    text: `❌ **QUÊTE INTROUVABLE**
-
-Le numéro de quête ${questIndex + 1} n'existe pas.
-
-📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
-                };
-            }
-
-            const quest = availableQuests[questIndex];
-            const questDisplay = this.questManager.formatQuestDisplay(quest);
-
-            return {
-                text: questDisplay + `\n\n🎯 Utilisez \`/accepter ${questIndex + 1}\` pour accepter cette quête`
-            };
-        } catch (error) {
-            console.error('❌ Erreur détail quête:', error);
-            return { text: '❌ Erreur lors du chargement des détails de la quête.' };
-        }
-    }
-
-    /**
-     * Accepte une quête
-     */
-    async handleAcceptQuestCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `🎯 **ACCEPTER UNE QUÊTE**
-
-💡 Usage: \`/accepter [numéro]\`
-
-Exemple: \`/accepter 1\`
-
-📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
-                };
-            }
-
-            const questIndex = parseInt(args[0]) - 1;
-            
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            await this.questManager.generateAllQuests();
-
-            const availableQuests = this.questManager.getAvailableQuests(
-                character.level,
-                character.kingdom,
-                20
-            );
-
-            if (questIndex < 0 || questIndex >= availableQuests.length) {
-                return {
-                    text: `❌ **QUÊTE INTROUVABLE**
-
-Le numéro de quête ${questIndex + 1} n'existe pas.
-
-📋 Utilisez \`/quetes\` pour voir les quêtes disponibles.`
-                };
-            }
-
-            const quest = availableQuests[questIndex];
-
-            // Animation d'acceptation de quête
-            const loadingAnimation = await this.loadingBarManager.createLoadingAnimation(
-                'quest_accept',
-                `Acceptation de "${quest.title}"`,
-                character.name
-            );
-
-            return {
-                text: `${loadingAnimation[loadingAnimation.length - 1]}
-
-✅ **QUÊTE ACCEPTÉE !**
-
-📋 **${quest.title}**
-📖 ${quest.description}
-
-🎯 **Objectifs acceptés:**
-${quest.objectives.map((obj, i) => `${i + 1}. ${this.questManager.formatObjectiveProgress(obj)}`).join('\n')}
-
-🏆 **Récompenses:**
-💫 ${quest.rewards.xp} XP
-💰 ${quest.rewards.gold} Or
-${quest.rewards.aura ? `✨ ${quest.rewards.aura} Aura\n` : ''}
-${quest.rewards.items.length > 0 ? `🎁 ${quest.rewards.items.join(', ')}\n` : ''}
-
-💡 Utilisez \`/progression\` pour suivre vos quêtes en cours !`
-            };
-        } catch (error) {
-            console.error('❌ Erreur acceptation quête:', error);
-            return { text: '❌ Erreur lors de l\'acceptation de la quête.' };
-        }
-    }
-
-    /**
-     * Abandonne une quête
-     */
-    async handleAbandonQuestCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            return {
-                text: `🚫 **ABANDONNER UNE QUÊTE**
-
-⚠️ Cette fonctionnalité n'est pas encore implémentée.
-
-💡 **Prochainement:**
-• Abandonner des quêtes en cours
-• Pénalités d'abandon
-• Récupération de quêtes abandonnées
-
-📋 Utilisez \`/progression\` pour voir vos quêtes actuelles.`
-            };
-        } catch (error) {
-            console.error('❌ Erreur abandon quête:', error);
-            return { text: '❌ Erreur lors de l\'abandon de la quête.' };
-        }
-    }
-
-    /**
-     * Affiche la progression des quêtes
-     */
-    async handleQuestProgressCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            return {
-                text: `📊 **PROGRESSION DES QUÊTES** 📊
-
-👤 **${character.name}**
-🏰 **Royaume:** ${character.kingdom}
-⭐ **Niveau:** ${character.level}
-
-🔄 **Quêtes en cours:** 0
-✅ **Quêtes complétées:** 0
-💫 **XP total des quêtes:** 0
-
-⚠️ **Système de progression en développement**
-
-💡 Prochainement :
-• Suivi automatique des objectifs
-• Récompenses automatiques
-• Historique des quêtes
-
-📋 Utilisez \`/quetes\` pour voir les quêtes disponibles !`
-            };
-        } catch (error) {
-            console.error('❌ Erreur progression quêtes:', error);
-            return { text: '❌ Erreur lors du chargement de la progression.' };
-        }
-    }
-
-    /**
-     * Recherche des quêtes par critères
-     */
-    async handleSearchQuestCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `🔍 **RECHERCHE DE QUÊTES**
-
-💡 Usage: \`/rechercher_quete [critère]\`
-
-**Exemples:**
-• \`/rechercher_quete dragon\` - Quêtes avec "dragon"
-• \`/rechercher_quete difficile\` - Quêtes difficiles
-• \`/rechercher_quete principale\` - Quêtes principales
-
-📋 Utilisez \`/quetes\` pour voir toutes les quêtes disponibles.`
-                };
-            }
-
-            const searchTerm = args.join(' ').toLowerCase();
-            
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            await this.questManager.generateAllQuests();
-
-            // Recherche avec critères
-            const searchCriteria = {
-                search: searchTerm,
-                kingdom: character.kingdom,
-                maxLevel: character.level + 5, // Quêtes jusqu'à 5 niveaux au-dessus
-                limit: 10
-            };
-
-            if (searchTerm.includes('principale') || searchTerm.includes('main')) {
-                searchCriteria.type = 'main';
-            } else if (searchTerm.includes('secondaire') || searchTerm.includes('side')) {
-                searchCriteria.type = 'side';
-            }
-
-            if (searchTerm.includes('facile')) {
-                searchCriteria.difficulty = 'Facile';
-            } else if (searchTerm.includes('difficile')) {
-                searchCriteria.difficulty = 'Difficile';
-            }
-
-            const results = this.questManager.searchQuests(searchCriteria);
-
-            if (results.length === 0) {
-                return {
-                    text: `🔍 **AUCUN RÉSULTAT**
-
-Aucune quête trouvée pour "${searchTerm}".
-
-💡 **Essayez:**
-• Des mots-clés plus généraux
-• "dragon", "exploration", "combat"
-• "facile", "difficile", "principale"
-
-📋 Utilisez \`/quetes\` pour voir toutes les quêtes disponibles.`
-                };
-            }
-
-            let resultText = `🔍 **RÉSULTATS DE RECHERCHE** 🔍\n\n`;
-            resultText += `🔎 **Recherche:** "${searchTerm}"\n`;
-            resultText += `📊 **${results.length} quête(s) trouvée(s)**\n\n`;
-
-            results.forEach((quest, index) => {
-                const typeEmoji = quest.type === 'main' ? '⭐' : '📋';
-                const difficultyEmoji = {
-                    'Facile': '🟢',
-                    'Normale': '🟡', 
-                    'Difficile': '🟠',
-                    'Très Difficile': '🔴',
-                    'Légendaire': '🟣'
-                }[quest.difficulty];
-
-                resultText += `${index + 1}. ${typeEmoji} **${quest.title}**\n`;
-                resultText += `   ${difficultyEmoji} ${quest.difficulty} • Niveau ${quest.requirements.level}\n`;
-                resultText += `   ⏱️ ${quest.estimatedTime} min • 🏆 ${quest.rewards.xp} XP\n\n`;
-            });
-
-            resultText += `💡 Utilisez \`/quete [numéro]\` pour voir les détails d'une quête`;
-
-            return { text: resultText };
-        } catch (error) {
-            console.error('❌ Erreur recherche quête:', error);
-            return { text: '❌ Erreur lors de la recherche de quêtes.' };
-        }
-    }
-
-    // ===========================================
-    // MÉTHODES POUR LE SYSTÈME D'AURA
-    // ===========================================
-
-    /**
-     * Affiche les informations d'aura du joueur
-     */
-    async handleAuraInfoCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
-            return { text: auraInfo };
-        } catch (error) {
-            console.error('❌ Erreur info aura:', error);
-            return { text: '❌ Erreur lors du chargement des informations d\'aura.' };
-        }
-    }
-
-    /**
-     * Démarre l'apprentissage d'une aura
-     */
-    async handleLearnAuraCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `🔮 **APPRENTISSAGE D'AURA** 🔮
-
-💡 Usage: \`/aura_apprendre [type]\`
-
-**Types d'aura disponibles:**
-🔥 \`fire\` - Aura de Flamme (maîtrise du feu)
-🌊 \`water\` - Aura Aquatique (contrôle de l'eau)
-🌍 \`earth\` - Aura Tellurique (force de la terre)
-💨 \`wind\` - Aura Éolienne (pouvoir du vent)
-⚡ \`lightning\` - Aura Foudroyante (foudre divine)
-🌑 \`shadow\` - Aura Ténébreuse (mystères des ombres)
-✨ \`light\` - Aura Lumineuse (grâce sacrée)
-
-**Exemple:** \`/aura_apprendre fire\`
-
-⏰ **Entraînement:** 10 jours (sessions quotidiennes de 30 secondes)`
-                };
-            }
-
-            const auraType = args[0].toLowerCase();
-            
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            // Vérifier si le joueur peut commencer un entraînement
-            if (!this.auraManager.canStartTraining(player.id)) {
-                return {
-                    text: `⚠️ **ENTRAÎNEMENT EN COURS**
-
-Vous avez déjà un entraînement d'aura en cours !
-
-🔮 Utilisez \`/aura\` pour voir vos entraînements actuels.
-💪 Utilisez \`/aura_session\` pour votre session quotidienne.`
-                };
-            }
-
-            try {
-                const techniqueNames = {
-                    fire: 'Souffle Ardent',
-                    water: 'Torrent Glacial', 
-                    earth: 'Armure de Roche',
-                    wind: 'Lame de Vent',
-                    lightning: 'Éclair Perçant',
-                    shadow: 'Invisibilité',
-                    light: 'Rayon Purificateur'
-                };
-
-                const techniqueName = techniqueNames[auraType] || 'Technique Basique';
-                
-                const trainingResult = await this.auraManager.startAuraTraining(
-                    player.id,
-                    auraType,
-                    techniqueName
-                );
-
-                return { text: trainingResult.message };
-            } catch (error) {
-                return {
-                    text: `❌ **TYPE D'AURA INVALIDE**
-
-Le type "${auraType}" n'existe pas.
-
-🔮 Types disponibles: fire, water, earth, wind, lightning, shadow, light
-
-💡 Utilisez \`/aura_apprendre [type]\` avec un type valide.`
-                };
-            }
-        } catch (error) {
-            console.error('❌ Erreur apprentissage aura:', error);
-            return { text: '❌ Erreur lors de l\'apprentissage d\'aura.' };
-        }
-    }
-
-    /**
-     * Effectue une session d'entraînement d'aura (30 secondes d'animation)
-     */
-    async handleAuraSessionCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            // Vérifier si le joueur a un entraînement actif
-            const activeTraining = this.auraManager.getPlayerTraining(player.id);
-            if (!activeTraining) {
-                return {
-                    text: `❌ **AUCUN ENTRAÎNEMENT ACTIF**
-
-Vous n'avez pas d'entraînement d'aura en cours.
-
-🔮 Utilisez \`/aura_apprendre [type]\` pour commencer un entraînement.
-💡 Types disponibles: fire, water, earth, wind, lightning, shadow, light`
-                };
-            }
-
-            // Lancer l'animation d'entraînement de 30 secondes
-            await this.auraManager.createAuraAnimation(
-                player.id,
-                activeTraining.auraType,
-                activeTraining.techniqueName,
-                sock,
-                chatId
-            );
-
-            // Mettre à jour le progrès
-            this.auraManager.updateTrainingProgress(activeTraining.id);
-
-            return { text: null }; // L'animation gère déjà les messages
-        } catch (error) {
-            console.error('❌ Erreur session aura:', error);
-            return { text: '❌ Erreur lors de la session d\'entraînement.' };
-        }
-    }
-
-    /**
-     * Affiche les techniques d'aura apprises
-     */
-    async handleAuraTechniquesCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-            
-            if (Object.keys(playerAuras).length === 0) {
-                return {
-                    text: `🔮 **AUCUNE TECHNIQUE D'AURA**
-
-Vous n'avez pas encore appris de techniques d'aura.
-
-💡 **Pour commencer:**
-• \`/aura_apprendre [type]\` - Débuter un entraînement
-• \`/aura_session\` - Effectuer une session quotidienne
-
-🌟 Les techniques d'aura vous donnent des pouvoirs extraordinaires !`
-                };
-            }
-
-            let techniquesList = `⚡ **TECHNIQUES D'AURA MAÎTRISÉES** ⚡\n\n`;
-            techniquesList += `👤 **Maître:** ${character.name}\n\n`;
-
-            for (const [type, auraData] of Object.entries(playerAuras)) {
-                const auraInfo = this.auraManager.auraTypes[type];
-                techniquesList += `${auraInfo.emoji} **${auraInfo.name}**\n`;
-                techniquesList += `   📊 Niveau ${auraData.level}\n`;
-                techniquesList += `   ⚡ Maîtrise: ${auraData.masteryPoints} points\n`;
-                techniquesList += `   🎯 Techniques connues: ${auraData.techniques.length}\n`;
-                
-                if (auraData.techniques.length > 0) {
-                    techniquesList += `   📚 **Techniques:**\n`;
-                    auraData.techniques.forEach(technique => {
-                        techniquesList += `      • ${technique}\n`;
-                    });
-                }
-                techniquesList += `\n`;
-            }
-
-            techniquesList += `💡 Utilisez \`/aura_cast [type] [technique]\` pour lancer une technique !`;
-
-            return { text: techniquesList };
-        } catch (error) {
-            console.error('❌ Erreur techniques aura:', error);
-            return { text: '❌ Erreur lors du chargement des techniques.' };
-        }
-    }
-
-    /**
-     * Lance une technique d'aura
-     */
-    async handleCastAuraCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length < 2) {
-                return {
-                    text: `⚡ **LANCEMENT DE TECHNIQUE D'AURA** ⚡
-
-💡 Usage: \`/aura_cast [type] [technique]\`
-
-**Exemples:**
-• \`/aura_cast fire "Souffle Ardent"\`
-• \`/aura_cast water "Torrent Glacial"\`
-• \`/aura_cast lightning "Éclair Perçant"\`
-
-🔮 Utilisez \`/aura_techniques\` pour voir vos techniques disponibles.`
-                };
-            }
-
-            const auraType = args[0].toLowerCase();
-            const techniqueName = args.slice(1).join(' ').replace(/"/g, '');
-
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            const result = await this.auraManager.castAuraTechnique(player.id, auraType, techniqueName);
-            return { text: result.message };
-        } catch (error) {
-            console.error('❌ Erreur lancement aura:', error);
-            return { text: '❌ Erreur lors du lancement de la technique.' };
-        }
-    }
-
-    /**
-     * Session de méditation pour l'aura
-     */
-    async handleMeditateCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            // Simulation d'une session de méditation
-            const loadingAnimation = await this.loadingBarManager.createLoadingAnimation(
-                'meditation',
-                'Méditation spirituelle',
-                character.name
-            );
-
-            return {
-                text: `${loadingAnimation[loadingAnimation.length - 1]}
-
-🧘 **MÉDITATION TERMINÉE** 🧘
-
-✨ **${character.name}** a médité profondément...
-
-🔮 **Bienfaits de la méditation:**
-• +5 Points de concentration
-• +3 Points d'énergie spirituelle  
-• +1 Point de sagesse
-
-💫 Votre aura s'est purifiée et renforcée !
-
-💡 **Conseil:** Méditez régulièrement pour améliorer vos capacités d'aura !`
-            };
-        } catch (error) {
-            console.error('❌ Erreur méditation:', error);
-            return { text: '❌ Erreur lors de la méditation.' };
-        }
-    }
-
-    // ===========================================
-    // MÉTHODES POUR LE TEMPS ET LA MÉTÉO
-    // ===========================================
-
-    /**
-     * Affiche l'heure et la date actuelles du monde
-     */
-    async handleTimeCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const timeDisplay = this.timeManager.formatTimeDisplay();
-            return { text: timeDisplay };
-        } catch (error) {
-            console.error('❌ Erreur temps:', error);
-            return { text: '❌ Erreur lors du chargement du temps.' };
-        }
-    }
-
-    /**
-     * Affiche les informations météo actuelles
-     */
-    async handleWeatherCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const weather = this.timeManager.getCurrentWeather();
-            const effects = this.timeManager.getCombinedEffects();
-
-            let weatherDisplay = `🌤️ **MÉTÉO ACTUELLE** 🌤️\n\n`;
-            weatherDisplay += `${weather.weatherInfo.emoji} **${weather.weatherInfo.name}**\n`;
-            weatherDisplay += `📖 ${weather.weatherInfo.description}\n\n`;
-            
-            weatherDisplay += `🌡️ **Température:** ${weather.temperature}°C\n`;
-            weatherDisplay += `💧 **Humidité:** ${weather.humidity}%\n`;
-            weatherDisplay += `💨 **Vent:** ${weather.windSpeed} km/h\n`;
-            weatherDisplay += `📊 **Pression:** ${weather.pressure} hPa\n\n`;
-            
-            weatherDisplay += `${weather.seasonInfo.emoji} **Saison:** ${weather.seasonInfo.name}\n`;
-            weatherDisplay += `📝 ${weather.seasonInfo.description}\n\n`;
-
-            weatherDisplay += `⚡ **EFFETS SUR LE GAMEPLAY** ⚡\n`;
-            for (const [effect, value] of Object.entries(effects)) {
-                if (Math.abs(value - 100) > 5) { // Seulement les effets significatifs
-                    const modifier = value > 100 ? '+' : '';
-                    const icon = value > 100 ? '⬆️' : '⬇️';
-                    weatherDisplay += `${icon} ${effect}: ${modifier}${Math.round(value - 100)}%\n`;
-                }
-            }
-
-            return { text: weatherDisplay };
-        } catch (error) {
-            console.error('❌ Erreur météo:', error);
-            return { text: '❌ Erreur lors du chargement de la météo.' };
-        }
-    }
-
-    /**
-     * Affiche les événements actifs
-     */
-    async handleEventsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const activeEvents = this.timeManager.getActiveEvents();
-
-            if (activeEvents.length === 0) {
-                return {
-                    text: `🎆 **AUCUN ÉVÉNEMENT ACTIF** 🎆
-
-Aucun événement spécial n'est en cours actuellement.
-
-⏰ **Événements à venir:**
-• Les événements se déclenchent aléatoirement
-• Éclipses, pluies de météores, aurores boréales
-• Festivals saisonniers
-
-🔮 Restez connecté pour ne rien manquer !`
-                };
-            }
-
-            let eventsDisplay = `🎆 **ÉVÉNEMENTS ACTIFS** 🎆\n\n`;
-            
-            activeEvents.forEach(event => {
-                const timeLeft = Math.max(0, Math.floor((event.endTime - Date.now()) / 60000));
-                eventsDisplay += `${event.emoji} **${event.name}**\n`;
-                eventsDisplay += `📖 ${event.description}\n`;
-                eventsDisplay += `⏳ Temps restant: ${timeLeft} minutes\n`;
-                eventsDisplay += `🌟 Rareté: ${event.rarity}\n\n`;
-                
-                if (event.effects && Object.keys(event.effects).length > 0) {
-                    eventsDisplay += `⚡ **Effets actifs:**\n`;
-                    for (const [effect, value] of Object.entries(event.effects)) {
-                        const modifier = value > 100 ? '+' : '';
-                        eventsDisplay += `• ${effect}: ${modifier}${Math.round(value - 100)}%\n`;
-                    }
-                    eventsDisplay += `\n`;
-                }
-            });
-
-            eventsDisplay += `💡 Profitez des événements pour booster vos capacités !`;
-
-            return { text: eventsDisplay };
-        } catch (error) {
-            console.error('❌ Erreur événements:', error);
-            return { text: '❌ Erreur lors du chargement des événements.' };
-        }
-    }
-
-    /**
-     * Affiche un calendrier avec les phases temporelles
-     */
-    async handleCalendarCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const currentTime = this.timeManager.getCurrentTime();
-            const weather = this.timeManager.getCurrentWeather();
-            
-            let calendarDisplay = `📅 **CALENDRIER MONDIAL** 📅\n\n`;
-            calendarDisplay += `📆 **${currentTime.dateString}**\n`;
-            calendarDisplay += `🕐 **${currentTime.timeString}**\n`;
-            calendarDisplay += `${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**\n\n`;
-            
-            calendarDisplay += `🌤️ **Météo:** ${weather.weatherInfo.emoji} ${weather.weatherInfo.name}\n\n`;
-            
-            calendarDisplay += `📊 **Cycle temporel:**\n`;
-            calendarDisplay += `• Année ${currentTime.year} de l'ère moderne\n`;
-            calendarDisplay += `• Mois ${currentTime.month}/12\n`;
-            calendarDisplay += `• Jour ${currentTime.day}/30\n`;
-            calendarDisplay += `• Heure ${currentTime.hour}:${currentTime.minute.toString().padStart(2, '0')}\n\n`;
-            
-            calendarDisplay += `🔄 **Phases saisonnières:**\n`;
-            const seasons = ['Printemps', 'Été', 'Automne', 'Hiver'];
-            const currentSeason = currentTime.seasonInfo.name;
-            seasons.forEach(season => {
-                const icon = season === currentSeason ? '🔸' : '🔹';
-                calendarDisplay += `${icon} ${season}\n`;
-            });
-            
-            calendarDisplay += `\n⏰ **1 minute réelle = 1 heure de jeu**\n`;
-            calendarDisplay += `📈 **Le temps affecte vos capacités et les événements !**`;
-
-            return { text: calendarDisplay };
-        } catch (error) {
-            console.error('❌ Erreur calendrier:', error);
-            return { text: '❌ Erreur lors du chargement du calendrier.' };
-        }
     }
 }
 
