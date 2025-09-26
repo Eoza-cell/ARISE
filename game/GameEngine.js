@@ -212,7 +212,8 @@ class GameEngine {
             '/calendar': this.handleCalendarCommand.bind(this),
             '/coordonnees': this.handleCoordinatesCommand.bind(this),
             '/coordinates': this.handleCoordinatesCommand.bind(this),
-            '/position': this.handleCoordinatesCommand.bind(this)
+            '/position': this.handleCoordinatesCommand.bind(this),
+            '/time_system': this.handleTimeSystemCommand.bind(this) // Nouvelle commande pour le système temporel
         };
     }
 
@@ -416,7 +417,8 @@ class GameEngine {
                    `• /combat - Système de combat\n` +
                    `• /inventaire - Gérer ton équipement\n` +
                    `• /carte - Carte du monde\n` +
-                   `• /aide - Aide complète\n\n` +
+                   `• /aide - Aide complète\n` +
+                   `• /time_system - Informations sur le temps de jeu\n\n` +
                    `💀 **Le monde bouge en permanence. Chaque seconde compte !**`;
 
         try {
@@ -1616,7 +1618,8 @@ ${isAlive ? '🤔 *Que fais-tu ensuite ?*' : '💀 *Vous renaissez au Sanctuaire
                   `• /carte - Carte du monde\n\n` +
                   `⚔️ **Combat :**\n` +
                   `• /combat - Système de combat\n` +
-                  `• /inventaire - Gestion équipement\n\n` +
+                  `• /inventaire - Gestion équipement\n` +
+                  `• /time_system - Informations sur le temps de jeu\n\n` +
                   `💀 **Le monde de Friction est impitoyable !**\n` +
                   `Chaque action doit être précise et réfléchie.`,
             image: await imageGenerator.generateHelpImage()
@@ -3695,14 +3698,27 @@ Exemple: \`/rechercher_quete dragon\`
     /**
      * Affiche l'heure et la date actuelles du monde
      */
-    async handleTimeCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const timeDisplay = this.timeManager.formatTimeDisplay();
-            return { text: timeDisplay };
-        } catch (error) {
-            console.error('❌ Erreur temps:', error);
-            return { text: '❌ Erreur lors du chargement du temps.' };
+    async handleTimeCommand({ player, dbManager }) {
+        if (!this.timeManager) {
+            return { text: "❌ Système temporel non initialisé" };
         }
+
+        return {
+            text: this.timeManager.formatTimeDisplay()
+        };
+    }
+
+    /**
+     * Affiche les informations système du temps de jeu
+     */
+    async handleTimeSystemCommand({ player, dbManager }) {
+        if (!this.timeManager) {
+            return { text: "❌ Système temporel non initialisé" };
+        }
+
+        return {
+            text: this.timeManager.getTimeSystemInfo()
+        };
     }
 
     /**

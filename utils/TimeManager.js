@@ -294,12 +294,15 @@ class TimeManager {
     }
     
     /**
-     * Démarre la mise à jour du temps (toutes les minutes réelles = 1 heure de jeu)
+     * Démarre la mise à jour du temps (1 mois de jeu = 1 semaine réelle)
+     * 1 semaine = 168 heures, 1 mois = 30 jours = 720 heures
+     * Ratio: 720/168 = 4.29, donc 1 heure réelle = 4.29 heures de jeu
+     * Intervalle: 60000ms / 4.29 ≈ 14000ms (14 secondes réelles = 1 heure de jeu)
      */
     startTimeUpdate() {
         setInterval(() => {
             this.advanceTime();
-        }, 60000); // 1 minute réelle = 1 heure de jeu
+        }, 14000); // 14 secondes réelles = 1 heure de jeu (1 mois = 1 semaine)
     }
     
     /**
@@ -321,33 +324,39 @@ class TimeManager {
     }
     
     /**
-     * Avance le temps du jeu
+     * Avance le temps du jeu (14 secondes réelles = 1 heure de jeu)
      */
     advanceTime() {
-        this.gameTime.minute += 60; // 1 minute réelle = 1 heure de jeu
+        this.gameTime.hour++; // Chaque appel = +1 heure de jeu
         
-        if (this.gameTime.minute >= 60) {
-            this.gameTime.minute = 0;
-            this.gameTime.hour++;
+        if (this.gameTime.hour >= 24) {
+            this.gameTime.hour = 0;
+            this.gameTime.day++;
             
-            if (this.gameTime.hour >= 24) {
-                this.gameTime.hour = 0;
-                this.gameTime.day++;
+            console.log(`📅 Nouveau jour dans Friction: Jour ${this.gameTime.day}`);
+            
+            if (this.gameTime.day > 30) {
+                this.gameTime.day = 1;
+                this.gameTime.month++;
                 
-                if (this.gameTime.day > 30) {
-                    this.gameTime.day = 1;
-                    this.gameTime.month++;
+                console.log(`🗓️ Nouveau mois dans Friction: Mois ${this.gameTime.month} de l'an ${this.gameTime.year}`);
+                
+                if (this.gameTime.month > 12) {
+                    this.gameTime.month = 1;
+                    this.gameTime.year++;
                     
-                    if (this.gameTime.month > 12) {
-                        this.gameTime.month = 1;
-                        this.gameTime.year++;
-                    }
+                    console.log(`🎊 Nouvelle année dans Friction: An ${this.gameTime.year}`);
                 }
             }
         }
         
         // Mettre à jour la saison
         this.updateSeason();
+        
+        // Log périodique pour debug (chaque jour de jeu)
+        if (this.gameTime.hour === 0) {
+            console.log(`⏰ Friction Time: ${this.formatDate()} ${this.formatTime()}`);
+        }
     }
     
     /**
@@ -635,6 +644,29 @@ class TimeManager {
         return `${this.gameTime.day} ${monthNames[this.gameTime.month - 1]} ${this.gameTime.year}`;
     }
     
+    /**
+     * Explique le système temporel du jeu
+     */
+    getTimeSystemInfo() {
+        return `⏰ **SYSTÈME TEMPOREL FRICTION ULTIMATE** ⏰
+
+🕐 **Correspondance temps réel ↔ temps jeu :**
+• 14 secondes réelles = 1 heure de jeu
+• 5,6 minutes réelles = 1 jour de jeu  
+• 1 semaine réelle = 1 mois de jeu
+• 1 mois réel = ~4,3 mois de jeu
+• 1 an réel = ~52 ans de jeu
+
+📊 **Rythme accéléré :**
+Les événements, quêtes et évolutions se déroulent à un rythme immersif permettant une progression rapide tout en gardant la cohérence narrative.
+
+🌍 **Impact sur le gameplay :**
+• Événements saisonniers fréquents
+• Économie dynamique en temps réel
+• Vieillissement des personnages accéléré
+• Cycles jour/nuit visibles`;
+    }
+
     /**
      * Formate l'affichage complet du temps
      */
