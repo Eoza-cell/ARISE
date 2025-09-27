@@ -2004,7 +2004,7 @@ Durée : ${socialEvent.duration}
     /**
      * Affiche les informations d'aura du joueur
      */
-    handleAuraInfoCommand({ player, dbManager }) {
+    async handleAuraInfoCommand({ player, dbManager }) {
         try {
             const character = await dbManager.getCharacterByPlayer(player.id);
             if (!character) {
