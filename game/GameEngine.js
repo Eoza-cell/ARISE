@@ -1360,7 +1360,7 @@ ${progressBar} ${Math.floor(percentage)}%
         if (!character || !message) return null;
 
         const lowerMessage = message.toLowerCase();
-        
+
         // Vérifier les objets mentionnés
         const itemKeywords = ['utilise', 'prend', 'équipe', 'avec mon', 'avec ma', 'sort mon', 'sort ma'];
         for (const keyword of itemKeywords) {
@@ -1771,7 +1771,7 @@ ${this.advancedMechanics.getReputationEffects(reputation).join('\n')}`;
     }
 
     async handleEventsCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return { text: "❌ Aucun personnage trouvé !" };
         }
@@ -2127,7 +2127,7 @@ Choisis un numéro entre 1 et ${kingdoms.length}`
 
 📸 **Étape 4/4 - Photo de ton visage :**
 
-🖼️ Envoie maintenant une photo de ton visage pour ton personnage.
+🖼️ Envoie une photo de ton visage pour ton personnage.
 ⚠️ **Important :**
 • Seule la zone du visage sera utilisée
 • Photo claire et bien éclairée recommandée
@@ -3825,7 +3825,7 @@ ${activeTraining.techniqueName} (${Math.floor(activeTraining.progress)}%)`
     }
 
     async handleAuraSessionCommand({ player, chatId, message, dbManager, imageGenerator, sock }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage !
@@ -3897,7 +3897,7 @@ Vous devez attendre ${remainingHours}h avant votre prochaine session d'entraîne
      * Afficher les techniques d'aura disponibles
      */
     async handleAuraTechniquesCommand({ player, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage !
@@ -4297,7 +4297,7 @@ ${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**
      */
     async handleCoordinatesCommand({ player, dbManager }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
             if (!character) {
                 return { text: "❌ Tu n'as pas encore de personnage !" };
             }

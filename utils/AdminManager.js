@@ -7,20 +7,20 @@ class AdminManager {
     constructor() {
         // Code d'authentification admin
         this.adminAuthCode = '2011';
-        
+
         // Sessions admin temporaires (validées avec le code 2011)
         this.authenticatedSessions = new Map();
-        
+
         // Durée de validité d'une session admin (en millisecondes)
         this.sessionTimeout = 30 * 60 * 1000; // 30 minutes
-        
+
         // ID de l'administrateur principal
         this.adminUsers = [
             '48198576038116@lid', // ID principal
             '48198576038116',     // Version sans @lid
             '+22663685468'        // Numéro de téléphone
         ];
-        
+
         // Permissions d'administration
         this.adminPermissions = [
             'modify_player_stats',
@@ -35,7 +35,7 @@ class AdminManager {
             'server_management',
             'debug_mode'
         ];
-        
+
         // Commandes d'administration disponibles
         this.adminCommands = {
             // Gestion des joueurs
@@ -45,24 +45,24 @@ class AdminManager {
             '/admin_teleport': 'Téléporte un joueur [joueur] [royaume] [x] [y]',
             '/admin_heal': 'Soigne complètement un joueur [joueur]',
             '/admin_power': 'Ajoute un pouvoir à un joueur [joueur] [pouvoir]',
-            
+
             // Gestion du temps et du monde
             '/admin_time': 'Modifie l\'heure du jeu [heure] [minute]',
             '/admin_weather': 'Change la météo [royaume] [météo]',
             '/admin_event': 'Lance un événement spécial [type] [royaume]',
-            
+
             // Gestion des royaumes et groupes
             '/admin_kingdom': 'Assigne un groupe à un royaume [groupeId] [royaume]',
             '/admin_groups': 'Liste tous les groupes et leurs royaumes',
             '/admin_reset_kingdom': 'Remet à zéro un royaume [royaume]',
-            
+
             // Debug et maintenance
             '/admin_debug': 'Active/désactive le mode debug',
             '/admin_backup': 'Crée une sauvegarde de la base de données',
             '/admin_reload': 'Recharge les données du jeu',
             '/admin_announce': 'Envoie une annonce à tous les joueurs [message]'
         };
-        
+
         // Heures du jeu (format 24h)
         this.gameTime = {
             hours: 12,
@@ -71,10 +71,10 @@ class AdminManager {
             season: 'Printemps', // Printemps, Été, Automne, Hiver
             year: 1247
         };
-        
+
         // Groupes WhatsApp assignés aux royaumes
         this.kingdomGroups = new Map();
-        
+
         // Log des actions d'administration
         this.adminLog = [];
     }
@@ -96,34 +96,34 @@ class AdminManager {
      */
     authenticateAdmin(userId, message) {
         if (!userId) return false;
-        
+
         // Vérifier si le message contient le code d'authentification
         if (!this.containsAuthCode(message)) return false;
-        
+
         console.log(`🔐 Tentative d'authentification admin: ${userId}`);
-        
+
         // Vérifier si l'utilisateur est dans la liste des admins potentiels
         const isValidAdmin = this.adminUsers.some(adminId => {
             if (userId === adminId) return true;
-            
+
             // Nettoyage et comparaison des IDs numériques
             const cleanUserId = userId.replace(/[^0-9]/g, '');
             const cleanAdminId = adminId.replace(/[^0-9]/g, '');
-            
+
             return cleanUserId === cleanAdminId && cleanUserId.length > 0;
         });
-        
+
         if (isValidAdmin) {
             // Créer une session authentifiée
             this.authenticatedSessions.set(userId, {
                 timestamp: Date.now(),
                 authenticated: true
             });
-            
+
             console.log(`✅ Admin authentifié avec succès: ${userId}`);
             return true;
         }
-        
+
         console.log(`❌ ID non autorisé pour l'authentification: ${userId}`);
         return false;
     }
@@ -139,9 +139,9 @@ class AdminManager {
             console.log(`❌ userId est vide ou null`);
             return false;
         }
-        
+
         console.log(`🔐 Vérification admin pour: "${userId}"`);
-        
+
         // Vérifier si l'utilisateur a une session authentifiée valide
         const session = this.authenticatedSessions.get(userId);
         if (session) {
@@ -155,7 +155,7 @@ class AdminManager {
                 console.log(`⏰ Session admin expirée: ${userId}`);
             }
         }
-        
+
         console.log(`❌ Admin non authentifié: ${userId}`);
         return false;
     }
@@ -177,7 +177,7 @@ class AdminManager {
     getAuthStatus(userId) {
         const session = this.authenticatedSessions.get(userId);
         if (!session) return { authenticated: false, timeLeft: 0 };
-        
+
         const timeLeft = this.sessionTimeout - (Date.now() - session.timestamp);
         return {
             authenticated: timeLeft > 0,
@@ -213,37 +213,37 @@ class AdminManager {
         switch (command) {
             case '/admin_stats':
                 return this.getServerStats();
-            
+
             case '/admin_time':
                 return this.modifyGameTime(params.hours, params.minutes);
-            
+
             case '/admin_kingdom':
                 return this.assignKingdomToGroup(params.groupId, params.kingdom);
-            
+
             case '/admin_groups':
                 return this.listKingdomGroups();
-            
+
             case '/admin_give':
                 return this.giveItemToPlayer(params.player, params.item, params.quantity);
-            
+
             case '/admin_level':
                 return this.modifyPlayerLevel(params.player, params.level);
-            
+
             case '/admin_power':
                 return this.addPowerToPlayer(params.player, params.power);
-            
+
             case '/admin_teleport':
                 return this.teleportPlayer(params.player, params.kingdom, params.x, params.y);
-            
+
             case '/admin_heal':
                 return this.healPlayer(params.player);
-            
+
             case '/admin_debug':
                 return this.toggleDebugMode();
-            
+
             case '/admin_announce':
                 return this.sendAnnouncement(params.message);
-            
+
             default:
                 return this.getAdminHelp();
         }
@@ -259,12 +259,12 @@ class AdminManager {
         if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
             return '❌ Heure invalide. Format: HH:MM (24h)';
         }
-        
+
         this.gameTime.hours = hours;
         this.gameTime.minutes = minutes;
-        
+
         const timeEmoji = this.getTimeEmoji(hours);
-        
+
         return `🕐 **TEMPS MODIFIÉ** 🕐
 
 ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}**
@@ -283,19 +283,19 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
         if (!kingdom) {
             return '❌ Veuillez spécifier un royaume valide.';
         }
-        
+
         const validKingdoms = [
             'AEGYRIA', 'SOMBRENUIT', 'TERRAVERDE', 'CIELNUAGE', 
             'FLAMMEBOURG', 'GELOPOLIS', 'VENTARIA', 'AURORALIS',
             'OMBRETERRE', 'CRYSTALIS', 'MAREVERDE', 'SOLARIA'
         ];
-        
+
         if (!validKingdoms.includes(kingdom.toUpperCase())) {
             return `❌ Royaume invalide. Royaumes disponibles:\n${validKingdoms.join(', ')}`;
         }
-        
+
         this.kingdomGroups.set(groupId, kingdom.toUpperCase());
-        
+
         return `🏰 **ROYAUME ASSIGNÉ** 🏰
 
 📱 Groupe: \`${groupId}\`
@@ -314,14 +314,14 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
         if (this.kingdomGroups.size === 0) {
             return '📝 **GROUPES ASSIGNÉS**\n\n❌ Aucun groupe n\'est actuellement assigné à un royaume.';
         }
-        
+
         let result = '📝 **GROUPES ASSIGNÉS AUX ROYAUMES** 📝\n\n';
-        
+
         for (const [groupId, kingdom] of this.kingdomGroups.entries()) {
             result += `🏰 **${kingdom}**\n`;
             result += `   📱 Groupe: \`${groupId}\`\n\n`;
         }
-        
+
         return result;
     }
 
@@ -342,14 +342,14 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
      */
     validatePlayerLocation(groupId, playerKingdom) {
         const groupKingdom = this.getGroupKingdom(groupId);
-        
+
         if (!groupKingdom) {
             return {
                 valid: true,
                 message: null
             };
         }
-        
+
         if (playerKingdom !== groupKingdom) {
             return {
                 valid: false,
@@ -368,7 +368,7 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
 ✅ Déplacez-vous correctement ou retournez dans votre royaume d'origine.`
             };
         }
-        
+
         return {
             valid: true,
             message: `✅ Position validée dans le royaume de **${groupKingdom}**`
@@ -387,11 +387,11 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
             'Régénération', 'Contrôle Élémentaire', 'Vision Mystique',
             'Maîtrise du Temps', 'Communication Animale', 'Guérison Divine'
         ];
-        
+
         if (!powers.includes(power)) {
             return `❌ Pouvoir invalide. Pouvoirs disponibles:\n${powers.join(', ')}`;
         }
-        
+
         return `✨ **POUVOIR ACCORDÉ** ✨
 
 👤 Joueur: **${playerName}**
@@ -426,7 +426,7 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
             action: action,
             params: params
         });
-        
+
         // Garde seulement les 100 dernières actions
         if (this.adminLog.length > 100) {
             this.adminLog.shift();
@@ -458,13 +458,13 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
      */
     getAdminHelp() {
         let help = '👑 **COMMANDES D\'ADMINISTRATION** 👑\n\n';
-        
+
         for (const [command, description] of Object.entries(this.adminCommands)) {
             help += `\`${command}\`\n   ${description}\n\n`;
         }
-        
+
         help += '⚠️ **Attention:** Ces commandes sont réservées aux administrateurs.';
-        
+
         return help;
     }
 
@@ -476,7 +476,7 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
      */
     parseAdminCommand(command, args) {
         const params = {};
-        
+
         switch (command) {
             case '/admin_time':
                 if (args.length >= 2) {
@@ -484,14 +484,14 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
                     params.minutes = parseInt(args[1]);
                 }
                 break;
-                
+
             case '/admin_kingdom':
                 if (args.length >= 2) {
                     params.groupId = args[0];
                     params.kingdom = args[1];
                 }
                 break;
-                
+
             case '/admin_give':
                 if (args.length >= 3) {
                     params.player = args[0];
@@ -499,26 +499,26 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
                     params.quantity = parseInt(args[2]);
                 }
                 break;
-                
+
             case '/admin_level':
                 if (args.length >= 2) {
                     params.player = args[0];
                     params.level = parseInt(args[1]);
                 }
                 break;
-                
+
             case '/admin_power':
                 if (args.length >= 2) {
                     params.player = args[0];
                     params.power = args.slice(1).join(' ');
                 }
                 break;
-                
+
             case '/admin_announce':
                 params.message = args.join(' ');
                 break;
         }
-        
+
         return params;
     }
 }

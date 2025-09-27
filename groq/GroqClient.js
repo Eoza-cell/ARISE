@@ -424,6 +424,56 @@ Génère UNIQUEMENT la réponse du PNJ, rien d'autre:`;
             throw error;
         }
     }
+
+    // Helper method to create fallback narration when Groq is not available
+    createFallbackNarration(action) {
+        console.log(`Fallback narration for action: ${action}`);
+        return `A mysterious event occurred: ${action}. The adventure continues...`;
+    }
+
+    // Helper method to create narration prompt, now with improved type checking
+    createNarrationPrompt(context, action, result) {
+        const characterName = context?.character?.name || 'Aventurier';
+        const actionText = typeof action === 'string' ? action : String(action || 'action inconnue');
+        const kingdom = context?.character?.kingdom || 'Royaume mystérieux';
+        const contextText = result?.context || 'L\'aventure continue';
+
+        return `Narre cette action de jeu RPG fantasy de façon immersive et épique en 2-3 phrases courtes et dynamiques:
+
+Personnage: ${characterName}
+Action: ${actionText}
+Royaume: ${kingdom}
+Contexte: ${contextText}
+
+Utilise un style narratif captivant à la deuxième personne, comme un maître de jeu expérimenté.`;
+    }
+
+    // Method to ensure valid message format for Groq API
+    async generateNarrationWithFormatCheck(context, action, result) {
+        try {
+            if (!this.hasValidClient()) {
+                return this.createFallbackNarration(action);
+            }
+
+            const prompt = this.createNarrationPrompt(context, action, result);
+
+            // S'assurer que le prompt est une chaîne de caractères valide
+            const validPrompt = typeof prompt === 'string' ? prompt : String(prompt || 'Action effectuée');
+
+            const response = await this.client.chat.completions.create({
+                messages: [{ role: 'user', content: validPrompt }],
+                model: this.model,
+                max_tokens: 600, // Default max tokens for narration
+                temperature: 0.8
+            });
+
+            return response.choices[0]?.message?.content?.trim() || '';
+
+        } catch (error) {
+            console.error('❌ Erreur Groq narration (avec vérification de format):', error.message);
+            throw error;
+        }
+    }
 }
 
 module.exports = GroqClient;
