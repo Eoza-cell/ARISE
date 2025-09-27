@@ -4,21 +4,21 @@
  */
 
 const apiKeys = {
-    // IA Générative
+    // IA Générative - Clés intégrées directement pour déploiement
     openai: {
-        apiKey: process.env.OPENAI_API_KEY,
-        organization: process.env.OPENAI_ORGANIZATION,
-        enabled: !!process.env.OPENAI_API_KEY
+        apiKey: null, // Pas de clé OpenAI
+        organization: null,
+        enabled: false
     },
 
     gemini: {
-        apiKey: process.env.GEMINI_API_KEY,
-        enabled: !!process.env.GEMINI_API_KEY
+        apiKey: null, // Pas de clé Gemini
+        enabled: false
     },
 
     groq: {
-        apiKey: process.env.GROQ_API_KEY,
-        enabled: !!process.env.GROQ_API_KEY
+        apiKey: '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',
+        enabled: true
     },
 
     // Génération d'images
@@ -49,8 +49,8 @@ const apiKeys = {
     },
 
     huggingFace: {
-        token: process.env.HF_TOKEN,
-        enabled: !!process.env.HF_TOKEN
+        token: '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',
+        enabled: true
     },
 
     // Synthèse vocale

@@ -1,4 +1,3 @@
-
 const http = require('http');
 const port = process.env.PORT || 5000;
 
@@ -15,7 +14,7 @@ let errorCount = 0;
 function getHealthStatus() {
     const uptime = Math.floor((Date.now() - startTime) / 1000);
     const memUsage = process.memoryUsage();
-    
+
     return {
         status: serverStatus,
         service: 'Friction Ultimate Bot',
@@ -58,20 +57,20 @@ function formatUptime(seconds) {
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
     const secs = seconds % 60;
-    
+
     let result = '';
     if (days > 0) result += `${days}j `;
     if (hours > 0) result += `${hours}h `;
     if (minutes > 0) result += `${minutes}m `;
     result += `${secs}s`;
-    
+
     return result.trim();
 }
 
 // Serveur keep-alive renforcé
 const server = http.createServer((req, res) => {
     requestCount++;
-    
+
     // Headers CORS et sécurité renforcés
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
@@ -80,14 +79,14 @@ const server = http.createServer((req, res) => {
     res.setHeader('Cache-Control', 'no-cache, no-store, must-revalidate');
     res.setHeader('Pragma', 'no-cache');
     res.setHeader('Expires', '0');
-    
+
     // Gestion des méthodes
     if (req.method === 'OPTIONS') {
         res.writeHead(200);
         res.end();
         return;
     }
-    
+
     if (req.method === 'HEAD') {
         res.writeHead(200, {
             'Content-Type': 'application/json',
@@ -102,9 +101,9 @@ const server = http.createServer((req, res) => {
     if (req.url === '/health' || req.url === '/status') {
         healthChecks++;
         lastHealthCheck = new Date().toISOString();
-        
+
         const healthStatus = getHealthStatus();
-        
+
         // Déterminer le code de statut basé sur la santé
         let statusCode = 200;
         if (serverStatus === 'error' || errorCount > 10) {
@@ -113,18 +112,18 @@ const server = http.createServer((req, res) => {
             statusCode = 202; // Accepted (avec avertissement)
         }
 
-        res.writeHead(statusCode, { 
+        res.writeHead(statusCode, {
             'Content-Type': 'application/json',
             'X-Health-Check-Count': healthChecks.toString(),
             'X-Request-Count': requestCount.toString()
         });
         res.end(JSON.stringify(healthStatus, null, 2));
-        
+
     } else if (req.url === '/ping') {
         // Endpoint ultra-simple pour ping rapide
         res.writeHead(200, { 'Content-Type': 'text/plain' });
         res.end('pong');
-        
+
     } else if (req.url === '/metrics') {
         // Métriques pour monitoring avancé
         const metrics = {
@@ -135,16 +134,16 @@ const server = http.createServer((req, res) => {
             error_count: errorCount,
             status: serverStatus
         };
-        
+
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify(metrics));
-        
+
     } else if (req.url === '/ready') {
         // Endpoint de readiness pour Kubernetes-style checks
         const isReady = serverStatus === 'running' && errorCount < 5;
         res.writeHead(isReady ? 200 : 503, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ ready: isReady, status: serverStatus }));
-        
+
     } else {
         // Page d'accueil renforcée
         const healthStatus = getHealthStatus();
@@ -158,10 +157,10 @@ const server = http.createServer((req, res) => {
     <meta http-equiv="refresh" content="30">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); 
-            color: #ffd700; 
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #ffd700;
             min-height: 100vh;
             padding: 20px;
         }
@@ -170,7 +169,7 @@ const server = http.createServer((req, res) => {
         .logo { font-size: 64px; margin: 20px 0; text-shadow: 0 0 20px #ffd700; }
         .title { font-size: 28px; margin-bottom: 10px; }
         .subtitle { color: #cccccc; font-size: 16px; }
-        
+
         .dashboard { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
         .card { background: rgba(22, 33, 62, 0.8); border-radius: 15px; padding: 20px; border: 1px solid #ffd700; }
         .card h3 { color: #ffd700; margin-bottom: 15px; display: flex; align-items: center; gap: 10px; }
@@ -178,31 +177,31 @@ const server = http.createServer((req, res) => {
         .status-running { background: #00ff00; box-shadow: 0 0 10px #00ff00; }
         .status-warning { background: #ffa500; box-shadow: 0 0 10px #ffa500; }
         .status-error { background: #ff0000; box-shadow: 0 0 10px #ff0000; }
-        
+
         .metric { display: flex; justify-content: space-between; margin: 8px 0; }
         .metric-label { color: #cccccc; }
         .metric-value { color: #ffd700; font-weight: bold; }
-        
+
         .endpoints { margin-top: 30px; text-align: center; }
-        .endpoint { 
-            display: inline-block; 
-            margin: 5px; 
-            padding: 8px 16px; 
-            background: rgba(255, 215, 0, 0.1); 
-            border: 1px solid #ffd700; 
-            border-radius: 20px; 
-            text-decoration: none; 
-            color: #ffd700; 
+        .endpoint {
+            display: inline-block;
+            margin: 5px;
+            padding: 8px 16px;
+            background: rgba(255, 215, 0, 0.1);
+            border: 1px solid #ffd700;
+            border-radius: 20px;
+            text-decoration: none;
+            color: #ffd700;
             font-family: monospace;
             transition: all 0.3s ease;
         }
-        .endpoint:hover { 
-            background: rgba(255, 215, 0, 0.2); 
+        .endpoint:hover {
+            background: rgba(255, 215, 0, 0.2);
             transform: translateY(-2px);
         }
-        
+
         .footer { text-align: center; margin-top: 40px; color: #666; }
-        
+
         @keyframes pulse {
             0%, 100% { opacity: 1; }
             50% { opacity: 0.7; }
@@ -217,7 +216,7 @@ const server = http.createServer((req, res) => {
             <h1 class="title">FRICTION ULTIMATE BOT</h1>
             <p class="subtitle">Système de Monitoring & Keep-Alive</p>
         </div>
-        
+
         <div class="dashboard">
             <div class="card">
                 <h3>
@@ -241,7 +240,7 @@ const server = http.createServer((req, res) => {
                     <span class="metric-value">${healthStatus.process.pid}</span>
                 </div>
             </div>
-            
+
             <div class="card">
                 <h3>📊 Métriques Requêtes</h3>
                 <div class="metric">
@@ -261,7 +260,7 @@ const server = http.createServer((req, res) => {
                     <span class="metric-value">${healthStatus.errors.count}</span>
                 </div>
             </div>
-            
+
             <div class="card">
                 <h3>💾 Utilisation Mémoire</h3>
                 <div class="metric">
@@ -281,7 +280,7 @@ const server = http.createServer((req, res) => {
                     <span class="metric-value">${healthStatus.memory.external} MB</span>
                 </div>
             </div>
-            
+
             <div class="card">
                 <h3>🔧 Environnement</h3>
                 <div class="metric">
@@ -302,7 +301,7 @@ const server = http.createServer((req, res) => {
                 </div>
             </div>
         </div>
-        
+
         <div class="endpoints">
             <h3 style="color: #ffd700; margin-bottom: 15px;">🔗 Endpoints de Monitoring</h3>
             <a href="/health" class="endpoint">/health</a>
@@ -311,7 +310,7 @@ const server = http.createServer((req, res) => {
             <a href="/metrics" class="endpoint">/metrics</a>
             <a href="/ready" class="endpoint">/ready</a>
         </div>
-        
+
         <div class="footer">
             <p>🤖 Friction Ultimate Bot - Keep-Alive Server</p>
             <p>Dernière mise à jour: ${new Date().toLocaleString('fr-FR')}</p>
@@ -319,7 +318,7 @@ const server = http.createServer((req, res) => {
     </div>
 </body>
 </html>`;
-        
+
         res.writeHead(200, { 'Content-Type': 'text/html; charset=UTF-8' });
         res.end(html);
     }
@@ -333,14 +332,14 @@ server.on('error', (error) => {
         timestamp: new Date().toISOString(),
         code: error.code
     };
-    
+
     if (error.code === 'EADDRINUSE') {
         console.error(`❌ Port ${port} déjà utilisé - Arrêt du serveur keep-alive`);
         console.log('💡 Le bot WhatsApp peut continuer sans serveur web');
         serverStatus = 'port_conflict';
         return; // Ne pas essayer de redémarrer
     }
-    
+
     serverStatus = 'error';
     console.error('❌ Erreur serveur keep-alive:', error);
 });
@@ -361,7 +360,7 @@ server.on('listening', () => {
 setInterval(() => {
     const memUsage = process.memoryUsage();
     const heapPercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
-    
+
     if (heapPercent > 90) {
         serverStatus = 'warning';
         console.warn(`⚠️ Utilisation mémoire élevée: ${heapPercent.toFixed(1)}%`);
@@ -371,7 +370,7 @@ setInterval(() => {
     } else if (serverStatus !== 'error') {
         serverStatus = 'running';
     }
-    
+
     // Log de santé toutes les 10 minutes
     if (Date.now() % 600000 < 30000) {
         console.log(`💚 Keep-alive: ${formatUptime(Math.floor((Date.now() - startTime) / 1000))} | Requests: ${requestCount} | Health: ${healthChecks}`);

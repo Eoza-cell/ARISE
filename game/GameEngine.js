@@ -1358,7 +1358,7 @@ ${progressBar} ${Math.floor(percentage)}%
      */
     detectNPCInteraction(message) {
         const lowerMessage = message.toLowerCase();
-        
+
         // Mots-clés d'interaction avec PNJ
         const npcInteractionKeywords = {
             talk: ['parle', 'dis', 'demande', 'questionne', 'interpelle', 'salue', 'bonjour', 'hey'],
@@ -1642,7 +1642,7 @@ ${character.name} est complètement épuisé ! Vous devez vous reposer avant d'a
             if (npcInteraction) {
                 // Démarrer le système de temps de réaction uniquement pour les interactions PNJ
                 console.log(`🎯 Interaction PNJ détectée: ${npcInteraction.type} avec ${npcInteraction.target}`);
-                
+
                 if (this.reactionTimeManager) {
                     // Créer un PNJ temporaire et démarrer le compte à rebours
                     const npcId = `npc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
@@ -2001,17 +2001,35 @@ Durée : ${socialEvent.duration}
 
     // ==================== COMMANDES D'AURA ====================
 
-    async handleAuraInfoCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
+    /**
+     * Affiche les informations d'aura du joueur
+     */
+    handleAuraInfoCommand({ player, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return {
+                    text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+                };
+            }
+
+            if (!this.auraManager) {
+                return {
+                    text: `❌ Système d'aura non disponible pour le moment.`
+                };
+            }
+
+            const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
+
             return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+                text: auraInfo
+            };
+        } catch (error) {
+            console.error('❌ Erreur commande aura info:', error);
+            return {
+                text: `❌ Erreur lors de l'affichage des informations d'aura.`
             };
         }
-
-        return {
-            text: this.auraManager.formatAuraInfo(player.id, character.name)
-        };
     }
 
     async handleLearnAuraCommand({ player, message, dbManager }) {
@@ -2046,7 +2064,7 @@ Durée : ${socialEvent.duration}
 
         const auraType = args[1].toLowerCase();
         const aura = this.auraManager.auraTypes[auraType];
-        
+
         if (!aura) {
             return {
                 text: `❌ **TYPE D'AURA INVALIDE**
@@ -2084,7 +2102,7 @@ Vous avez déjà un entraînement d'aura actif. Terminez-le avant d'en commencer
 
         // Entraînement normal
         const trainingResult = await this.auraManager.startAuraTraining(player.id, auraType, aura.techniques[0]);
-        
+
         return {
             text: trainingResult.message
         };
@@ -2108,7 +2126,7 @@ Utilisez d'abord /aura_apprendre [type] pour commencer un entraînement d'aura.`
         }
 
         const aura = this.auraManager.auraTypes[activeTraining.auraType];
-        
+
         // Démarrer l'animation d'entraînement
         setTimeout(async () => {
             await this.auraManager.createAuraAnimation(
@@ -2122,7 +2140,7 @@ Utilisez d'abord /aura_apprendre [type] pour commencer un entraînement d'aura.`
             // Après l'animation, tentative de progression
             setTimeout(async () => {
                 const growthResult = await this.auraManager.attemptAuraGrowth(player.id, activeTraining.auraType);
-                
+
                 await sock.sendMessage(chatId, {
                     text: growthResult.message
                 });
@@ -2141,7 +2159,7 @@ ${aura.emoji} Préparation de l'entraînement ${aura.name}...
     }
 
     async handleAuraTechniquesCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2149,7 +2167,7 @@ ${aura.emoji} Préparation de l'entraînement ${aura.name}...
         }
 
         const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-        
+
         if (Object.keys(playerAuras).length === 0) {
             return {
                 text: `✨ **AUCUNE TECHNIQUE D'AURA**
@@ -2164,7 +2182,7 @@ Utilisez /aura_apprendre [type] pour commencer votre formation.`
         for (const [auraType, auraData] of Object.entries(playerAuras)) {
             const aura = this.auraManager.auraTypes[auraType];
             techniquesText += `${aura.emoji} **${aura.name}** (Niveau ${auraData.level})\n`;
-            
+
             if (auraData.techniques.length > 0) {
                 auraData.techniques.forEach(technique => {
                     techniquesText += `   ⚡ ${technique}\n`;
@@ -2181,7 +2199,7 @@ Utilisez /aura_apprendre [type] pour commencer votre formation.`
     }
 
     async handleCastAuraCommand({ player, message, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2221,7 +2239,7 @@ Utilisez /aura_techniques pour voir vos techniques disponibles.`
     }
 
     async handleMeditateCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2243,7 +2261,7 @@ Utilisez /aura_techniques pour voir vos techniques disponibles.`
     }
 
     async handleRegenerateAuraCommand({ player, dbManager, sock, chatId }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2260,7 +2278,7 @@ Utilisez /aura_techniques pour voir vos techniques disponibles.`
     }
 
     async handleRegenerateMagicCommand({ player, dbManager, sock, chatId }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2606,7 +2624,7 @@ Choisis un numéro entre 1 et ${kingdoms.length}`
      * Gère les informations d'aura du joueur
      */
     async handleAuraInfoCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Vous devez d'abord créer un personnage avec /créer !`
@@ -2627,7 +2645,7 @@ Choisis un numéro entre 1 et ${kingdoms.length}`
      * Commencer l'apprentissage d'une aura
      */
     async handleLearnAuraCommand({ player, message, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Vous devez d'abord créer un personnage avec /créer !`
@@ -2655,7 +2673,7 @@ Choisis un numéro entre 1 et ${kingdoms.length}`
         }
 
         const auraType = args[0].toLowerCase();
-        
+
         if (!this.auraManager.auraTypes[auraType]) {
             return {
                 text: `❌ Type d'aura invalide : "${auraType}"
@@ -2678,7 +2696,7 @@ Types valides : fire, water, earth, wind, lightning, shadow, light`
      * Session d'entraînement d'aura
      */
     async handleAuraSessionCommand({ player, dbManager, sock, chatId }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Vous devez d'abord créer un personnage avec /créer !`
@@ -2695,20 +2713,20 @@ Utilisez \`/aura_apprendre [type]\` pour commencer un entraînement.`
         }
 
         const aura = this.auraManager.auraTypes[training.auraType];
-        
+
         // Démarrer l'animation d'entraînement
         try {
             await this.auraManager.createAuraAnimation(
-                player.id, 
-                training.auraType, 
-                training.techniqueName, 
-                sock, 
+                player.id,
+                training.auraType,
+                training.techniqueName,
+                sock,
                 chatId
             );
 
             // Tentative de progression après l'animation
             const growthResult = await this.auraManager.attemptAuraGrowth(player.id, training.auraType);
-            
+
             setTimeout(async () => {
                 await sock.sendMessage(chatId, { text: growthResult.message });
             }, 32000); // Après l'animation de 30 secondes + 2 secondes
@@ -2725,7 +2743,7 @@ Utilisez \`/aura_apprendre [type]\` pour commencer un entraînement.`
      * Lancer une technique d'aura
      */
     async handleCastAuraCommand({ player, message, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Vous devez d'abord créer un personnage avec /créer !`
@@ -2767,11 +2785,11 @@ ${Object.entries(playerAuras).map(([type, data]) => {
         }
 
         const techniqueName = args.join(' ');
-        
+
         // Chercher la technique dans toutes les auras du joueur
         let foundAura = null;
         let foundTechnique = null;
-        
+
         for (const [auraType, auraData] of Object.entries(playerAuras)) {
             if (auraData.techniques.includes(techniqueName)) {
                 foundAura = auraType;
@@ -2787,7 +2805,7 @@ ${Object.entries(playerAuras).map(([type, data]) => {
 🚫 "${techniqueName}" n'est pas dans votre répertoire !
 
 📚 **Vos techniques :**
-${Object.entries(playerAuras).map(([type, data]) => 
+${Object.entries(playerAuras).map(([type, data]) =>
     data.techniques.map(t => `• ${t}`).join('\n')
 ).join('\n')}`
             };
@@ -2798,1883 +2816,13 @@ ${Object.entries(playerAuras).map(([type, data]) =>
     }
 
     /**
-     * Affiche le statut d'authentification admin
-     */
-    async handleAdminStatusCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        console.log(`🔐 Tentative d'accès admin par: "${playerNumber}"`);
-
-        const authStatus = this.adminManager.getAuthStatus(playerNumber);
-
-        if (!authStatus.authenticated) {
-            return {
-                text: `🔒 **STATUT ADMIN** 🔒
-
-❌ Non authentifié
-🔑 Envoyez le code d'administration pour vous connecter`
-            };
-        }
-
-        return {
-            text: `🔐 **STATUT ADMIN** 🔐
-
-✅ Authentifié
-⏰ Temps restant: ${authStatus.timeLeft} minutes
-🛡️ Accès complet aux commandes d'administration
-
-💡 Utilisez \`/admin_logout\` pour vous déconnecter`
-        };
-    }
-
-    /**
-     * Déconnecte l'administrateur
-     */
-    async handleAdminLogoutCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        this.adminManager.logoutAdmin(playerNumber);
-
-        return {
-            text: `🔒 **DÉCONNEXION ADMIN** 🔒
-
-✅ Vous avez été déconnecté avec succès
-🔑 Envoyez le code d'administration pour vous reconnecter`
-        };
-    }
-
-    /**
-     * Affiche l'aide des commandes d'administration
-     */
-    async handleAdminHelpCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        console.log(`🔐 Demande d'aide admin par: "${playerNumber}"`);
-
-        if (!this.adminManager.isAdmin(playerNumber)) {
-            return {
-                text: `🔒 **ACCÈS REFUSÉ** 🔒
-
-❌ Vous n'êtes pas authentifié en tant qu'administrateur
-🔑 Envoyez le code d'administration pour vous connecter`
-            };
-        }
-
-        return {
-            text: this.adminManager.getAdminHelp()
-        };
-    }
-
-    /**
-     * Liste tous les groupes et leurs royaumes
-     */
-    async handleAdminGroupsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        console.log(`🔐 Commande admin_groups par: "${playerNumber}"`);
-
-        if (!this.adminManager.isAdmin(playerNumber)) {
-            return {
-                text: `🔒 **ACCÈS REFUSÉ** 🔒
-
-❌ Vous n'êtes pas authentifié en tant qu'administrateur
-🔑 Envoyez le code d'administration pour vous connecter`
-            };
-        }
-
-        return {
-            text: this.adminManager.listKingdomGroups()
-        };
-    }
-
-    /**
-     * Assigne un royaume à un groupe
-     */
-    async handleAdminKingdomCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        console.log(`🔐 Commande admin_kingdom par: "${playerNumber}"`);
-
-        if (!this.adminManager.isAdmin(playerNumber)) {
-            return {
-                text: `🔒 **ACCÈS REFUSÉ** 🔒
-
-❌ Vous n'êtes pas authentifié en tant qu'administrateur
-🔑 Envoyez le code d'administration pour vous connecter`
-            };
-        }
-
-        const args = message.split(' ').slice(1);
-        if (args.length < 1) {
-            return {
-                text: `📋 **COMMANDE ADMIN_KINGDOM**
-
-Usage: /admin_kingdom [ROYAUME_ID]
-
-**Exemples:**
-• /admin_kingdom AEGYRIA
-
-Cette commande assigne le groupe actuel au royaume spécifié.
-
-**Royaumes disponibles:**
-AEGYRIA, SOMBRENUIT, KHELOS, ABRANTIS, VARHA, SYLVARIA, ECLYPSIA, TERRE_DESOLE, DRAK_TARR, URVALA, OMBREFIEL, KHALDAR`
-            };
-        }
-
-        const kingdomId = args[0].toUpperCase();
-        const result = this.adminManager.assignKingdomToGroup(chatId, kingdomId);
-
-        return {
-            text: result
-        };
-    }
-
-    async finalizeCharacterCreation({ player, dbManager, imageGenerator, hasCustomImage = false, imageBuffer = null }) {
-        const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
-        const kingdomId = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
-        const name = await dbManager.getTemporaryData(player.id, 'creation_name');
-
-        if (!gender || !kingdomId || !name) {
-            return {
-                text: `❌ Erreur : données de création manquantes. Recommence avec /créer`
-            };
-        }
-
-        const kingdom = await dbManager.getKingdomById(kingdomId);
-        const kingdomName = kingdom ? kingdom.name : kingdomId;
-
-        const characterData = {
-            playerId: player.id,
-            name: name,
-            gender: gender,
-            kingdom: kingdomId,
-            level: 1,
-            experience: 0,
-            powerLevel: 'G',
-            frictionLevel: 'G',
-            currentLife: 100,
-            maxLife: 100,
-            currentEnergy: 100,
-            maxEnergy: 100,
-            currentLocation: `Capitale de ${kingdomName}`,
-            position: { x: 0, y: 0, z: 0 },
-            coins: 100,
-            equipment: {},
-            inventory: [],
-            learnedTechniques: [],
-            customImage: hasCustomImage
-        };
-
-        console.log(`✅ Création personnage: ${name}, Royaume: ${kingdomName} (${kingdomId}), Genre: ${gender}, Image: ${hasCustomImage}`);
-
-        try {
-            const newCharacter = await dbManager.createCharacter(characterData);
-
-            if (hasCustomImage && imageBuffer) {
-                await imageGenerator.saveCustomCharacterImage(newCharacter.id, imageBuffer);
-            }
-
-            await dbManager.clearTemporaryData(player.id, 'creation_started');
-            await dbManager.clearTemporaryData(player.id, 'creation_gender');
-            await dbManager.clearTemporaryData(player.id, 'creation_kingdom');
-            await dbManager.clearTemporaryData(player.id, 'creation_name');
-
-            const imageType = hasCustomImage ? "avec ta photo personnalisée" : "avec une image générée";
-
-            let characterImage = null;
-            try {
-                characterImage = await imageGenerator.generateCharacterImage(newCharacter);
-            } catch (imageError) {
-                console.log('⚠️ Impossible de générer l\'image du personnage, continuons sans image:', imageError.message);
-            }
-
-            return {
-                text: `🎉 **PERSONNAGE CRÉÉ AVEC SUCCÈS !**
-
-👤 **Nom :** ${newCharacter.name}
-👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}
-🏰 **Royaume :** ${kingdomName}
-📸 **Image :** ${imageType}
-⚔️ **Niveau :** ${newCharacter.level}
-🌟 **Niveau de puissance :** ${newCharacter.powerLevel}
-
-🎮 Utilise /menu pour découvrir tes options !`,
-                image: characterImage
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur lors de la création du personnage:', error);
-            return {
-                text: `❌ Erreur lors de la création du personnage. Réessaie plus tard.`
-            };
-        }
-    }
-
-    async handleModifyCharacterCommand({ player, dbManager, imageGenerator, sock, chatId }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage !
-
-Utilise la commande /créer pour en créer un.`
-            };
-        }
-
-        if (this.characterCustomization) {
-            const success = await this.characterCustomization.startCharacterCustomization(
-                player.whatsappNumber,
-                chatId,
-                true
-            );
-
-            if (success) {
-                return { text: '' };
-            } else {
-                return {
-                    text: '❌ Impossible de démarrer le système de modification. Une personnalisation est peut-être déjà en cours.\n\n' +
-                          'Tapez "annuler" si vous avez un processus en cours, puis réessayez /modifier.'
-                };
-            }
-        } else {
-            return await this.handleOldModifyCharacterCommand({ player, dbManager, imageGenerator });
-        }
-    }
-
-    async handleOldModifyCharacterCommand({ player, dbManager, imageGenerator }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        await dbManager.setTemporaryData(player.id, 'modification_started', true);
-
-        let characterImage = null;
-        try {
-            characterImage = await imageGenerator.generateCharacterImage(character);
-        } catch (imageError) {
-            console.log('⚠️ Impossible de générer l\'image du personnage pour modification, continuons sans image:', imageError.message);
-        }
-
-        return {
-            text: `✨ **MODIFICATION DE PERSONNAGE (Mode Simple)**
-
-👤 **Personnage actuel :** ${character.name}
-🏰 **Royaume :** ${character.kingdom}
-👤 **Sexe :** ${character.gender === 'male' ? 'Homme' : 'Femme'}
-
-⚠️ Le système 3D avancé n'est pas disponible.
-
-🎨 **Nouvelle apparence personnalisée :**
-
-📝 Décris en détail l'apparence que tu veux pour ton personnage :
-• Couleur des cheveux, des yeux
-• Taille, corpulence
-• Style vestimentaire
-• Armes et accessoires
-• Cicatrices, tatouages, etc.
-
-✍️ **Écris ta description complète en un seul message :**`,
-            image: characterImage
-        };
-    }
-
-    async handleModificationDescription({ player, description, dbManager, imageGenerator }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            await dbManager.clearTemporaryData(player.id, 'modification_started');
-            return {
-                text: `❌ Personnage non trouvé. Utilise /créer pour créer un personnage.`
-            };
-        }
-
-        try {
-            console.log(`🎨 Génération nouvelle image pour ${character.name} avec description personnalisée...`);
-
-            const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
-            const kingdomDesc = this.getKingdomDescription(character.kingdom);
-
-            const cleanDescription = description.trim();
-
-            const basePrompt = `fantasy ${genderDesc} warrior`;
-            const kingdomContext = `from ${character.kingdom} kingdom (${kingdomDesc})`;
-            const userCustomization = cleanDescription;
-            const artStyle = 'detailed fantasy RPG character art, first person POV perspective, epic fantasy style';
-
-            let fullPrompt = `${basePrompt} ${kingdomContext}, appearance: ${userCustomization}, ${artStyle}`;
-
-            console.log(`🎨 Prompt de modification généré: "${fullPrompt}"`);
-
-            if (!fullPrompt.toLowerCase().includes(cleanDescription.toLowerCase().substring(0, 20))) {
-                console.log('⚠️ Description utilisateur mal intégrée, correction...');
-                const correctedPrompt = `${userCustomization}, ${basePrompt} ${kingdomContext}, ${artStyle}`;
-                console.log(`🔧 Prompt corrigé: "${correctedPrompt}"`);
-                fullPrompt = correctedPrompt;
-            }
-
-            const imagePath = `temp/character_modified_${character.id}_${Date.now()}.png`;
-
-            console.log(`📝 Description originale: "${cleanDescription}"`);
-            console.log(`🎯 Prompt final envoyé: "${fullPrompt}"`);
-
-            await imageGenerator.freepikClient.generateImage(fullPrompt, imagePath, {
-                style: '3d',
-                perspective: 'first_person',
-                nudity: false
-            });
-
-            const fs = require('fs').promises;
-            const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-
-            await dbManager.clearTemporaryData(player.id, 'modification_started');
-
-            if (imageBuffer) {
-                await imageGenerator.saveCustomCharacterImage(character.id, imageBuffer);
-
-                return {
-                    text: `✨ **PERSONNAGE MODIFIÉ AVEC SUCCÈS !**
-
-👤 **${character.name}** - Nouvelle apparence générée
-
-📝 **Description appliquée :**
-"${cleanDescription}"
-
-🎨 **Image générée par Freepik avec IA (vue première personne)**
-
-✅ Ton personnage a maintenant une apparence unique basée sur ta description!`,
-                    image: imageBuffer
-                };
-            } else {
-                return {
-                    text: `❌ Erreur lors de la génération de l'image. Réessaie avec /modifier`
-                };
-            }
-
-        } catch (error) {
-            console.error('❌ Erreur lors de la modification:', error);
-            await dbManager.clearTemporaryData(player.id, 'modification_started');
-
-            return {
-                text: `❌ Erreur lors de la génération de l'image personnalisée.
-
-Réessaie avec une description plus simple ou utilise /modifier à nouveau.`
-            };
-        }
-    }
-
-    getKingdomDescription(kingdom) {
-        const descriptions = {
-            'AEGYRIA': 'golden plains kingdom with honor and chivalry, blessed armor and noble weapons',
-            'SOMBRENUIT': 'dark mysterious forests with moon magic and shadow spirits, dark robes',
-            'KHELOS': 'burning desert kingdom with ancient ruins and nomadic culture, desert garb',
-            'ABRANTIS': 'coastal kingdom with naval tradition, sea-themed armor and weapons',
-            'VARHA': 'snowy mountain kingdom with beast hunters, fur armor and winter gear',
-            'SYLVARIA': 'magical forest kingdom with nature magic, elven-style clothing and equipment',
-            'ECLYPSIA': 'dark eclipse lands with shadow magic, dark mystical robes and artifacts',
-            'TERRE_DESOLE': 'post-apocalyptic wasteland, scavenged armor and improvised weapons',
-            'DRAK_TARR': 'volcanic kingdom with dragon themes, dragon-scale armor and fire weapons',
-            'URVALA': 'misty swamp kingdom with alchemy, alchemical gear and mystical accessories',
-            'OMBREFIEL': 'gray plains with mercenaries, practical armor and versatile weapons',
-            'KHALDAR': 'tropical jungle kingdom, light armor and nature-based weapons'
-        };
-
-        return descriptions[kingdom] || 'fantasy kingdom with unique customs and equipment';
-    }
-
-    async processDialogueAction({ player, character, message, dbManager, imageGenerator }) {
-        try {
-            console.log(`💬 Dialogue PNJ détecté pour ${character.name}: ${message}`);
-
-            let playerSpeech = message;
-            if (message.includes('"')) {
-                const matches = message.match(/"([^"]+)"/);
-                if (matches && matches[1]) {
-                    playerSpeech = matches[1];
-                }
-            }
-
-            let npcResponse;
-            const sessionId = `player_${player.id}`;
-
-            try {
-                console.log('🎭 Génération réponse PNJ avec Groq...');
-
-                if (this.groqClient && this.groqClient.hasValidClient()) {
-                    npcResponse = await this.groqClient.generateNPCResponse(
-                        'Habitant du village',
-                        `un habitant du royaume ${character.kingdom}, personnage amical et curieux`,
-                        playerSpeech,
-                        {
-                            location: character.currentLocation,
-                            kingdom: character.kingdom,
-                            playerName: character.name
-                        }
-                    );
-                } else {
-                    npcResponse = `"Salut ${character.name} ! Que fais-tu par ici ?"`;
-                }
-            } catch (error) {
-                console.error('❌ Erreur génération dialogue PNJ:', error.message);
-                npcResponse = `"Bonjour, voyageur. Belle journée, n'est-ce pas ?"`;
-            }
-
-            let dialogueImage = null;
-            let dialogueAudio = null;
-
-            try {
-                const mediaResult = await imageGenerator.generateDialogueImage(
-                    character,
-                    'Habitant du village',
-                    npcResponse,
-                    { style: '3d', perspective: 'second_person' }
-                );
-                dialogueImage = mediaResult.image;
-                dialogueAudio = mediaResult.audio;
-            } catch (mediaError) {
-                console.error('❌ Erreur génération média dialogue:', mediaError.message);
-            }
-
-            return {
-                text: `💬 ${playerSpeech}
-
-${npcResponse}
-
-📍 *${character.currentLocation}*`,
-                image: dialogueImage,
-                audio: dialogueAudio
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur processDialogueAction:', error);
-            return {
-                text: `❌ Erreur lors du dialogue. Les habitants semblent occupés en ce moment.`
-            };
-        }
-    }
-
-    async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
-        try {
-            const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-            if (!character) {
-                return {
-                    text: `❌ Tu n'as pas de personnage à supprimer.
-
-Utilise /créer pour créer un nouveau personnage.`
-                };
-            }
-
-            await dbManager.deleteCharacter(character.id);
-
-            await dbManager.clearTemporaryData(player.id, 'game_mode');
-            await dbManager.clearTemporaryData(player.id, 'creation_started');
-            await dbManager.clearTemporaryData(player.id, 'creation_mode');
-
-            console.log(`🗑️ Personnage supprimé: ${character.name} (ID: ${character.id})`);
-
-            return {
-                text: `🗑️ **PERSONNAGE SUPPRIMÉ** 🗑️
-
-👤 **${character.name}** a été définitivement supprimé de ${character.kingdom}.
-
-✨ Tu peux maintenant créer un nouveau personnage avec /créer
-
-💀 **Attention :** Cette action est irréversible!`,
-                image: await imageGenerator.generateMenuImage()
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur lors de la suppression du personnage:', error);
-            return {
-                text: `❌ **Erreur lors de la suppression**
-
-Une erreur s'est produite. Veuillez réessayer plus tard.`
-            };
-        }
-    }
-
-    async generateNPCResponse(character, playerDialogue, sessionId) {
-        try {
-            if (this.groqClient && this.groqClient.hasValidClient()) {
-                return await this.groqClient.generateDialogueResponse(character, playerDialogue, sessionId);
-            }
-
-            if (this.openAIClient && this.openAIClient.isAvailable) {
-                const context = {
-                    character: character,
-                    playerMessage: playerDialogue,
-                    location: character.currentLocation
-                };
-                return await this.openAIClient.generateCharacterResponse(character, context, playerDialogue, sessionId);
-            }
-
-            return "Le PNJ vous regarde attentivement et hoche la tête.";
-
-        } catch (error) {
-            console.error('❌ Erreur génération réponse PNJ:', error);
-            return "Le PNJ semble perplexe et ne sait pas quoi répondre.";
-        }
-    }
-
-    async handleAuthorizeCommand({ player, chatId, message, dbManager, imageGenerator }) {
-        try {
-            // Extraire le nom du joueur et optionnellement le royaume de la commande
-            const parts = message.split(' ');
-            if (parts.length < 2) {
-                return {
-                    text: `📋 **COMMANDE AUTORISE**
-
-Usage: /autorise [nom_du_joueur] [ROYAUME_OPTIONNEL]
-
-**Exemples:**
-• /autorise Jean
-• /autorise Jean AEGYRIA
-
-Si aucun royaume n'est spécifié, le système détectera automatiquement le royaume pour ce groupe.`
-                };
-            }
-
-            const playerName = parts[1].trim();
-            const specifiedKingdom = parts[2] ? parts[2].toUpperCase().trim() : null;
-
-            let kingdom = null;
-
-            // Si un royaume est spécifié dans la commande, l'utiliser et enregistrer l'association
-            if (specifiedKingdom) {
-                kingdom = await dbManager.getKingdomById(specifiedKingdom);
-
-                if (!kingdom) {
-                    const kingdoms = await dbManager.getAllKingdoms();
-                    let kingdomsList = kingdoms.map((k, i) => `${i + 1}. ${k.name} (${k.id})`).join('\n');
-
-                    return {
-                        text: `❌ **ROYAUME INVALIDE**
-
-Le royaume "${specifiedKingdom}" n'existe pas.
-
-**Royaumes disponibles:**
-${kingdomsList}`
-                    };
-                }
-
-                // Enregistrer automatiquement l'association groupe-royaume
-                try {
-                    await dbManager.saveChatKingdomAssociation(chatId, kingdom.id);
-                    console.log(`✅ Association automatique sauvegardée: ${chatId} -> ${kingdom.id}`);
-                } catch (saveError) {
-                    console.error('⚠️ Erreur sauvegarde association:', saveError);
-                    // Continue malgré l'erreur d'association
-                }
-            } else {
-                // Essayer de récupérer le royaume depuis l'association existante
-                kingdom = await this.getKingdomFromChatId(chatId, dbManager);
-
-                if (!kingdom) {
-                    return {
-                        text: `❌ **GROUPE NON CONFIGURÉ**
-
-Ce groupe WhatsApp n'est pas encore associé à un royaume.
-
-**Solutions:**
-• Utilisez: /autorise ${playerName} ROYAUME_ID
-• Ou configurez d'abord avec: /config_royaume ROYAUME_ID
-
-**Exemples:**
-• /autorise ${playerName} AEGYRIA
-• /config_royaume AEGYRIA`
-                    };
-                }
-            }
-
-            // Rechercher le personnage par nom
-            const character = await dbManager.getCharacterByName(playerName);
-
-            if (!character) {
-                return {
-                    text: `❌ **JOUEUR NON TROUVÉ**
-
-Aucun personnage trouvé avec le nom "${playerName}".
-
-Vérifiez l'orthographe ou demandez au joueur de créer son personnage avec /créer.`
-                };
-            }
-
-            // Vérifier si le joueur est déjà dans le bon royaume
-            if (character.kingdom === kingdom.id) {
-                return {
-                    text: `✅ **DÉJÀ AUTORISÉ**
-
-Le joueur **${character.name}** est déjà membre du royaume **${kingdom.name}**.
-
-🏰 Royaume actuel: ${kingdom.name}
-📍 Localisation: ${character.currentLocation}`
-                };
-            }
-
-            // Sauvegarder l'ancien royaume pour l'affichage
-            const oldKingdom = character.kingdom;
-
-            // Mettre à jour le royaume du personnage
-            await dbManager.updateCharacter(character.id, {
-                kingdom: kingdom.id,
-                currentLocation: this.getStartingLocation(kingdom.id)
-            });
-
-            console.log(`👑 Autorisation: ${character.name} transféré vers ${kingdom.name} via groupe ${chatId}`);
-
-            return {
-                text: `👑 **AUTORISATION ACCORDÉE** 👑
-
-✅ Le joueur **${character.name}** a été autorisé dans le royaume **${kingdom.name}**!
-
-🏰 **Ancien royaume:** ${oldKingdom}
-🏰 **Nouveau royaume:** ${kingdom.name}
-📍 **Nouvelle localisation:** ${this.getStartingLocation(kingdom.id)}
-
-${specifiedKingdom ? '✨ **Association groupe-royaume automatiquement enregistrée!**\n\n' : ''}Le joueur peut maintenant participer aux activités de ce royaume.`,
-                image: await imageGenerator.generateKingdomImage(kingdom.id)
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur commande autorise:', error);
-            return {
-                text: `❌ **ERREUR D'AUTORISATION**
-
-Une erreur s'est produite lors de l'autorisation.
-
-Veuillez réessayer ou contactez un administrateur.`
-            };
-        }
-    }
-
-    async getKingdomFromChatId(chatId, dbManager) {
-        try {
-            // Récupérer l'association depuis la base de données
-            const association = await dbManager.getChatKingdomAssociation(chatId);
-
-            if (!association) {
-                console.log(`⚠️ Groupe non configuré: ${chatId}`);
-                return null;
-            }
-
-            console.log(`✅ Groupe ${chatId} mappé vers le royaume ${association.kingdomId}`);
-
-            // Récupérer les informations complètes du royaume
-            return await dbManager.getKingdomById(association.kingdomId);
-        } catch (error) {
-            console.error('❌ Erreur récupération association groupe-royaume:', error);
-            return null;
-        }
-    }
-
-    async handleConfigKingdomCommand({ player, chatId, message, dbManager, imageGenerator }) {
-        try {
-            const parts = message.split(' ');
-
-            if (parts.length < 2) {
-                const kingdoms = await dbManager.getAllKingdoms();
-                let kingdomsList = kingdoms.map((k, i) => `${i + 1}. ${k.name} (${k.id})`).join('\n');
-
-                return {
-                    text: `⚙️ **CONFIGURATION ROYAUME**
-
-Usage: /config_royaume [ROYAUME_ID]
-
-**Royaumes disponibles:**
-${kingdomsList}
-
-**Exemple:** /config_royaume AEGYRIA
-
-Cette commande vous aide à configurer ce groupe WhatsApp.
-
-📍 **ID du groupe actuel:** \`${chatId}\`
-
-💡 **Pour les développeurs:** Copiez cet ID pour l'ajouter dans le mapping des groupes.`
-                };
-            }
-
-            const kingdomId = parts[1].toUpperCase();
-            const kingdom = await dbManager.getKingdomById(kingdomId);
-
-            if (!kingdom) {
-                return {
-                    text: `❌ **ROYAUME INVALIDE**
-
-Le royaume "${kingdomId}" n'existe pas.
-
-Utilisez /config_royaume pour voir la liste des royaumes disponibles.`
-                };
-            }
-
-            // Vérifier si le groupe est déjà configuré
-            const currentKingdom = await this.getKingdomFromChatId(chatId, dbManager);
-
-            if (currentKingdom && currentKingdom.id === kingdomId) {
-                return {
-                    text: `✅ **DÉJÀ CONFIGURÉ**
-
-Ce groupe est déjà associé au royaume **${kingdom.name}**!
-
-🏰 **Royaume:** ${kingdom.name}
-📍 **ID Groupe:** \`${chatId}\`
-
-Les commandes /autorise fonctionnent déjà pour ce royaume.`
-                };
-            }
-
-            // Sauvegarder automatiquement l'association
-            try {
-                await dbManager.saveChatKingdomAssociation(chatId, kingdomId);
-
-                console.log(`✅ Association sauvegardée: ${chatId} -> ${kingdomId}`);
-
-                return {
-                    text: `✅ **CONFIGURATION RÉUSSIE !**
-
-Le groupe WhatsApp a été automatiquement associé au royaume **${kingdom.name}**!
-
-🏰 **Royaume:** ${kingdom.name}
-🎯 **ID Royaume:** ${kingdom.id}
-📱 **ID Groupe:** \`${chatId}\`
-
-✨ **L'association a été sauvegardée dans la base de données.**
-
-Les commandes /autorise fonctionnent maintenant pour ce royaume !`,
-                    image: await imageGenerator.generateKingdomImage(kingdom.id)
-                };
-            } catch (saveError) {
-                console.error('❌ Erreur sauvegarde association:', saveError);
-
-                return {
-                    text: `❌ **ERREUR DE SAUVEGARDE**
-
-Impossible de sauvegarder l'association du groupe au royaume **${kingdom.name}**.
-
-Erreur: ${saveError.message}
-
-Veuillez réessayer ou contactez un administrateur.`
-                };
-            }
-
-        } catch (error) {
-            console.error('❌ Erreur config royaume:', error);
-            return {
-                text: `❌ **ERREUR DE CONFIGURATION**
-
-Une erreur s'est produite lors de la configuration.
-
-Veuillez réessayer ou contactez un administrateur.`
-            };
-        }
-    }
-
-    // ===========================================
-    // NOUVELLES MÉTHODES POUR LES SORTS ET L'ALPHABET ANCIEN
-    // ===========================================
-
-    /**
-     * Affiche les détails d'un sort spécifique
-     */
-    async handleSpellCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `📚 **CONSULTATION DE SORT** 📚
-
-Usage: /sort [nom du sort]
-
-Exemples:
-• /sort boule de feu
-• /sort ⫷⧉⩚⧃⧇ ⟁✦ ⫷✦⪦ (alphabet ancien)
-
-📖 Tapez /sorts pour voir votre grimoire complet.`
-                };
-            }
-
-            const spellInput = args.join(' ');
-            const parsedInput = this.ancientAlphabetManager.parseSpellInput(spellInput);
-
-            // Simulation d'un sort - dans la vraie version, cela viendrait de la base de données
-            const mockSpell = {
-                name: parsedInput.modern,
-                type: 'fire',
-                level: 3,
-                description: 'Lance une boule de feu dévastatrice sur vos ennemis.',
-                manaCost: 25,
-                damage: 45,
-                effect: 'Brûlure pendant 3 tours'
-            };
-
-            const spellDisplay = this.ancientAlphabetManager.createSpellDisplay(mockSpell);
-
-            return {
-                text: spellDisplay,
-                image: null
-            };
-        } catch (error) {
-            console.error('❌ Erreur sort:', error);
-            return { text: '❌ Erreur lors de la consultation du sort.' };
-        }
-    }
-
-    /**
-     * Affiche le grimoire du joueur avec tous ses sorts
-     */
-    async handleSpellbookCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            // Simulation des sorts appris - dans la vraie version, cela viendrait de la base de données
-            const learnedSpells = [
-                { name: 'Boule de Feu', type: 'fire', level: 2, manaCost: 20 },
-                { name: 'Éclair Mystique', type: 'lightning', level: 1, manaCost: 15 },
-                { name: 'Soin Mineur', type: 'healing', level: 1, manaCost: 10 }
-            ];
-
-            const spellbookDisplay = this.ancientAlphabetManager.createSpellbook(learnedSpells, character.name);
-
-            return {
-                text: spellbookDisplay,
-                image: null
-            };
-        } catch (error) {
-            console.error('❌ Erreur grimoire:', error);
-            return { text: '❌ Erreur lors de l\'affichage du grimoire.' };
-        }
-    }
-
-    /**
-     * Lance un sort en combat ou hors combat
-     */
-    async handleCastSpellCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `✨ **LANCEMENT DE SORT** ✨
-
-Usage: /lancer [nom du sort]
-
-Exemples:
-• /lancer boule de feu
-• /lancer ⫷⧉⩚⧃⧇ ⟁✦ ⫷✦⪦ (alphabet ancien)
-
-🔮 Tapez /sorts pour voir vos sorts disponibles.`
-                };
-            }
-
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            const spellInput = args.join(' ');
-            const parsedInput = this.ancientAlphabetManager.parseSpellInput(spellInput);
-
-            // Simulation de lancement de sort
-            const mockSpell = {
-                name: parsedInput.modern,
-                type: 'fire',
-                level: 3,
-                manaCost: 25,
-                damage: 45,
-                effects: 'Dégâts de feu critiques !',
-                incantation: this.ancientAlphabetManager.createIncantation(parsedInput.modern, 'fire', 3)
-            };
-
-            // Créer l'animation de lancement
-            const castingFrames = this.ancientAlphabetManager.createSpellCastingAnimation(
-                mockSpell,
-                character.name,
-                null
-            );
-
-            // Afficher l'animation avec des barres de chargement
-            const loadingAnimation = await this.loadingBarManager.createLoadingAnimation(
-                'spell',
-                `Lancement de ${mockSpell.name}`,
-                character.name
-            );
-
-            // Créer une narration complète avec image
-            const narration = await this.narrationImageManager.createSpellNarration(mockSpell, character);
-
-            return {
-                text: `${loadingAnimation[loadingAnimation.length - 1]}
-
-${castingFrames[castingFrames.length - 1]}
-
-${narration.text}`,
-                image: narration.imagePath
-            };
-        } catch (error) {
-            console.error('❌ Erreur lancement sort:', error);
-            return { text: '❌ Erreur lors du lancement du sort.' };
-        }
-    }
-
-    /**
-     * Permet d'apprendre un nouveau sort
-     */
-    async handleLearnSpellCommand({ playerNumber, chatId, message, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `📚 **APPRENTISSAGE DE SORT** 📚
-
-Usage: /apprendre [nom du sort]
-
-🔮 Vous devez être près d'un maître de magie ou dans une académie pour apprendre de nouveaux sorts.
-
-📍 Rendez-vous dans les lieux suivants :
-• Académie Mystique d'AEGYRIA
-• Tour des Mages de SOMBRENUIT
-• Sanctuaire Élémentaire de TERRAVERDE`
-                };
-            }
-
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            const spellName = args.join(' ');
-            const ancientName = this.ancientAlphabetManager.toAncientText(spellName);
-
-            return {
-                text: `✨ **SORT APPRIS !** ✨
-
-🎓 **${character.name}** a appris le sort **${spellName}** !
-
-🔮 **Nom mystique:** ${ancientName}
-
-📚 Le sort a été ajouté à votre grimoire.
-💫 Vous pouvez maintenant l'utiliser avec /lancer ${spellName}
-
-⚡ **Conseil:** Les sorts en alphabet ancien sont plus puissants !`
-            };
-        } catch (error) {
-            console.error('❌ Erreur apprentissage sort:', error);
-            return { text: '❌ Erreur lors de l\'apprentissage du sort.' };
-        }
-    }
-
-    // ===========================================
-    // MÉTHODES D'ADMINISTRATION
-    // ===========================================
-
-    /**
-     * Affiche les statistiques du serveur (Admin uniquement)
-     */
-    async handleAdminStatsCommand({ player, chatId, message, sock, dbManager, imageGenerator, playerNumber }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        console.log(`🔐 Tentative d'accès admin par: "${adminId}"`);
-
-        if (!this.adminManager.isAdmin(adminId)) {
-            return {
-                text: `❌ **ACCÈS REFUSÉ** ❌
-
-🚫 Vous n'avez pas les permissions d'administrateur.
-🔑 Envoyez d'abord votre code d'authentification (2011).`
-            };
-        }
-
-        // Auto-suppression du message de commande admin après traitement
-        setTimeout(async () => {
-            try {
-                await sock.sendMessage(chatId, { delete: originalMessage.key });
-                console.log(`🗑️ Commande admin supprimée automatiquement`);
-            } catch (error) {
-                console.log(`⚠️ Impossible de supprimer la commande admin: ${error.message}`);
-            }
-        }, 5000);
-
-        const response = await this.adminManager.processAdminCommand('/admin_stats', adminId);
-
-        return {
-            text: `${response}
-
-🔒 Cette commande et sa réponse seront automatiquement supprimées.
-⏰ Session expire dans ${this.adminManager.getAuthStatus(adminId)?.timeLeft || 0} minutes.`
-        };
-    }
-
-    /**
-     * Modifie l'heure du jeu (Admin uniquement)
-     */
-    async handleAdminTimeCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_time', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_time', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Assigne un groupe à un royaume (Admin uniquement)
-     */
-    async handleAdminKingdomCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        if (args.length < 2) {
-            return {
-                text: `👑 **GESTION DES ROYAUMES** 👑
-
-Usage: /admin_kingdom [groupeId] [royaume]
-
-Exemple: /admin_kingdom ${chatId} AEGYRIA
-
-🏰 **Royaumes disponibles:**
-AEGYRIA, SOMBRENUIT, TERRAVERDE, CIELNUAGE,
-FLAMMEBOURG, GELOPOLIS, VENTARIA, AURORALIS,
-OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
-            };
-        }
-
-        const params = { groupId: args[0], kingdom: args[1] };
-        const response = await this.adminManager.processAdminCommand('/admin_kingdom', adminId, params);
-
-        // Mettre à jour le mapping local également
-        this.adminManager.assignKingdomToGroup(params.groupId, params.kingdom);
-
-        return { text: response };
-    }
-
-    /**
-     * Liste tous les groupes et leurs royaumes (Admin uniquement)
-     */
-    async handleAdminGroupsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const response = await this.adminManager.processAdminCommand('/admin_groups', adminId);
-        return { text: response };
-    }
-
-    /**
-     * Donne un objet à un joueur (Admin uniquement)
-     */
-    async handleAdminGiveCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_give', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_give', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Modifie le niveau d'un joueur (Admin uniquement)
-     */
-    async handleAdminLevelCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_level', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_level', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Téléporte un joueur (Admin uniquement)
-     */
-    async handleAdminTeleportCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_teleport', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_teleport', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Soigne complètement un joueur (Admin uniquement)
-     */
-    async handleAdminHealCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_heal', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_heal', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Ajoute un pouvoir à un joueur (Admin uniquement)
-     */
-    async handleAdminPowerCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_power', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_power', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Change la météo (Admin uniquement)
-     */
-    async handleAdminWeatherCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_weather', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_weather', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Lance un événement spécial (Admin uniquement)
-     */
-    async handleAdminEventCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_event', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_event', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Remet à zéro un royaume (Admin uniquement)
-     */
-    async handleAdminResetKingdomCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_reset_kingdom', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_reset_kingdom', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Active/désactive le mode debug (Admin uniquement)
-     */
-    async handleAdminDebugCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_debug', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_debug', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Crée une sauvegarde (Admin uniquement)
-     */
-    async handleAdminBackupCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_backup', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_backup', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Recharge les données du jeu (Admin uniquement)
-     */
-    async handleAdminReloadCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_reload', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_reload', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Envoie une annonce à tous les joueurs (Admin uniquement)
-     */
-    async handleAdminAnnounceCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const args = message.split(' ').slice(1);
-        const params = this.adminManager.parseAdminCommand('/admin_announce', args);
-
-        const response = await this.adminManager.processAdminCommand('/admin_announce', adminId, params);
-        return { text: response };
-    }
-
-    /**
-     * Affiche l'aide pour les commandes d'administration (Admin uniquement)
-     */
-    async handleAdminHelpCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        const adminId = playerNumber || player.whatsappNumber;
-        if (!this.adminManager.isAdmin(adminId)) {
-            return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
-        }
-
-        const response = this.adminManager.getAdminHelp();
-        return { text: response };
-    }
-
-    /**
-     * Vérifie la position d'un joueur dans un groupe/royaume
-     */
-    async validatePlayerKingdomLocation(playerNumber, chatId, dbManager) {
-        try {
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) return { valid: true, message: null };
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) return { valid: true, message: null };
-
-            return this.adminManager.validatePlayerLocation(chatId, character.kingdom);
-        } catch (error) {
-            console.error('❌ Erreur validation position:', error);
-            return { valid: true, message: null };
-        }
-    }
-
-    // ===========================================
-    // MÉTHODES POUR LES QUÊTES (30,000 quêtes)
-    // ===========================================
-
-    /**
-     * Affiche la liste des quêtes disponibles
-     */
-    async handleQuestsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            // Générer les quêtes si pas encore fait
-            await this.questManager.generateAllQuests();
-
-            // Obtenir les quêtes disponibles pour ce joueur
-            const availableQuests = this.questManager.getAvailableQuests(
-                character.level,
-                character.kingdom,
-                10
-            );
-
-            if (availableQuests.length === 0) {
-                return {
-                    text: `📋 **AUCUNE QUÊTE DISPONIBLE**
-
-Aucune quête n'est disponible pour votre niveau et royaume actuels.
-
-💡 **Conseils:**
-• Augmentez votre niveau pour débloquer plus de quêtes
-• Explorez d'autres royaumes
-• Terminez vos quêtes en cours`
-                };
-            }
-
-            let questList = `📋 **QUÊTES DISPONIBLES** 📋
-
-👤 **Personnage:** ${character.name}
-🏰 **Royaume:** ${character.kingdom}
-⭐ **Niveau:** ${character.level}
-
-`;
-
-            availableQuests.forEach((quest, index) => {
-                const typeEmoji = quest.type === 'main' ? '⭐' : '📋';
-                const difficultyEmoji = {
-                    'Facile': '🟢',
-                    'Normale': '🟡',
-                    'Difficile': '🟠',
-                    'Très Difficile': '🔴',
-                    'Légendaire': '🟣'
-                }[quest.difficulty];
-
-                questList += `${index + 1}. ${typeEmoji} **${quest.title}**
-   ${difficultyEmoji} ${quest.difficulty} • Niveau ${quest.requirements.level}
-   ⏱️ ${quest.estimatedTime} min • 🏆 ${quest.rewards.xp} XP
-
-`;
-
-                if (quest.type === 'main' && quest.chapter) {
-                    questList += `   📖 Chapitre ${quest.chapter}
-
-`;
-                }
-            });
-
-            questList += `💡 Utilisez /quete [numéro] pour voir les détails d'une quête
-🎯 Utilisez /accepter [numéro] pour accepter une quête`;
-
-            return { text: questList };
-        } catch (error) {
-            console.error('❌ Erreur quêtes:', error);
-            return { text: '❌ Erreur lors du chargement des quêtes.' };
-        }
-    }
-
-    /**
-     * Affiche les détails d'une quête spécifique
-     */
-    async handleQuestDetailsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `📖 **DÉTAILS DE QUÊTE**
-
-Usage: /quete [numéro]
-
-Exemple: /quete 1
-
-📋 Utilisez /quetes pour voir la liste des quêtes disponibles.`
-                };
-            }
-
-            const questIndex = parseInt(args[0]) - 1;
-
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            // Générer les quêtes si pas encore fait
-            await this.questManager.generateAllQuests();
-
-            const availableQuests = this.questManager.getAvailableQuests(
-                character.level,
-                character.kingdom,
-                20
-            );
-
-            if (questIndex < 0 || questIndex >= availableQuests.length) {
-                return {
-                    text: `❌ **QUÊTE INTROUVABLE**
-
-Le numéro de quête ${questIndex + 1} n'existe pas.
-
-📋 Utilisez /quetes pour voir les quêtes disponibles.`
-                };
-            }
-
-            const quest = availableQuests[questIndex];
-            const questDisplay = this.questManager.formatQuestDisplay(quest);
-
-            return {
-                text: questDisplay + `\n\n🎯 Utilisez /accepter ${questIndex + 1} pour accepter cette quête`
-            };
-        } catch (error) {
-            console.error('❌ Erreur détail quête:', error);
-            return { text: '❌ Erreur lors du chargement des détails de la quête.' };
-        }
-    }
-
-    /**
-     * Accepte une quête
-     */
-    async handleAcceptQuestCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `🎯 **ACCEPTER UNE QUÊTE**
-
-Usage: /accepter [numéro]
-
-Exemple: /accepter 1
-
-📋 Utilisez /quetes pour voir les quêtes disponibles.`
-                };
-            }
-
-            const questIndex = parseInt(args[0]) - 1;
-
-            const player = await dbManager.getPlayerByWhatsApp(playerNumber);
-            if (!player) {
-                return { text: '❌ Vous devez d\'abord vous enregistrer avec /menu' };
-            }
-
-            const character = await dbManager.getCharacterByPlayerId(player.id);
-            if (!character) {
-                return { text: '❌ Vous devez d\'abord créer un personnage avec /créer' };
-            }
-
-            await this.questManager.generateAllQuests();
-
-            const availableQuests = this.questManager.getAvailableQuests(
-                character.level,
-                character.kingdom,
-                20
-            );
-
-            if (questIndex < 0 || questIndex >= availableQuests.length) {
-                return {
-                    text: `❌ **QUÊTE INTROUVABLE**
-
-Le numéro de quête ${questIndex + 1} n'existe pas.
-
-📋 Utilisez /quetes pour voir les quêtes disponibles.`
-                };
-            }
-
-            const quest = availableQuests[questIndex];
-
-            // Animation d'acceptation de quête
-            const loadingAnimation = await this.loadingBarManager.createLoadingAnimation(
-                'quest_accept',
-                `Acceptation de "${quest.title}"`,
-                character.name
-            );
-
-            return {
-                text: `${loadingAnimation[loadingAnimation.length - 1]}
-
-✅ **QUÊTE ACCEPTÉE !**
-
-📋 **${quest.title}**
-📖 ${quest.description}
-
-🎯 **Objectifs:**
-${quest.objectives.map(obj => `• ${obj}`).join('\n')}
-
-🏆 **Récompenses:**
-• 💰 ${quest.rewards.gold} pièces d'or
-• ⭐ ${quest.rewards.xp} points d'expérience
-${quest.rewards.items ? quest.rewards.items.map(item => `• 🎒 ${item}`).join('\n') : ''}
-
-📍 **Localisation:** ${quest.location}
-⏱️ **Temps estimé:** ${quest.estimatedTime} minutes
-
-💡 Utilisez /progression pour voir vos quêtes en cours`
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur acceptation quête:', error);
-            return { text: '❌ Erreur lors de l\'acceptation de la quête.' };
-        }
-    }
-
-    async handleAbandonQuestCommand({ player, message, dbManager }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `🚫 **ABANDONNER UNE QUÊTE**
-
-Usage: /abandonner [numéro]
-
-Exemple: /abandonner 1
-
-📋 Utilisez /progression pour voir vos quêtes en cours.`
-                };
-            }
-
-            return { text: "🚫 Fonctionnalité d'abandon de quête en développement." };
-
-        } catch (error) {
-            console.error('❌ Erreur abandon quête:', error);
-            return { text: "❌ Erreur lors de l'abandon de la quête." };
-        }
-    }
-
-    async handleQuestProgressCommand({ player, dbManager }) {
-        try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            return { text: "📊 Système de progression des quêtes en développement." };
-
-        } catch (error) {
-            console.error('❌ Erreur progression quête:', error);
-            return { text: "❌ Erreur lors de l'affichage de la progression." };
-        }
-    }
-
-    async handleSearchQuestCommand({ player, message, dbManager }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `🔍 **RECHERCHER UNE QUÊTE**
-
-Usage: /rechercher_quete [mot-clé]
-
-Exemple: /rechercher_quete dragon
-
-📋 Recherchez parmi plus de 30,000 quêtes disponibles !`
-                };
-            }
-
-            return { text: "🔍 Système de recherche de quête en développement." };
-
-        } catch (error) {
-            console.error('❌ Erreur recherche quête:', error);
-            return { text: "❌ Erreur lors de la recherche de quête." };
-        }
-    }
-
-    // ===========================================
-    // MÉTHODES POUR LE SYSTÈME D'AURA
-    // ===========================================
-
-    /**
-     * Affiche les informations d'aura du joueur
-     */
-    async handleAuraInfoCommand({ player, dbManager }) {
-        try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return { text: "❌ Tu n'as pas encore de personnage !" };
-            }
-
-            if (!this.auraManager) {
-                const AuraManager = require('../utils/AuraManager');
-                this.auraManager = new AuraManager(dbManager, this.loadingBarManager);
-            }
-
-            const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
-            return { text: auraInfo };
-
-        } catch (error) {
-            console.error('❌ Erreur commande aura info:', error);
-            return { text: "❌ Erreur lors de l'affichage des informations d'aura." };
-        }
-    }
-
-    /**
-     * Démarre l'apprentissage d'une aura
-     */
-    async handleLearnAuraCommand({ player, chatId, message, dbManager, sock }) {
-        try {
-            const args = message.split(' ').slice(1);
-            if (args.length === 0) {
-                return {
-                    text: `🔮 **APPRENTISSAGE D'AURA** 🔮
-
-📚 **Types d'aura disponibles :**
-🔥 fire - Aura de Flamme
-🌊 water - Aura Aquatique
-🌍 earth - Aura Tellurique
-💨 wind - Aura Éolienne
-⚡ lightning - Aura Foudroyante
-🌑 shadow - Aura Ténébreuse
-✨ light - Aura Lumineuse
-
-💡 **Usage :** \`/aura_apprendre [type]\`
-**Exemple :** \`/aura_apprendre fire\`
-
-⏰ **Durée :** 10 jours d'entraînement par aura
-🎲 **20% de chance de maîtrise instantanée !**`
-                };
-            }
-
-            const auraType = args[0].toLowerCase();
-            if (!this.auraManager.auraTypes[auraType]) {
-                return {
-                    text: `❌ Type d'aura invalide : "${auraType}"
-
-Types disponibles : fire, water, earth, wind, lightning, shadow, light`
-                };
-            }
-
-            if (!this.auraManager.canStartTraining(player.id)) {
-                const activeTraining = this.auraManager.getPlayerTraining(player.id);
-                return {
-                    text: `⚠️ Vous avez déjà un entraînement en cours !
-
-${activeTraining.techniqueName} (${Math.floor(activeTraining.progress)}%)`
-                };
-            }
-
-            // 20% de chance de maîtrise instantanée
-            const instantMasteryChance = Math.random();
-            if (instantMasteryChance < 0.2) { // 20% de chance
-                const instantResult = await this.auraManager.grantInstantMastery(player.id, auraType);
-                return {
-                    text: instantResult.message
-                };
-            }
-
-            // Sinon, démarrer l'entraînement normal
-            const result = await this.auraManager.startAuraTraining(
-                player.id,
-                auraType,
-                this.auraManager.auraTypes[auraType].techniques[0]
-            );
-
-            return {
-                text: result.message
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur apprentissage aura:', error);
-            return {
-                text: '❌ Erreur lors de l\'apprentissage d\'aura. Réessayez plus tard.'
-            };
-        }
-    }
-
-    async handleAuraSessionCommand({ player, chatId, message, dbManager, imageGenerator, sock }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage !
-
-Utilise /créer pour créer ton personnage.`
-            };
-        }
-
-        const activeTraining = this.auraManager.getPlayerTraining(player.id);
-        if (!activeTraining) {
-            return {
-                text: `❌ **AUCUN ENTRAÎNEMENT ACTIF**
-
-Vous n'avez pas d'entraînement d'aura en cours.
-
-Utilisez /aura_apprendre [type] pour commencer.`
-            };
-        }
-
-        if (activeTraining.status === 'completed') {
-            return {
-                text: `✅ **ENTRAÎNEMENT TERMINÉ**
-
-Votre entraînement est déjà complété !
-
-Utilisez /aura_apprendre [type] pour un nouveau type d'aura.`
-            };
-        }
-
-        // Vérifier si le joueur a déjà fait sa session aujourd'hui
-        const lastSession = activeTraining.lastSessionAt || activeTraining.startTime;
-        const now = new Date();
-        const timeSinceLastSession = now.getTime() - new Date(lastSession).getTime();
-        const hoursGap = timeSinceLastSession / (1000 * 60 * 60);
-
-        if (hoursGap < 20) { // Au moins 20h entre les sessions
-            const remainingHours = Math.ceil(20 - hoursGap);
-            return {
-                text: `⏰ **SESSION DÉJÀ EFFECTUÉE**
-
-Vous devez attendre ${remainingHours}h avant votre prochaine session d'entraînement.`
-            };
-        }
-
-        // Démarrer l'animation d'entraînement
-        try {
-            await this.auraManager.createAuraAnimation(
-                player.id,
-                activeTraining.auraType,
-                activeTraining.techniqueName,
-                sock,
-                chatId
-            );
-
-            // Mettre à jour le progrès
-            this.auraManager.updateTrainingProgress(activeTraining.id);
-            activeTraining.lastSessionAt = now.toISOString();
-
-            return { text: '' }; // Pas de réponse supplémentaire car l'animation gère tout
-        } catch (error) {
-            console.error('❌ Erreur session aura:', error);
-            return {
-                text: `❌ Erreur lors de la session d'entraînement. Réessayez.`
-            };
-        }
-    }
-
-    /**
-     * Afficher les techniques d'aura disponibles
-     */
-    async handleAuraTechniquesCommand({ player, dbManager, imageGenerator }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage !
-
-Utilise /créer pour créer ton personnage.`
-            };
-        }
-
-        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-
-        if (Object.keys(playerAuras).length === 0) {
-            return {
-                text: `🌟 **AUCUNE TECHNIQUE D'AURA**
-
-Vous n'avez pas encore appris de techniques d'aura.
-
-Utilisez /aura_apprendre [type] pour commencer votre entraînement !`
-            };
-        }
-
-        let techniquesText = `⚡ **TECHNIQUES D'AURA MAÎTRISÉES** ⚡
-
-`;
-
-        for (const [type, auraData] of Object.entries(playerAuras)) {
-            const auraInfo = this.auraManager.auraTypes[type];
-            techniquesText += `${auraInfo.emoji} **${auraInfo.name}** (Niveau ${auraData.level})
-`;
-
-            if (auraData.techniques.length > 0) {
-                auraData.techniques.forEach(technique => {
-                    techniquesText += `   ⚡ ${technique}
-`;
-                });
-            } else {
-                techniquesText += `   💭 Aucune technique maîtrisée
-`;
-            }
-            techniquesText += `
-`;
-        }
-
-        techniquesText += `💡 **Utilisez /aura_cast [technique] pour lancer une technique !**`;
-
-        return { text: techniquesText };
-    }
-
-    /**
-     * Lancer une technique d'aura
-     */
-    async handleCastAuraCommand({ player, chatId, message, dbManager, imageGenerator }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage !
-
-Utilise /créer pour créer ton personnage.`
-            };
-        }
-
-        const parts = message.split(' ');
-        if (parts.length < 2) {
-            return {
-                text: `🔮 **LANCEMENT DE TECHNIQUE D'AURA** 🔮
-
-Usage: /aura_cast [nom_technique]
-
-Utilisez /aura_techniques pour voir vos techniques disponibles.`
-            };
-        }
-
-        const techniqueName = parts.slice(1).join(' ');
-
-        // Chercher la technique dans toutes les auras du joueur
-        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-        let foundAura = null;
-
-        for (const [type, auraData] of Object.entries(playerAuras)) {
-            if (auraData.techniques.some(tech => tech.toLowerCase().includes(techniqueName.toLowerCase()))) {
-                foundAura = type;
-                break;
-            }
-        }
-
-        if (!foundAura) {
-            return {
-                text: `❌ **TECHNIQUE NON MAÎTRISÉE**
-
-Vous ne maîtrisez pas la technique "${techniqueName}".
-
-Utilisez /aura_techniques pour voir vos techniques disponibles.`
-            };
-        }
-
-        try {
-            const result = await this.auraManager.castAuraTechnique(player.id, foundAura, techniqueName);
-            return {
-                text: result.message
-            };
-        } catch (error) {
-            console.error('❌ Erreur lancement technique:', error);
-            return {
-                text: `❌ Erreur lors du lancement de la technique. Réessayez.`
-            };
-        }
-    }
-
-    /**
      * Méditation pour récupérer l'énergie spirituelle
      */
-    async handleMeditateCommand({ player, chatId, dbManager, sock }) {
+    async handleMeditateCommand({ player, dbManager }) {
         const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
-                text: `❌ Tu n'as pas encore de personnage !
-
-Utilise /créer pour créer ton personnage.`
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
             };
         }
 
@@ -4691,8 +2839,8 @@ Utilisez /aura_apprendre [type] pour commencer.`
         }
 
         try {
-            await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
-            return { text: '' }; // La régénération gère l'affichage
+            const result = await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
+            return { text: result.message };
         } catch (error) {
             console.error('❌ Erreur méditation:', error);
             return {
@@ -4701,7 +2849,7 @@ Utilisez /aura_apprendre [type] pour commencer.`
         }
     }
 
-    async handleRegenerateAuraCommand({ player, chatId, dbManager, sock }) {
+    async handleRegenerateAuraCommand({ player, dbManager, sock, chatId }) {
         return await this.handleMeditateCommand({ player, chatId, dbManager, sock });
     }
 

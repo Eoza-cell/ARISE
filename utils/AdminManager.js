@@ -8,6 +8,13 @@ class AdminManager {
         // Code d'authentification admin
         this.adminAuthCode = '2011';
 
+        // Codes d'authentification admin intégrés directement pour déploiement
+        this.authCodes = [
+            'ADMIN_FRICTION_2024_ULTRA',
+            'FRICTION_MASTER_KEY_2024',
+            'ULTIMATE_ADMIN_ACCESS_2024'
+        ];
+
         // Sessions admin temporaires (validées avec le code 2011)
         this.authenticatedSessions = new Map();
 

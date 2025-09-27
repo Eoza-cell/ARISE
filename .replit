@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["blender", "freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libuuid", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [workflows]
-runButton = "Project"
+runButton = "Start Bot Fixed"
 
 [[workflows.workflow]]
 name = "Start Friction Bot"
@@ -94,6 +94,15 @@ args = "pkill -f \"node index.js\" || true"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "sleep 5"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
+
+[[workflows.workflow]]
+name = "Start Bot Fixed"
+author = 48052626
+mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
