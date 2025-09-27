@@ -328,10 +328,76 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
     /**
      * Vérifie si un groupe appartient à un royaume spécifique
      * @param {string} groupId - ID du groupe
+     * @param {string} groupName - Nom du groupe (optionnel)
      * @returns {string|null}
      */
-    getGroupKingdom(groupId) {
-        return this.kingdomGroups.get(groupId) || null;
+    getGroupKingdom(groupId, groupName = null) {
+        // D'abord vérifier les assignations manuelles
+        const manualAssignment = this.kingdomGroups.get(groupId);
+        if (manualAssignment) {
+            return manualAssignment;
+        }
+
+        // Si pas d'assignation manuelle, essayer de détecter via le nom du groupe
+        if (groupName) {
+            return this.detectKingdomFromGroupName(groupName);
+        }
+
+        return null;
+    }
+
+    /**
+     * Détecte automatiquement le royaume basé sur le nom du groupe WhatsApp
+     * @param {string} groupName - Nom du groupe
+     * @returns {string|null}
+     */
+    detectKingdomFromGroupName(groupName) {
+        if (!groupName) return null;
+
+        const lowerName = groupName.toLowerCase();
+
+        // Mots-clés pour chaque royaume
+        const kingdomKeywords = {
+            'AEGYRIA': ['aegyria', 'aegyr', 'honneur', 'honor', 'plaine', 'valorhall', 'noble', 'paladin', 'lumière'],
+            'SOMBRENUIT': ['sombrenuit', 'sombre', 'nuit', 'darkness', 'shadow', 'ombre', 'forêt', 'murmure', 'lunelame'],
+            'KHELOS': ['khelos', 'désert', 'desert', 'sable', 'sand', 'oasis', 'mirage', 'sablesang', 'dune'],
+            'ABRANTIS': ['abrantis', 'port', 'mer', 'sea', 'ocean', 'marin', 'marée', 'kraken', 'navire', 'bateau'],
+            'VARHA': ['varha', 'montagne', 'mountain', 'neige', 'snow', 'froid', 'cold', 'loup', 'wolf', 'glacierre'],
+            'SYLVARIA': ['sylvaria', 'forêt', 'forest', 'arbre', 'tree', 'nature', 'vert', 'green', 'druide', 'anciens'],
+            'ECLYPSIA': ['eclypsia', 'éclipse', 'eclipse', 'mystique', 'mystic', 'temple', 'magie', 'magic'],
+            'TERRE_DESOLE': ['terre', 'désolé', 'wasteland', 'désert', 'apocalypse', 'ruine', 'survivant'],
+            'DRAK_TARR': ['drak', 'tarr', 'dragon', 'feu', 'fire', 'volcan', 'forge', 'cratère', 'flamme'],
+            'URVALA': ['urvala', 'mort', 'death', 'nécro', 'necro', 'marais', 'swamp', 'laboratoire', 'maudit'],
+            'OMBREFIEL': ['ombrefiel', 'ombre', 'shadow', 'exil', 'exile', 'gris', 'grey', 'citadelle', 'banni'],
+            'KHALDAR': ['khaldar', 'jungle', 'tropical', 'pilotis', 'amazonien', 'tribal', 'shaman', 'nature']
+        };
+
+        // Chercher les correspondances
+        for (const [kingdom, keywords] of Object.entries(kingdomKeywords)) {
+            for (const keyword of keywords) {
+                if (lowerName.includes(keyword)) {
+                    console.log(`🏰 Royaume détecté automatiquement: ${kingdom} (mot-clé: "${keyword}" dans "${groupName}")`);
+                    return kingdom;
+                }
+            }
+        }
+
+        // Vérifier si le nom du groupe contient directement le nom du royaume
+        const validKingdoms = [
+            'AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS', 'VARHA', 
+            'SYLVARIA', 'ECLYPSIA', 'TERRE_DESOLE', 'DRAK_TARR', 
+            'URVALA', 'OMBREFIEL', 'KHALDAR'
+        ];
+
+        for (const kingdom of validKingdoms) {
+            if (lowerName.includes(kingdom.toLowerCase())) {
+                console.log(`🏰 Royaume détecté directement: ${kingdom} dans "${groupName}"`);
+                return kingdom;
+            }
+        }
+
+        console.log(`🔍 Aucun royaume détecté pour le groupe: "${groupName}"`);
+        return null;
     }
 
     /**

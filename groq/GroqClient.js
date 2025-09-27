@@ -77,17 +77,37 @@ class GroqClient {
         return this.isAvailable && this.client;
     }
 
-    async generateNarration(prompt, maxTokens = 600) {
+    async generateNarration(prompt, maxTokens = 1500) {
         try {
             if (!this.hasValidClient()) {
                 throw new Error('Client Groq non disponible');
             }
 
+            // Améliorer le prompt pour une narration ultra-détaillée
+            const enhancedPrompt = `Tu es un narrateur IA ULTRA-DÉTAILLÉ pour un RPG épique comme Game of Thrones/Lord of the Rings.
+
+RÈGLES DE NARRATION ULTRA-IMMERSIVE :
+🎭 STYLE : Narrateur omniscient, descriptif, cinématographique
+📚 LONGUEUR : Minimum 3-4 paragraphes détaillés (800-1200 mots)
+🌍 DÉTAILS : Décris TOUT - environnement, sensations, émotions, atmosphère
+⚔️ ACTION : Chaque mouvement est décrit avec précision chirurgicale
+👥 PNJ : Réactions détaillées, expressions faciales, langage corporel
+🏛️ MONDE : Architecture, odeurs, sons, textures, température
+💭 PSYCHOLOGIE : Pensées internes, motivations, peurs, espoirs
+🎬 CINÉMA : Angles de caméra, ralentis, gros plans, panoramiques
+
+CONTEXTE DE L'ACTION :
+${prompt}
+
+Génère une narration ÉPIQUE et ULTRA-DÉTAILLÉE qui transporte le lecteur dans ce monde fantastique. Chaque phrase doit peindre une image vivante dans l'esprit du lecteur.
+
+Style : Immersif, poétique, dramatique, avec des détails sensoriels riches.`;
+
             const response = await this.client.chat.completions.create({
-                messages: [{ role: 'user', content: prompt }],
+                messages: [{ role: 'user', content: enhancedPrompt }],
                 model: this.model,
                 max_tokens: maxTokens,
-                temperature: 0.8
+                temperature: 0.85 // Légèrement plus créatif
             });
 
             return response.choices[0]?.message?.content?.trim() || '';

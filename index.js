@@ -217,6 +217,27 @@ class FrictionUltimateBot {
                 return;
             }
 
+            // Récupérer les métadonnées du groupe si c'est un groupe
+            let groupMetadata = null;
+            let detectedKingdom = null;
+            if (from.includes('@g.us')) {
+                try {
+                    groupMetadata = await this.sock.groupMetadata(from);
+                    const groupName = groupMetadata.subject;
+                    
+                    // Détecter automatiquement le royaume via le nom du groupe
+                    detectedKingdom = this.gameEngine.adminManager.detectKingdomFromGroupName(groupName);
+                    
+                    if (detectedKingdom) {
+                        // Auto-assigner le groupe au royaume détecté
+                        this.gameEngine.adminManager.kingdomGroups.set(from, detectedKingdom);
+                        console.log(`🏰 Groupe "${groupName}" auto-assigné au royaume: ${detectedKingdom}`);
+                    }
+                } catch (groupError) {
+                    console.log('⚠️ Impossible de récupérer les métadonnées du groupe:', groupError.message);
+                }
+            }
+
             // Système de déduplication basé sur l'ID unique du message par chat
             const messageKey = `${from}:${messageId}`;
             const now = Date.now();

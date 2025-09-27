@@ -1466,6 +1466,33 @@ Réponds en JSON avec:
         }
     }
 
+    createDetailedFallbackNarration(character, action) {
+        const timeOfDay = new Date().getHours();
+        const timeDescription = timeOfDay < 6 ? 'dans la pénombre de l\'aube naissante' :
+                              timeOfDay < 12 ? 'sous la lumière dorée du matin' :
+                              timeOfDay < 18 ? 'dans la chaleur de l\'après-midi' :
+                              timeOfDay < 22 ? 'dans les lueurs orangées du crépuscule' :
+                              'sous le manteau étoilé de la nuit';
+
+        const locationDescriptions = {
+            'AEGYRIA': 'Les vastes plaines d\'honneur s\'étendent à perte de vue, parsemées de fleurs dorées qui dansent dans la brise.',
+            'SOMBRENUIT': 'Les ombres dansent entre les arbres millénaires de cette forêt mystérieuse où règne un silence presque surnaturel.',
+            'KHELOS': 'Le sable chaud crisse sous les pas tandis que les dunes ondulent vers l\'horizon dans une symphonie de couleurs ocre.',
+            'ABRANTIS': 'L\'air salin porte les cris des mouettes tandis que les vagues viennent lécher les quais de pierre ancienne.',
+            'VARHA': 'Le vent glacé siffle entre les pics enneigés, portant avec lui l\'écho lointain des loups des montagnes.'
+        };
+
+        const locationDesc = locationDescriptions[character.kingdom] || 'Dans ce lieu mystérieux aux mille secrets';
+
+        return `${timeDescription}, ${character.name} se dresse dans ${character.currentLocation || 'un lieu indéterminé'}. ${locationDesc}
+
+L'air semble vibrer d'une énergie particulière tandis que ${character.gender === 'male' ? 'le héros' : 'l\'héroïne'} s'apprête à accomplir son geste : "${action}".
+
+Chaque muscle se tend, chaque sens s'aiguise. ${character.currentEnergy < 50 ? 'Malgré la fatigue qui pèse sur ses épaules, ' : ''}${character.name} puise dans ses réserves de détermination, conscient${character.gender === 'male' ? '' : 'e'} que dans ce monde impitoyable, chaque action peut avoir des conséquences dramatiques.
+
+Le destin semble retenir son souffle...`;
+    }
+
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
             // Vérifier que le personnage a assez d'énergie pour agir
@@ -1485,17 +1512,30 @@ ${character.name} est complètement épuisé ! Vous devez vous reposer avant d'a
             // Générer une narration immersive avec l'IA
             let narrationResponse;
             try {
-                narrationResponse = await this.groqClient.generateNarration({
-                    character,
-                    action: message,
-                    location: character.currentLocation || 'Zone Inconnue',
-                    previousActions: character.actionHistory || []
-                });
+                // Créer un contexte ultra-détaillé pour la narration
+                const detailedContext = `
+PERSONNAGE : ${character.name}
+- Sexe : ${character.gender === 'male' ? 'Homme' : 'Femme'}
+- Royaume : ${character.kingdom}
+- Niveau : ${character.level} (Rang ${character.powerLevel})
+- Localisation : ${character.currentLocation || 'Zone Inconnue'}
+- État physique : ${character.currentLife}/${character.maxLife} PV, ${character.currentEnergy}/${character.maxEnergy} énergie
+- Équipement : ${Object.keys(character.equipment || {}).length > 0 ? Object.values(character.equipment).join(', ') : 'Aucun équipement spécial'}
+
+ACTION DEMANDÉE : "${message}"
+
+CONTEXTE NARRATIF :
+${character.currentLocation ? `Le héros se trouve actuellement dans ${character.currentLocation}, un lieu emblématique du royaume de ${character.kingdom}.` : ''}
+${character.powerLevel === 'G' ? 'Ce personnage est encore un débutant, ses mouvements sont maladroits et hésitants.' : ''}
+${character.currentEnergy < 30 ? 'Le personnage semble fatigué, ses gestes sont plus lents.' : ''}
+
+Narre cette scène comme si tu étais George R.R. Martin ou J.R.R. Tolkien, avec des détails sensoriels, des descriptions d'ambiance, et une immersion totale.`;
+
+                narrationResponse = await this.groqClient.generateNarration(detailedContext);
             } catch (narrationError) {
                 console.error('❌ Erreur narration Groq:', narrationError);
-                narrationResponse = {
-                    narration: `${character.name} tente l'action : "${message}". L'aventure continue dans ce monde mystérieux...`
-                };
+                // Fallback avec une narration basique mais détaillée
+                narrationResponse = this.createDetailedFallbackNarration(character, message);
             }
 
             const narration = narrationResponse.narration || narrationResponse;

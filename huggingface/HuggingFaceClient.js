@@ -3,6 +3,7 @@ const path = require('path');
 
 class HuggingFaceClient {
     constructor() {
+        // Clé API Hugging Face intégrée directement
         this.apiKey = process.env.HF_TOKEN || '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';
         this.isAvailable = false;
         this.client = null;
