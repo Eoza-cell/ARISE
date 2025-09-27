@@ -43,10 +43,18 @@ class FrictionUltimateBot {
         this.gameEngine = new GameEngine(this.dbManager);
         this.buttonManager = null; // Sera initialisé après la connexion
         this.isConnected = false;
-        // Système de déduplication amélioré avec cache borné
+        // Système de déduplication optimisé pour économiser la mémoire
         this.processedMessages = new Map(); // ID du message -> timestamp
-        this.maxCacheSize = 1000; // Limite de cache pour éviter la fuite mémoire
-        this.cacheCleanupInterval = 5 * 60 * 1000; // Nettoyer le cache toutes les 5 minutes
+        this.maxCacheSize = 500; // Réduire la limite de cache
+        this.cacheCleanupInterval = 2 * 60 * 1000; // Nettoyer le cache toutes les 2 minutes
+
+        // Nettoyage automatique de la mémoire
+        setInterval(() => {
+            this.cleanupCache();
+            if (global.gc) {
+                global.gc();
+            }
+        }, this.cacheCleanupInterval);
 
         // Injecter l'ImageGenerator dans le GameEngine
         this.gameEngine.imageGenerator = this.imageGenerator;
