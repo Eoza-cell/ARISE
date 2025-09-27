@@ -174,6 +174,8 @@ class GameEngine {
             '/admin_status': this.handleAdminStatusCommand.bind(this),
             '/admin_logout': this.handleAdminLogoutCommand.bind(this),
             '/admin_help': this.handleAdminHelpCommand.bind(this),
+            '/admin_groups': this.handleAdminGroupsCommand.bind(this),
+            '/admin_kingdom': this.handleAdminKingdomCommand.bind(this),
 
             // Commandes de quêtes (10,000 principales + 20,000 secondaires)
             '/quetes': this.handleQuestsCommand.bind(this),
@@ -1351,6 +1353,119 @@ ${progressBar} ${Math.floor(percentage)}%
 💫 Récupération en cours...`;
     }
 
+    /**
+     * Vérifie si l'action est impossible avec l'équipement/état actuel
+     */
+    async checkImpossibleAction(message, character) {
+        if (!character || !message) return null;
+
+        const lowerMessage = message.toLowerCase();
+        
+        // Vérifier les objets mentionnés
+        const itemKeywords = ['utilise', 'prend', 'équipe', 'avec mon', 'avec ma', 'sort mon', 'sort ma'];
+        for (const keyword of itemKeywords) {
+            if (lowerMessage.includes(keyword)) {
+                // Extraire l'objet mentionné
+                const words = lowerMessage.split(' ');
+                const keywordIndex = words.findIndex(word => keyword.includes(word));
+                if (keywordIndex !== -1 && keywordIndex < words.length - 1) {
+                    const item = words[keywordIndex + 1];
+                    if (!character.inventory?.some(inv => inv.itemId.toLowerCase().includes(item)) &&
+                        !Object.values(character.equipment || {}).some(eq => eq.toLowerCase().includes(item))) {
+                        return {
+                            text: `❌ **ACTION IMPOSSIBLE** ❌
+
+Vous ne possédez pas : **${item}**
+
+Utilisez /inventaire pour voir vos objets disponibles.`
+                        };
+                    }
+                }
+            }
+        }
+
+        // Vérifier les techniques avancées par rang
+        const detectedTechniques = this.detectTechniques(message);
+        for (const technique of detectedTechniques) {
+            if (technique.type !== 'combat_basic' && !this.canUseTechnique(character, technique)) {
+                return {
+                    text: `❌ **TECHNIQUE INACCESSIBLE** ❌
+
+La technique **"${technique.name}"** requiert le rang **${technique.requiredRank}**
+
+🏆 Votre rang actuel : **${character.powerLevel}**
+⚡ Continuez à vous entraîner pour débloquer de nouvelles techniques !`
+                };
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Analyse l'action du joueur pour déterminer les conséquences
+     */
+    async analyzePlayerAction({ character, action, narration, dbManager }) {
+        try {
+            // Utiliser l'IA pour analyser l'action si disponible
+            if (this.groqClient && this.groqClient.hasValidClient()) {
+                const analysisPrompt = `Analyse cette action de RPG et détermine les conséquences:
+
+Personnage: ${character.name} (${character.powerLevel})
+Action: "${action}"
+Narration: "${narration}"
+
+Réponds en JSON avec:
+{
+  "energyCost": nombre (1-30),
+  "consequences": "description des conséquences",
+  "riskLevel": "low|medium|high|extreme"
+}`;
+
+                try {
+                    const response = await this.groqClient.generateNarration(analysisPrompt, 200);
+                    const jsonMatch = response.match(/\{[\s\S]*\}/);
+                    if (jsonMatch) {
+                        return JSON.parse(jsonMatch[0]);
+                    }
+                } catch (aiError) {
+                    console.log('⚠️ Erreur analyse IA, utilisation fallback:', aiError.message);
+                }
+            }
+
+            // Analyse basique en fallback
+            const lowerAction = action.toLowerCase();
+            let energyCost = 5;
+            let consequences = "Action réalisée avec succès.";
+            let riskLevel = "low";
+
+            // Détecter le type d'action
+            if (lowerAction.includes('combat') || lowerAction.includes('attaque') || lowerAction.includes('frappe')) {
+                energyCost = 15;
+                consequences = "Combat engagé - énergie consommée.";
+                riskLevel = "high";
+            } else if (lowerAction.includes('court') || lowerAction.includes('saute') || lowerAction.includes('grimpe')) {
+                energyCost = 10;
+                consequences = "Effort physique - léger épuisement.";
+                riskLevel = "medium";
+            } else if (lowerAction.includes('regarde') || lowerAction.includes('examine') || lowerAction.includes('observe')) {
+                energyCost = 2;
+                consequences = "Observation attentive - concentration légère.";
+                riskLevel = "low";
+            }
+
+            return { energyCost, consequences, riskLevel };
+
+        } catch (error) {
+            console.error('❌ Erreur analyzePlayerAction:', error);
+            return {
+                energyCost: 5,
+                consequences: "Action effectuée.",
+                riskLevel: "low"
+            };
+        }
+    }
+
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
             // Vérifier que le personnage a assez d'énergie pour agir
@@ -2061,6 +2176,86 @@ Choisis un numéro entre 1 et ${kingdoms.length}`
 
 ✅ Vous avez été déconnecté avec succès
 🔑 Envoyez le code d'administration pour vous reconnecter`
+        };
+    }
+
+    /**
+     * Affiche l'aide des commandes d'administration
+     */
+    async handleAdminHelpCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        console.log(`🔐 Demande d'aide admin par: "${playerNumber}"`);
+
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return {
+                text: `🔒 **ACCÈS REFUSÉ** 🔒
+
+❌ Vous n'êtes pas authentifié en tant qu'administrateur
+🔑 Envoyez le code d'administration pour vous connecter`
+            };
+        }
+
+        return {
+            text: this.adminManager.getAdminHelp()
+        };
+    }
+
+    /**
+     * Liste tous les groupes et leurs royaumes
+     */
+    async handleAdminGroupsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        console.log(`🔐 Commande admin_groups par: "${playerNumber}"`);
+
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return {
+                text: `🔒 **ACCÈS REFUSÉ** 🔒
+
+❌ Vous n'êtes pas authentifié en tant qu'administrateur
+🔑 Envoyez le code d'administration pour vous connecter`
+            };
+        }
+
+        return {
+            text: this.adminManager.listKingdomGroups()
+        };
+    }
+
+    /**
+     * Assigne un royaume à un groupe
+     */
+    async handleAdminKingdomCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        console.log(`🔐 Commande admin_kingdom par: "${playerNumber}"`);
+
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return {
+                text: `🔒 **ACCÈS REFUSÉ** 🔒
+
+❌ Vous n'êtes pas authentifié en tant qu'administrateur
+🔑 Envoyez le code d'administration pour vous connecter`
+            };
+        }
+
+        const args = message.split(' ').slice(1);
+        if (args.length < 1) {
+            return {
+                text: `📋 **COMMANDE ADMIN_KINGDOM**
+
+Usage: /admin_kingdom [ROYAUME_ID]
+
+**Exemples:**
+• /admin_kingdom AEGYRIA
+
+Cette commande assigne le groupe actuel au royaume spécifié.
+
+**Royaumes disponibles:**
+AEGYRIA, SOMBRENUIT, KHELOS, ABRANTIS, VARHA, SYLVARIA, ECLYPSIA, TERRE_DESOLE, DRAK_TARR, URVALA, OMBREFIEL, KHALDAR`
+            };
+        }
+
+        const kingdomId = args[0].toUpperCase();
+        const result = this.adminManager.assignKingdomToGroup(chatId, kingdomId);
+
+        return {
+            text: result
         };
     }
 
