@@ -361,7 +361,7 @@ Tu es maintenant enregistré en tant que : **${username}**
             }
 
             if (this.commandHandlers[command]) {
-                response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock });
+                response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock, playerNumber });
             } else {
                 // Vérifier les tentatives d'actions impossibles
                 const character = await dbManager.getCharacterByPlayer(player.id); // Récupérer le personnage ici pour la vérification
@@ -1072,7 +1072,7 @@ En mode libre, je ne traite pas les actions de jeu.`
             };
         }
 
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
 
         if (!character) {
             return {
@@ -1441,13 +1441,13 @@ ${character.name} est complètement épuisé ! Vous devez vous reposer avant d'a
 
             // Barres de statut visuelles
             const healthBar = this.loadingBarManager.createHealthBar(
-                character.currentLife, 
-                character.maxLife, 
+                character.currentLife,
+                character.maxLife,
                 'life'
             );
             const energyBar = this.loadingBarManager.createHealthBar(
-                character.currentEnergy, 
-                character.maxEnergy, 
+                character.currentEnergy,
+                character.maxEnergy,
                 'energy'
             );
 
@@ -1736,7 +1736,7 @@ ${Object.entries(factionStandings).map(([faction, standing]) =>
     }
 
     async handleChallengesCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return { text: "❌ Aucun personnage trouvé !" };
         }
@@ -2026,6 +2026,8 @@ Choisis un numéro entre 1 et ${kingdoms.length}`
      * Affiche le statut d'authentification admin
      */
     async handleAdminStatusCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
+        console.log(`🔐 Tentative d'accès admin par: "${playerNumber}"`);
+
         const authStatus = this.adminManager.getAuthStatus(playerNumber);
 
         if (!authStatus.authenticated) {
@@ -2272,7 +2274,7 @@ Utilise la commande /créer pour en créer un.`
 
 🎨 **Image générée par Freepik avec IA (vue première personne)**
 
-✅ Ton personnage a maintenant une apparence unique basée sur ta description !`,
+✅ Ton personnage a maintenant une apparence unique basée sur ta description!`,
                     image: imageBuffer
                 };
             } else {
@@ -2410,7 +2412,7 @@ Utilise /créer pour créer un nouveau personnage.`
 
 ✨ Tu peux maintenant créer un nouveau personnage avec /créer
 
-💀 **Attention :** Cette action est irréversible !`,
+💀 **Attention :** Cette action est irréversible!`,
                 image: await imageGenerator.generateMenuImage()
             };
 
@@ -2917,21 +2919,16 @@ Usage: /apprendre [nom du sort]
     /**
      * Affiche les statistiques du serveur (Admin uniquement)
      */
-    async handleAdminStatsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        console.log(`🔐 Tentative d'accès admin par: "${playerNumber}"`);
+    async handleAdminStatsCommand({ player, chatId, message, sock, dbManager, imageGenerator, playerNumber }) {
+        const adminId = playerNumber || player.whatsappNumber;
+        console.log(`🔐 Tentative d'accès admin par: "${adminId}"`);
 
-        const authStatus = this.adminManager.getAuthStatus(playerNumber);
-
-        if (!authStatus.authenticated) {
+        if (!this.adminManager.isAdmin(adminId)) {
             return {
-                text: `🔐 **ACCÈS ADMIN REQUIS** 🔐
+                text: `❌ **ACCÈS REFUSÉ** ❌
 
-❌ Vous devez être authentifié en tant qu'administrateur
-
-🔑 Pour vous authentifier, envoyez le code d'administration dans un message
-⏰ L'authentification sera valide pendant 30 minutes
-
-🚫 Si vous n'avez pas le code, contactez l'administrateur principal.`
+🚫 Vous n'avez pas les permissions d'administrateur.
+🔑 Envoyez d'abord votre code d'authentification (2011).`
             };
         }
 
@@ -2945,13 +2942,13 @@ Usage: /apprendre [nom du sort]
             }
         }, 5000);
 
-        const response = await this.adminManager.processAdminCommand('/admin_stats', playerNumber);
+        const response = await this.adminManager.processAdminCommand('/admin_stats', adminId);
 
         return {
             text: `${response}
 
 🔒 Cette commande et sa réponse seront automatiquement supprimées.
-⏰ Session expire dans ${authStatus.timeLeft} minutes.`
+⏰ Session expire dans ${this.adminManager.getAuthStatus(adminId)?.timeLeft || 0} minutes.`
         };
     }
 
@@ -2959,14 +2956,15 @@ Usage: /apprendre [nom du sort]
      * Modifie l'heure du jeu (Admin uniquement)
      */
     async handleAdminTimeCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_time', args);
 
-        const response = await this.adminManager.processAdminCommand('/admin_time', playerNumber, params);
+        const response = await this.adminManager.processAdminCommand('/admin_time', adminId, params);
         return { text: response };
     }
 
@@ -2974,7 +2972,8 @@ Usage: /apprendre [nom du sort]
      * Assigne un groupe à un royaume (Admin uniquement)
      */
     async handleAdminKingdomCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
@@ -2995,7 +2994,7 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
         }
 
         const params = { groupId: args[0], kingdom: args[1] };
-        const response = await this.adminManager.processAdminCommand('/admin_kingdom', playerNumber, params);
+        const response = await this.adminManager.processAdminCommand('/admin_kingdom', adminId, params);
 
         // Mettre à jour le mapping local également
         this.adminManager.assignKingdomToGroup(params.groupId, params.kingdom);
@@ -3007,11 +3006,12 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Liste tous les groupes et leurs royaumes (Admin uniquement)
      */
     async handleAdminGroupsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
-        const response = await this.adminManager.processAdminCommand('/admin_groups', playerNumber);
+        const response = await this.adminManager.processAdminCommand('/admin_groups', adminId);
         return { text: response };
     }
 
@@ -3019,14 +3019,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Donne un objet à un joueur (Admin uniquement)
      */
     async handleAdminGiveCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_give', args);
 
-        const response = await this.adminManager.processAdminCommand('/admin_give', playerNumber, params);
+        const response = await this.adminManager.processAdminCommand('/admin_give', adminId, params);
         return { text: response };
     }
 
@@ -3034,14 +3035,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Modifie le niveau d'un joueur (Admin uniquement)
      */
     async handleAdminLevelCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_level', args);
 
-        const response = await this.adminManager.processAdminCommand('/admin_level', playerNumber, params);
+        const response = await this.adminManager.processAdminCommand('/admin_level', adminId, params);
         return { text: response };
     }
 
@@ -3049,14 +3051,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Téléporte un joueur (Admin uniquement)
      */
     async handleAdminTeleportCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_teleport', args);
 
-        const response = await this.adminManager.processAdminCommand('/admin_teleport', playerNumber, params);
+        const response = await this.adminManager.processAdminCommand('/admin_teleport', adminId, params);
         return { text: response };
     }
 
@@ -3064,14 +3067,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Soigne complètement un joueur (Admin uniquement)
      */
     async handleAdminHealCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_heal', args);
 
-        const response = await this.adminManager.processAdminCommand('/admin_heal', playerNumber, params);
+        const response = await this.adminManager.processAdminCommand('/admin_heal', adminId, params);
         return { text: response };
     }
 
@@ -3079,14 +3083,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Ajoute un pouvoir à un joueur (Admin uniquement)
      */
     async handleAdminPowerCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_power', args);
 
-        const response = await this.adminManager.processAdminCommand('/admin_power', playerNumber, params);
+        const response = await this.adminManager.processAdminCommand('/admin_power', adminId, params);
         return { text: response };
     }
 
@@ -3094,11 +3099,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Change la météo (Admin uniquement)
      */
     async handleAdminWeatherCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
-        const response = await this.adminManager.processAdminCommand('/admin_weather', playerNumber);
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_weather', args);
+
+        const response = await this.adminManager.processAdminCommand('/admin_weather', adminId, params);
         return { text: response };
     }
 
@@ -3106,11 +3115,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Lance un événement spécial (Admin uniquement)
      */
     async handleAdminEventCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
-        const response = await this.adminManager.processAdminCommand('/admin_event', playerNumber);
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_event', args);
+
+        const response = await this.adminManager.processAdminCommand('/admin_event', adminId, params);
         return { text: response };
     }
 
@@ -3118,11 +3131,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Remet à zéro un royaume (Admin uniquement)
      */
     async handleAdminResetKingdomCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
-        const response = await this.adminManager.processAdminCommand('/admin_reset_kingdom', playerNumber);
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_reset_kingdom', args);
+
+        const response = await this.adminManager.processAdminCommand('/admin_reset_kingdom', adminId, params);
         return { text: response };
     }
 
@@ -3130,11 +3147,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Active/désactive le mode debug (Admin uniquement)
      */
     async handleAdminDebugCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
-        const response = await this.adminManager.processAdminCommand('/admin_debug', playerNumber);
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_debug', args);
+
+        const response = await this.adminManager.processAdminCommand('/admin_debug', adminId, params);
         return { text: response };
     }
 
@@ -3142,11 +3163,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Crée une sauvegarde (Admin uniquement)
      */
     async handleAdminBackupCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
-        const response = await this.adminManager.processAdminCommand('/admin_backup', playerNumber);
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_backup', args);
+
+        const response = await this.adminManager.processAdminCommand('/admin_backup', adminId, params);
         return { text: response };
     }
 
@@ -3154,11 +3179,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Recharge les données du jeu (Admin uniquement)
      */
     async handleAdminReloadCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
-        const response = await this.adminManager.processAdminCommand('/admin_reload', playerNumber);
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_reload', args);
+
+        const response = await this.adminManager.processAdminCommand('/admin_reload', adminId, params);
         return { text: response };
     }
 
@@ -3166,14 +3195,15 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Envoie une annonce à tous les joueurs (Admin uniquement)
      */
     async handleAdminAnnounceCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
         const args = message.split(' ').slice(1);
         const params = this.adminManager.parseAdminCommand('/admin_announce', args);
 
-        const response = await this.adminManager.processAdminCommand('/admin_announce', playerNumber, params);
+        const response = await this.adminManager.processAdminCommand('/admin_announce', adminId, params);
         return { text: response };
     }
 
@@ -3181,7 +3211,8 @@ OMBRETERRE, CRYSTALIS, MAREVERDE, SOLARIA`
      * Affiche l'aide pour les commandes d'administration (Admin uniquement)
      */
     async handleAdminHelpCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        if (!this.adminManager.isAdmin(playerNumber)) {
+        const adminId = playerNumber || player.whatsappNumber;
+        if (!this.adminManager.isAdmin(adminId)) {
             return { text: '❌ Accès refusé. Cette commande est réservée aux administrateurs.' };
         }
 
@@ -3537,7 +3568,7 @@ Exemple: /rechercher_quete dragon
 
 📚 **Types d'aura disponibles :**
 🔥 fire - Aura de Flamme
-🌊 water - Aura Aquatique  
+🌊 water - Aura Aquatique
 🌍 earth - Aura Tellurique
 💨 wind - Aura Éolienne
 ⚡ lightning - Aura Foudroyante
@@ -3581,8 +3612,8 @@ ${activeTraining.techniqueName} (${Math.floor(activeTraining.progress)}%)`
 
             // Sinon, démarrer l'entraînement normal
             const result = await this.auraManager.startAuraTraining(
-                player.id, 
-                auraType, 
+                player.id,
+                auraType,
                 this.auraManager.auraTypes[auraType].techniques[0]
             );
 
@@ -3723,7 +3754,7 @@ Utilisez /aura_apprendre [type] pour commencer votre entraînement !`
      * Lancer une technique d'aura
      */
     async handleCastAuraCommand({ player, chatId, message, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage !
@@ -3783,7 +3814,7 @@ Utilisez /aura_techniques pour voir vos techniques disponibles.`
      * Méditation pour récupérer l'énergie spirituelle
      */
     async handleMeditateCommand({ player, chatId, dbManager, sock }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage !
@@ -3820,7 +3851,7 @@ Utilisez /aura_apprendre [type] pour commencer.`
     }
 
     async handleRegenerateMagicCommand({ player, chatId, dbManager, sock }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage !
