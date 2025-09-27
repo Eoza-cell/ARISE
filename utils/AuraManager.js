@@ -17,8 +17,8 @@ class AuraManager {
                 emoji: '🔥',
                 color: '🟠',
                 description: 'Maîtrise des flammes éternelles',
-                trainingDays: 10,
-                maxLevel: 100,
+                trainingDays: 365, // 1 AN d'entraînement intense
+                maxLevel: 10, // Très limité
                 techniques: [
                     'Souffle Ardent', 'Mur de Flammes', 'Météore Igné', 
                     'Phoenix Renaissant', 'Apocalypse de Feu'
@@ -29,8 +29,8 @@ class AuraManager {
                 emoji: '🌊',
                 color: '🔵',
                 description: 'Contrôle des eaux primordiales',
-                trainingDays: 10,
-                maxLevel: 100,
+                trainingDays: 365, // 1 AN d'entraînement intense
+                maxLevel: 10, // Très limité
                 techniques: [
                     'Torrent Glacial', 'Barrière Liquide', 'Tsunami Dévastateur',
                     'Régénération Aquatique', 'Déluge Éternel'
@@ -41,8 +41,8 @@ class AuraManager {
                 emoji: '🌍',
                 color: '🟤',
                 description: 'Force de la terre-mère',
-                trainingDays: 10,
-                maxLevel: 100,
+                trainingDays: 365, // 1 AN d'entraînement intense
+                maxLevel: 10, // Très limité
                 techniques: [
                     'Armure de Roche', 'Tremblement de Terre', 'Pics de Cristal',
                     'Sanctuaire de Pierre', 'Cataclysme Tellurique'
@@ -53,8 +53,8 @@ class AuraManager {
                 emoji: '💨',
                 color: '⚪',
                 description: 'Liberté des vents célestes',
-                trainingDays: 10,
-                maxLevel: 100,
+                trainingDays: 365, // 1 AN d'entraînement intense
+                maxLevel: 10, // Très limité
                 techniques: [
                     'Lame de Vent', 'Cyclone Protecteur', 'Tornade Fléau',
                     'Vol Éthéré', 'Tempête Apocalyptique'
@@ -65,8 +65,8 @@ class AuraManager {
                 emoji: '⚡',
                 color: '🟡',
                 description: 'Puissance de la foudre divine',
-                trainingDays: 10,
-                maxLevel: 100,
+                trainingDays: 365, // 1 AN d'entraînement intense
+                maxLevel: 10, // Très limité
                 techniques: [
                     'Éclair Perçant', 'Champ Électrique', 'Foudre Vengeresse',
                     'Vitesse Lumière', 'Jugement Céleste'
@@ -77,8 +77,8 @@ class AuraManager {
                 emoji: '🌑',
                 color: '⚫',
                 description: 'Mystères des ombres éternelles',
-                trainingDays: 10,
-                maxLevel: 100,
+                trainingDays: 365, // 1 AN d'entraînement intense
+                maxLevel: 10, // Très limité
                 techniques: [
                     'Invisibilité', 'Liens d\'Ombre', 'Void Dévastateur',
                     'Téléportation Noire', 'Néant Absolu'
@@ -89,8 +89,8 @@ class AuraManager {
                 emoji: '✨',
                 color: '🟨',
                 description: 'Grâce de la lumière sacrée',
-                trainingDays: 10,
-                maxLevel: 100,
+                trainingDays: 365, // 1 AN d'entraînement intense
+                maxLevel: 10, // Très limité
                 techniques: [
                     'Rayon Purificateur', 'Bouclier Sacré', 'Explosion Solaire',
                     'Bénédiction Divine', 'Apocalypse Lumineuse'
@@ -461,13 +461,14 @@ ${frame.particles}
 ${aura.color} **Type:** ${aura.name}
 
 🎯 **Résultats de la session:**
-• +15 Points d'Expérience d'Aura
-• +5 Points de Maîtrise
-• +1 Session complétée
+• Tentative d'amélioration: 2% de chance seulement
+• Session d'entraînement acharnée complétée
+• Progression quasi-imperceptible
 
 ✨ **Votre aura s'est renforcée !** ✨
 
-💡 **Conseil:** Répétez l'entraînement quotidiennement pendant ${aura.trainingDays} jours pour maîtriser complètement cette technique.`;
+💡 **Conseil:** L'aura demande des ANNÉES d'entraînement quotidien. Seuls les plus déterminés y parviennent.
+⚠️ **Taux de réussite par session: 2% seulement !**`;
     }
 
     /**
@@ -484,12 +485,13 @@ ${aura.color} **Type:** ${aura.name}
 ⏰ **Début:** ${new Date(training.startTime).toLocaleString('fr-FR')}
 🏁 **Fin estimée:** ${new Date(training.endTime).toLocaleString('fr-FR')}
 
-📋 **Programme journalier:**
-• 1 session de méditation (30 secondes)
-• 3 exercices de canalisation
-• 5 pratiques de concentration
+📋 **Programme journalier EXTRÊME:**
+• 1 session de méditation intense (30 secondes)
+• Chance de progression: 2% SEULEMENT
+• Échecs fréquents et frustrants attendus
 
-💪 **Engagement requis:** ${aura.trainingDays} jours consécutifs
+💪 **Engagement requis:** ${aura.trainingDays} jours consécutifs (1 AN COMPLET)
+⚠️ **ATTENTION:** Système ultra-difficile, progression très lente !
 
 ✨ **Utilisez \`/aura_session\` pour votre session quotidienne !**`;
     }
@@ -608,30 +610,65 @@ ${aura.color} **Type:** ${aura.name}
     }
 
     /**
-     * Accorde une maîtrise instantanée d'aura (20% de chance)
+     * SYSTÈME ULTRA-DIFFICILE - Tentative de progression minuscule
+     * L'aura ne peut être développée que par un entraînement acharné sur des années
      */
-    async grantInstantMastery(playerId, auraType) {
+    async attemptAuraGrowth(playerId, auraType) {
         const aura = this.auraTypes[auraType];
         if (!aura) {
             throw new Error('Type d\'aura invalide');
         }
 
-        // Ajouter l'aura complète au joueur
+        // Chance TRÈS faible d'amélioration (2% par session)
+        const successChance = Math.random();
+        if (successChance > 0.02) {
+            return {
+                success: false,
+                message: `❌ **ÉCHEC D'ENTRAÎNEMENT** ❌
+
+🥵 Votre concentration a failli...
+💔 L'aura reste insaisissable et vous échappe
+😤 Vous ressentez une frustration immense
+
+⚠️ **L'aura est extrêmement difficile à maîtriser !**
+🔄 Recommencez l'entraînement demain avec plus de détermination.
+
+📊 **Statistiques:** 98% des tentatives échouent
+💪 **Seuls les plus acharnés y arrivent après des années...**`
+            };
+        }
+
+        // Micro-progression seulement si réussite
         if (!this.auraLevels.has(playerId)) {
             this.auraLevels.set(playerId, {});
         }
 
         const playerAuras = this.auraLevels.get(playerId);
-        playerAuras[auraType] = {
-            level: aura.maxLevel,
-            techniques: [...aura.techniques], // Toutes les techniques
-            masteryPoints: aura.maxLevel * 100,
-            masteredInstantly: true
-        };
+        if (!playerAuras[auraType]) {
+            playerAuras[auraType] = {
+                level: 0.1, // Commence TRÈS faible
+                techniques: [],
+                masteryPoints: 1 // 1 seul point sur des milliers nécessaires
+            };
+        } else {
+            playerAuras[auraType].masteryPoints += 1; // Progression très lente
+            if (playerAuras[auraType].masteryPoints >= 5000) { // 5000 points pour 0.1 niveau
+                playerAuras[auraType].level += 0.1; // Niveau très lent à augmenter
+                playerAuras[auraType].masteryPoints = 0;
+            }
+        }
 
         return {
             success: true,
-            message: this.formatInstantMasteryMessage(aura)
+            message: `✨ **MICRO-PROGRESSION DÉTECTÉE** ✨
+
+🌟 Vous ressentez une infime vibration d'aura...
+📈 +1 Point de maîtrise (${playerAuras[auraType].masteryPoints}/5000)
+🎯 Niveau: ${playerAuras[auraType].level.toFixed(1)}/${aura.maxLevel}
+
+⚠️ **L'aura demande des ANNÉES de pratique assidue !**
+💡 Il faut 5000 points pour augmenter de 0.1 niveau seulement
+🏆 Seuls 2% des entraînements réussissent - Félicitations !`
         };
     }
 
