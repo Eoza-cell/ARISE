@@ -1998,6 +1998,285 @@ Durée : ${socialEvent.duration}
 
 ⚠️ **Impact sur le gameplay en cours...**`;
 
+
+    // ==================== COMMANDES D'AURA ====================
+
+    async handleAuraInfoCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: this.auraManager.formatAuraInfo(player.id, character.name)
+        };
+    }
+
+    async handleLearnAuraCommand({ player, message, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const args = message.split(' ');
+        if (args.length < 2) {
+            return {
+                text: `✨ **APPRENTISSAGE D'AURA** ✨
+
+💡 **Usage :** /aura_apprendre [type]
+
+🌟 **Types d'aura disponibles :**
+🔥 fire - Aura de Flamme
+🌊 water - Aura Aquatique  
+🌍 earth - Aura Tellurique
+💨 wind - Aura Éolienne
+⚡ lightning - Aura Foudroyante
+🌑 shadow - Aura Ténébreuse
+✨ light - Aura Lumineuse
+
+⚠️ **ATTENTION :** L'entraînement dure 365 jours avec seulement 2% de chance de succès par session !
+
+📝 **Exemple :** /aura_apprendre fire`
+            };
+        }
+
+        const auraType = args[1].toLowerCase();
+        const aura = this.auraManager.auraTypes[auraType];
+        
+        if (!aura) {
+            return {
+                text: `❌ **TYPE D'AURA INVALIDE**
+
+Types disponibles : fire, water, earth, wind, lightning, shadow, light`
+            };
+        }
+
+        if (!this.auraManager.canStartTraining(player.id)) {
+            return {
+                text: `❌ **ENTRAÎNEMENT DÉJÀ EN COURS**
+
+Vous avez déjà un entraînement d'aura actif. Terminez-le avant d'en commencer un nouveau.`
+            };
+        }
+
+        // Chance de maîtrise instantanée (20%)
+        if (Math.random() < 0.2) {
+            // Maîtrise instantanée !
+            if (!this.auraManager.auraLevels.has(player.id)) {
+                this.auraManager.auraLevels.set(player.id, {});
+            }
+
+            const playerAuras = this.auraManager.auraLevels.get(player.id);
+            playerAuras[auraType] = {
+                level: aura.maxLevel,
+                techniques: [...aura.techniques],
+                masteryPoints: 10000
+            };
+
+            return {
+                text: this.auraManager.formatInstantMasteryMessage(aura)
+            };
+        }
+
+        // Entraînement normal
+        const trainingResult = await this.auraManager.startAuraTraining(player.id, auraType, aura.techniques[0]);
+        
+        return {
+            text: trainingResult.message
+        };
+    }
+
+    async handleAuraSessionCommand({ player, dbManager, sock, chatId }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const activeTraining = this.auraManager.getPlayerTraining(player.id);
+        if (!activeTraining) {
+            return {
+                text: `❌ **AUCUN ENTRAÎNEMENT ACTIF**
+
+Utilisez d'abord /aura_apprendre [type] pour commencer un entraînement d'aura.`
+            };
+        }
+
+        const aura = this.auraManager.auraTypes[activeTraining.auraType];
+        
+        // Démarrer l'animation d'entraînement
+        setTimeout(async () => {
+            await this.auraManager.createAuraAnimation(
+                player.id,
+                activeTraining.auraType,
+                activeTraining.techniqueName,
+                sock,
+                chatId
+            );
+
+            // Après l'animation, tentative de progression
+            setTimeout(async () => {
+                const growthResult = await this.auraManager.attemptAuraGrowth(player.id, activeTraining.auraType);
+                
+                await sock.sendMessage(chatId, {
+                    text: growthResult.message
+                });
+            }, 2000);
+
+        }, 1000);
+
+        return {
+            text: `🧘 **SESSION D'ENTRAÎNEMENT COMMENCÉE**
+
+${aura.emoji} Préparation de l'entraînement ${aura.name}...
+⏱️ Durée : 30 secondes d'entraînement intense
+
+🔮 L'animation va commencer dans un instant...`
+        };
+    }
+
+    async handleAuraTechniquesCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
+        
+        if (Object.keys(playerAuras).length === 0) {
+            return {
+                text: `✨ **AUCUNE TECHNIQUE D'AURA**
+
+Vous n'avez pas encore appris de techniques d'aura.
+Utilisez /aura_apprendre [type] pour commencer votre formation.`
+            };
+        }
+
+        let techniquesText = `⚡ **TECHNIQUES D'AURA DISPONIBLES** ⚡\n\n`;
+
+        for (const [auraType, auraData] of Object.entries(playerAuras)) {
+            const aura = this.auraManager.auraTypes[auraType];
+            techniquesText += `${aura.emoji} **${aura.name}** (Niveau ${auraData.level})\n`;
+            
+            if (auraData.techniques.length > 0) {
+                auraData.techniques.forEach(technique => {
+                    techniquesText += `   ⚡ ${technique}\n`;
+                });
+            } else {
+                techniquesText += `   🚫 Aucune technique maîtrisée\n`;
+            }
+            techniquesText += `\n`;
+        }
+
+        techniquesText += `💡 **Utilisez /aura_cast [technique] pour lancer une technique**`;
+
+        return { text: techniquesText };
+    }
+
+    async handleCastAuraCommand({ player, message, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const args = message.split(' ');
+        if (args.length < 2) {
+            return {
+                text: `⚡ **LANCER TECHNIQUE D'AURA** ⚡
+
+💡 **Usage :** /aura_cast [technique]
+
+📝 **Exemple :** /aura_cast Souffle Ardent
+
+💫 Utilisez /aura_techniques pour voir vos techniques disponibles.`
+            };
+        }
+
+        const techniqueName = args.slice(1).join(' ');
+        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
+
+        // Chercher la technique dans les auras du joueur
+        for (const [auraType, auraData] of Object.entries(playerAuras)) {
+            if (auraData.techniques.includes(techniqueName)) {
+                const result = await this.auraManager.castAuraTechnique(player.id, auraType, techniqueName);
+                return { text: result.message };
+            }
+        }
+
+        return {
+            text: `❌ **TECHNIQUE INCONNUE**
+
+Vous ne maîtrisez pas la technique "${techniqueName}".
+Utilisez /aura_techniques pour voir vos techniques disponibles.`
+        };
+    }
+
+    async handleMeditateCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: `🧘 **MÉDITATION SPIRITUELLE** 🧘
+
+✨ Vous fermez les yeux et entrez en méditation profonde...
+🌟 Votre esprit se calme et votre aura se stabilise...
+💫 Vous ressentez une paix intérieure profonde...
+
+⚡ **Énergie spirituelle régénérée !**
+🔮 **Concentration améliorée !**
+
+💡 Pour apprendre l'aura, utilisez /aura_apprendre [type]`
+        };
+    }
+
+    async handleRegenerateAuraCommand({ player, dbManager, sock, chatId }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        // Démarrer la régénération d'aura
+        const regenId = await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
+
+        return {
+            text: '',
+            skipResponse: true // Pas de réponse immédiate, l'animation gère tout
+        };
+    }
+
+    async handleRegenerateMagicCommand({ player, dbManager, sock, chatId }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        // Démarrer la régénération de magie
+        const regenId = await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
+
+        return {
+            text: '',
+            skipResponse: true // Pas de réponse immédiate, l'animation gère tout
+        };
+    }
+
+
         return { text: weatherText };
     }
 
