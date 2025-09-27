@@ -2,8 +2,8 @@ const Groq = require('groq-sdk');
 
 class GroqClient {
     constructor() {
-        // Clé API Groq intégrée directement (dépôt privé sécurisé)
-        this.apiKey = "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";
+        // Utilisation sécurisée avec variable d'environnement
+        this.apiKey = process.env.GROQ_API_KEY;
         this.client = null;
         this.isAvailable = false;
         this.model = 'llama-3.3-70b-versatile'; // Modèle Groq récent pour la narration

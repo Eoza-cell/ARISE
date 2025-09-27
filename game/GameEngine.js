@@ -12,6 +12,8 @@ const QuestManager = require('../utils/QuestManager');
 const AuraManager = require('../utils/AuraManager');
 const TimeManager = require('../utils/TimeManager');
 const ReactionTimeManager = require('../utils/ReactionTimeManager');
+const HealthBarManager = require('../utils/HealthBarManager');
+const RPEncounterManager = require('../utils/RPEncounterManager');
 const path = require('path');
 
 class GameEngine {
@@ -112,10 +114,12 @@ class GameEngine {
         this.ancientAlphabetManager = new AncientAlphabetManager();
         this.adminManager = new AdminManager();
         this.narrationImageManager = new NarrationImageManager();
+        this.healthBarManager = new HealthBarManager(); // Nouveau système de barres de vie
         this.questManager = null; // Initialisé avec dbManager
         this.auraManager = null; // Initialisé avec dbManager
         this.timeManager = null; // Initialisé avec dbManager
         this.reactionTimeManager = null; // Initialisé avec sock
+        this.rpEncounterManager = null; // Initialisé avec sock pour rencontres RP
 
         this.commandHandlers = {
             '/menu': this.handleMenuCommand.bind(this),
@@ -272,6 +276,10 @@ class GameEngine {
 
             if (!this.characterCustomization && sock) {
                 this.characterCustomization = new CharacterCustomizationManager(dbManager, imageGenerator, sock);
+            }
+
+            if (!this.rpEncounterManager && sock) {
+                this.rpEncounterManager = new RPEncounterManager(this, sock);
             }
 
             let player = await dbManager.getPlayerByWhatsApp(playerNumber);
