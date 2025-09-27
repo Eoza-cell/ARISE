@@ -191,7 +191,7 @@ class GameEngine {
             '/rechercher_quete': this.handleSearchQuestCommand.bind(this),
             '/search_quest': this.handleSearchQuestCommand.bind(this),
 
-            // Commandes d'aura (système de 10 jours d'entraînement)
+            // Commandes d'aura (système de 365 jours d'entraînement)
             '/aura': this.handleAuraInfoCommand.bind(this),
             '/aura_info': this.handleAuraInfoCommand.bind(this),
             '/aura_apprendre': this.handleLearnAuraCommand.bind(this),
@@ -1354,6 +1354,128 @@ ${progressBar} ${Math.floor(percentage)}%
     }
 
     /**
+     * Détecte si le joueur interagit avec un PNJ
+     */
+    detectNPCInteraction(message) {
+        const lowerMessage = message.toLowerCase();
+        
+        // Mots-clés d'interaction avec PNJ
+        const npcInteractionKeywords = {
+            talk: ['parle', 'dis', 'demande', 'questionne', 'interpelle', 'salue', 'bonjour', 'hey'],
+            attack: ['attaque', 'frappe', 'combat', 'tue', 'massacre', 'agresse'],
+            trade: ['achète', 'vend', 'échange', 'commerce', 'négocie'],
+            follow: ['suis', 'accompagne', 'va avec'],
+            help: ['aide', 'assiste', 'secours']
+        };
+
+        // Mots-clés de cibles PNJ
+        const npcTargets = [
+            'garde', 'soldat', 'marchand', 'villageois', 'paysan', 'noble', 'roi', 'reine',
+            'prêtre', 'mage', 'voleur', 'bandit', 'assassin', 'forgeron', 'aubergiste',
+            'pnj', 'personnage', 'homme', 'femme', 'enfant', 'vieillard', 'guerrier'
+        ];
+
+        for (const [actionType, keywords] of Object.entries(npcInteractionKeywords)) {
+            for (const keyword of keywords) {
+                if (lowerMessage.includes(keyword)) {
+                    // Chercher une cible PNJ dans le message
+                    for (const target of npcTargets) {
+                        if (lowerMessage.includes(target)) {
+                            return {
+                                type: actionType,
+                                target: target,
+                                fullMessage: message
+                            };
+                        }
+                    }
+                    // Si mot-clé d'interaction détecté mais pas de cible spécifique
+                    return {
+                        type: actionType,
+                        target: 'PNJ inconnu',
+                        fullMessage: message
+                    };
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Vérifie si le joueur tente d'utiliser des pouvoirs qu'il ne possède pas
+     */
+    checkInvalidPowerUsage(character, message) {
+        const lowerMessage = message.toLowerCase();
+
+        // Pouvoirs magiques/surnaturels interdits pour les humains de base
+        const forbiddenPowers = {
+            magic: ['sort', 'magie', 'incantation', 'enchantement', 'sortilège', 'rituel', 'malédiction'],
+            elemental: ['feu', 'flamme', 'glace', 'foudre', 'électricité', 'terre', 'eau', 'vent', 'air'],
+            supernatural: ['téléporte', 'vole', 'invisibilité', 'transformation', 'métamorphose', 'clone'],
+            divine: ['bénédiction', 'miracle', 'divin', 'sacré', 'guérison divine', 'résurrection'],
+            aura: ['aura', 'chakra', 'énergie spirituelle', 'ki', 'chi', 'mana']
+        };
+
+        // Vérifier si le joueur a réellement accès à ces pouvoirs
+        const hasAura = this.auraManager && this.auraManager.getPlayerAuraLevel(character.playerId);
+        const hasAuraSkills = hasAura && Object.keys(hasAura).length > 0;
+
+        for (const [powerType, keywords] of Object.entries(forbiddenPowers)) {
+            for (const keyword of keywords) {
+                if (lowerMessage.includes(keyword)) {
+                    // Vérifier si c'est une tentative d'utilisation de pouvoir
+                    const usageKeywords = ['utilise', 'lance', 'invoque', 'active', 'déclenche', 'cast'];
+                    const isAttemptingToUse = usageKeywords.some(usage => lowerMessage.includes(usage));
+
+                    if (isAttemptingToUse || lowerMessage.includes('/aura_cast')) {
+                        // Cas spécial pour l'aura
+                        if (powerType === 'aura' && !hasAuraSkills) {
+                            return {
+                                text: `❌ **POUVOIR INACCESSIBLE** ❌
+
+🚫 Vous tentez d'utiliser l'aura, mais vous n'avez aucune formation !
+
+👤 **${character.name}** est un simple humain de niveau ${character.level}
+⚡ **Rang actuel :** ${character.powerLevel} (débutant)
+
+💡 **Pour apprendre l'aura :**
+• Utilisez \`/aura_apprendre [type]\`
+• Entraînez-vous pendant 365 jours
+• Seuls 2% des tentatives réussissent
+
+🔰 **Actions disponibles :** Combat de base, déplacement, dialogue avec PNJ`
+                            };
+                        }
+
+                        // Autres pouvoirs magiques
+                        if (powerType !== 'aura' && character.level < 10) {
+                            return {
+                                text: `❌ **POUVOIR INTERDIT** ❌
+
+🚫 Un simple humain ne peut pas utiliser de ${powerType === 'magic' ? 'magie' : 'pouvoirs élémentaires'} !
+
+👤 **${character.name}** n'est qu'un humain ordinaire
+📊 **Niveau trop faible :** ${character.level} (minimum 10 requis)
+⚔️ **Rang :** ${character.powerLevel} (insuffisant)
+
+💪 **Actions possibles :**
+• Combat à mains nues ou avec armes
+• Déplacement et exploration
+• Dialogue et interaction
+• Entraînement physique
+
+🎯 **Montez de niveau pour débloquer des capacités !**`
+                            };
+                        }
+                    }
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Vérifie si l'action est impossible avec l'équipement/état actuel
      */
     async checkImpossibleAction(message, character) {
@@ -1507,6 +1629,30 @@ ${character.name} est complètement épuisé ! Vous devez vous reposer avant d'a
 
 💡 **Utilisez /regenerer_aura ou attendez la régénération naturelle.**`
                 };
+            }
+
+            // Vérifier si le joueur tente d'utiliser des pouvoirs qu'il ne possède pas
+            const invalidPowerAttempt = this.checkInvalidPowerUsage(character, message);
+            if (invalidPowerAttempt) {
+                return invalidPowerAttempt;
+            }
+
+            // Détecter si le joueur interagit avec un PNJ
+            const npcInteraction = this.detectNPCInteraction(message);
+            if (npcInteraction) {
+                // Démarrer le système de temps de réaction uniquement pour les interactions PNJ
+                console.log(`🎯 Interaction PNJ détectée: ${npcInteraction.type} avec ${npcInteraction.target}`);
+                
+                if (this.reactionTimeManager) {
+                    // Créer un PNJ temporaire et démarrer le compte à rebours
+                    const npcId = `npc_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
+                    await this.reactionTimeManager.startReactionTimer(
+                        `action_${Date.now()}`,
+                        npcId,
+                        arguments[0].chatId || 'unknown_chat',
+                        `${character.name} tente de ${npcInteraction.type} avec ${npcInteraction.target}`
+                    );
+                }
             }
 
             // Générer une narration immersive avec l'IA
@@ -2175,6 +2321,201 @@ Choisis un numéro entre 1 et ${kingdoms.length}`
 
 📷 **Envoie ta photo maintenant...**`
         };
+    }
+
+    /**
+     * Gère les informations d'aura du joueur
+     */
+    async handleAuraInfoCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        if (!this.auraManager) {
+            return {
+                text: `❌ Système d'aura non disponible`
+            };
+        }
+
+        const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
+        return { text: auraInfo };
+    }
+
+    /**
+     * Commencer l'apprentissage d'une aura
+     */
+    async handleLearnAuraCommand({ player, message, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        const args = message.split(' ').slice(1);
+        if (args.length === 0) {
+            return {
+                text: `🔮 **APPRENTISSAGE D'AURA** 🔮
+
+**Usage:** \`/aura_apprendre [type]\`
+
+**Types d'aura disponibles :**
+🔥 **fire** - Aura de Flamme
+🌊 **water** - Aura Aquatique  
+🌍 **earth** - Aura Tellurique
+💨 **wind** - Aura Éolienne
+⚡ **lightning** - Aura Foudroyante
+🌑 **shadow** - Aura Ténébreuse
+✨ **light** - Aura Lumineuse
+
+⚠️ **ATTENTION :** L'entraînement dure 365 jours avec seulement 2% de chance de réussite par session !`
+            };
+        }
+
+        const auraType = args[0].toLowerCase();
+        
+        if (!this.auraManager.auraTypes[auraType]) {
+            return {
+                text: `❌ Type d'aura invalide : "${auraType}"
+
+Types valides : fire, water, earth, wind, lightning, shadow, light`
+            };
+        }
+
+        try {
+            const result = await this.auraManager.startAuraTraining(player.id, auraType, `Maîtrise ${auraType}`);
+            return { text: result.message };
+        } catch (error) {
+            return {
+                text: `❌ Erreur lors du démarrage de l'entraînement : ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * Session d'entraînement d'aura
+     */
+    async handleAuraSessionCommand({ player, dbManager, sock, chatId }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        const training = this.auraManager.getPlayerTraining(player.id);
+        if (!training) {
+            return {
+                text: `❌ Aucun entraînement d'aura en cours !
+
+Utilisez \`/aura_apprendre [type]\` pour commencer un entraînement.`
+            };
+        }
+
+        const aura = this.auraManager.auraTypes[training.auraType];
+        
+        // Démarrer l'animation d'entraînement
+        try {
+            await this.auraManager.createAuraAnimation(
+                player.id, 
+                training.auraType, 
+                training.techniqueName, 
+                sock, 
+                chatId
+            );
+
+            // Tentative de progression après l'animation
+            const growthResult = await this.auraManager.attemptAuraGrowth(player.id, training.auraType);
+            
+            setTimeout(async () => {
+                await sock.sendMessage(chatId, { text: growthResult.message });
+            }, 32000); // Après l'animation de 30 secondes + 2 secondes
+
+            return { text: '', skipResponse: true };
+        } catch (error) {
+            return {
+                text: `❌ Erreur pendant la session d'entraînement : ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * Lancer une technique d'aura
+     */
+    async handleCastAuraCommand({ player, message, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
+            };
+        }
+
+        // Vérifier d'abord si le joueur a des auras
+        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
+        if (!playerAuras || Object.keys(playerAuras).length === 0) {
+            return {
+                text: `❌ **AUCUNE AURA MAÎTRISÉE** ❌
+
+🚫 Vous n'avez appris aucune technique d'aura !
+
+💡 **Pour débuter :**
+• Utilisez \`/aura_apprendre [type]\`
+• Entraînez-vous 365 jours minimum
+• Seuls les plus déterminés y arrivent
+
+🔰 Vous êtes encore un simple humain sans pouvoirs.`
+            };
+        }
+
+        const args = message.split(' ').slice(1);
+        if (args.length === 0) {
+            return {
+                text: `🔮 **LANCER UNE TECHNIQUE D'AURA** 🔮
+
+**Usage:** \`/aura_cast [technique]\`
+
+📚 **Vos techniques disponibles :**
+${Object.entries(playerAuras).map(([type, data]) => {
+    const aura = this.auraManager.auraTypes[type];
+    return `${aura.emoji} **${aura.name}** (Niv. ${data.level}):\n${data.techniques.map(t => `   • ${t}`).join('\n')}`;
+}).join('\n\n')}
+
+⚡ **Exemple :** \`/aura_cast Souffle Ardent\``
+            };
+        }
+
+        const techniqueName = args.join(' ');
+        
+        // Chercher la technique dans toutes les auras du joueur
+        let foundAura = null;
+        let foundTechnique = null;
+        
+        for (const [auraType, auraData] of Object.entries(playerAuras)) {
+            if (auraData.techniques.includes(techniqueName)) {
+                foundAura = auraType;
+                foundTechnique = techniqueName;
+                break;
+            }
+        }
+
+        if (!foundAura) {
+            return {
+                text: `❌ **TECHNIQUE INCONNUE** ❌
+
+🚫 "${techniqueName}" n'est pas dans votre répertoire !
+
+📚 **Vos techniques :**
+${Object.entries(playerAuras).map(([type, data]) => 
+    data.techniques.map(t => `• ${t}`).join('\n')
+).join('\n')}`
+            };
+        }
+
+        const result = await this.auraManager.castAuraTechnique(player.id, foundAura, foundTechnique);
+        return { text: result.message };
     }
 
     /**
