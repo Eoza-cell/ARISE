@@ -50,10 +50,10 @@ class FrictionUltimateBot {
         this.processedMessages = new Map(); // ID du message -> timestamp
         this.maxCacheSize = 200; // Réduire encore plus la limite de cache pour économiser la mémoire
         this.cacheCleanupInterval = 90 * 1000; // Nettoyer le cache toutes les 90 secondes (plus fréquent)
-        
+
         // IA Frictia pour les groupes de discussion
         this.frictiaAI = new FrictiaAI();
-        
+
         // Limitation de QR codes pour éviter la boucle infinie
         this.qrCodeAttempts = 0;
         this.maxQrCodeAttempts = 5;
@@ -152,22 +152,22 @@ class FrictionUltimateBot {
         if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
             return 'image/jpeg';
         }
-        
+
         // PNG
         if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
             return 'image/png';
         }
-        
+
         // WebP
         if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
             return 'image/webp';
         }
-        
+
         // GIF
         if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
             return 'image/gif';
         }
-        
+
         return null;
     }
 
@@ -223,25 +223,25 @@ class FrictionUltimateBot {
 
             if (qr) {
                 const now = Date.now();
-                
+
                 // Limitation des QR codes pour éviter la boucle infinie
                 if (this.qrCodeAttempts >= this.maxQrCodeAttempts) {
                     console.log(`❌ Limite de QR codes atteinte (${this.maxQrCodeAttempts}). Arrêt pour éviter la boucle.`);
                     console.log('💡 Le serveur web continue de fonctionner sur le port 5000');
                     return;
                 }
-                
+
                 if (now - this.lastQrCodeTime < this.qrCodeCooldown) {
                     console.log(`⏳ QR Code en cooldown (${Math.round((this.qrCodeCooldown - (now - this.lastQrCodeTime)) / 1000)}s restants)`);
                     return;
                 }
-                
+
                 this.qrCodeAttempts++;
                 this.lastQrCodeTime = now;
-                
+
                 console.log(`📱 QR Code généré (${this.qrCodeAttempts}/${this.maxQrCodeAttempts}) - Scannez avec WhatsApp:`);
                 qrcode.generate(qr, { small: true });
-                
+
                 // Sauvegarder le QR code dans le SessionManager si nécessaire
                 await sessionManager.saveQrCode(qr);
             }
@@ -345,7 +345,7 @@ class FrictionUltimateBot {
 
         // SUPPRIMÉ: Deuxième handler connection.update dupliqué qui causait la boucle infinie de QR codes
         // Le seul handler qui reste est celui avec les limitations QR au-dessus
-        
+
         console.log('📱 Bot WhatsApp initialisé');
     }
 
@@ -485,12 +485,12 @@ class FrictionUltimateBot {
                     const userName = playerNumber.split('@')[0];
                     const isGroup = from.includes('@g.us');
                     const isDirectlyMentioned = messageText.toLowerCase().includes('frictia') || messageText.toLowerCase().includes('erza');
-                    
+
                     // Traiter les commandes spéciales de Frictia/Erza d'abord
                     if (messageText.startsWith('/') || messageText.startsWith('!') || isDirectlyMentioned) {
                         const command = messageText.replace(/^[\/!]/, '').trim().split(' ')[0];
                         const commandResponse = await this.frictiaAI.handleCommand(command, userName);
-                        
+
                         if (commandResponse) {
                             // Envoyer la réponse de commande Frictia immédiatement
                             setTimeout(async () => {
@@ -501,42 +501,42 @@ class FrictionUltimateBot {
                             }, 500);
                         }
                     }
-                    
+
                     // Ajouter TOUS les messages au contexte (groupes ET privé)
                     this.frictiaAI.addToConversationHistory(from, userName, messageText);
-                    
+
                     // Frictia peut répondre dans TOUTES les situations (connectée à tout)
-                    const shouldFrictiaRespond = isDirectlyMentioned || 
+                    const shouldFrictiaRespond = isDirectlyMentioned ||
                                                this.frictiaAI.shouldRespond(messageText, from, isDirectlyMentioned);
-                    
+
                     if (shouldFrictiaRespond) {
                         // Obtenir le contexte de conversation
                         const conversationContext = this.frictiaAI.getConversationContext(from);
-                        
+
                         // Générer une réponse de Frictia/Erza
                         const frictiaResponse = await this.frictiaAI.generateResponse(
-                            messageText, 
-                            groupName, 
-                            userName, 
+                            messageText,
+                            groupName,
+                            userName,
                             conversationContext
                         );
-                        
+
                         if (frictiaResponse) {
                             // Délai différent selon si c'est mention directe ou spontané
                             const delay = isDirectlyMentioned ? 1000 : (3000 + Math.random() * 4000);
-                            
+
                             setTimeout(async () => {
                                 // Ajouter sticker Erza aléatoire parfois
                                 const useSticker = Math.random() < 0.3;
                                 const stickerText = useSticker ? ` ${this.frictiaAI.getRandomErzaSticker()}` : '';
-                                
+
                                 await this.sendResponse(from, {
                                     text: `${frictiaResponse}${stickerText}`
                                 });
-                                
+
                                 // Mettre à jour la dernière activité
                                 this.frictiaAI.updateLastActivity(from);
-                                
+
                                 // Ajouter la réponse de Frictia au contexte
                                 this.frictiaAI.addToConversationHistory(from, 'Frictia', frictiaResponse);
                             }, delay);
@@ -669,7 +669,7 @@ class FrictionUltimateBot {
                 // Caractères spéciaux de ponctuation
                 '‹': '<', '›': '>', '«': '"', '»': '"', '„': '"', '"': '"', '"': '"', ''': "'", ''': "'",
                 '…': '...', '–': '-', '—': '-', '•': '*', '·': '.', '‚': ',', '‛': "'",
-                
+
                 // Autres caractères stylés communs
                 'ʌ': 'v', 'ʌ': 'A', 'ɐ': 'a', 'ɯ': 'm', 'ɹ': 'r', 'ɾ': 'r', 'ʇ': 't', 'ʎ': 'y'
             };
@@ -705,7 +705,7 @@ class FrictionUltimateBot {
 
                 try {
                     const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-                    
+
                     // Augmenter le timeout pour les grandes images
                     const downloadOptions = {
                         logger: require('pino')({ level: 'silent' }),
@@ -715,15 +715,15 @@ class FrictionUltimateBot {
                     let buffer = null;
                     let attempts = 0;
                     const maxAttempts = 5; // Plus de tentatives
-                    
+
                     // Plusieurs tentatives de téléchargement
                     while (!buffer && attempts < maxAttempts) {
                         attempts++;
                         console.log(`📥 Tentative ${attempts}/${maxAttempts} de téléchargement...`);
-                        
+
                         try {
                             buffer = await downloadMediaMessage(message, 'buffer', downloadOptions);
-                            
+
                             if (buffer && buffer.length > 0) {
                                 // Validation améliorée du buffer
                                 if (!Buffer.isBuffer(buffer)) {
@@ -731,7 +731,7 @@ class FrictionUltimateBot {
                                     buffer = null;
                                     continue;
                                 }
-                                
+
                                 // Vérifier que c'est vraiment une image valide
                                 const isValidImage = this.validateImageBuffer(buffer, imageMessage.mimetype);
                                 if (!isValidImage) {
@@ -739,7 +739,7 @@ class FrictionUltimateBot {
                                     buffer = null;
                                     continue;
                                 }
-                                
+
                                 console.log(`✅ Téléchargement réussi à la tentative ${attempts}`);
                                 break;
                             } else {
@@ -749,7 +749,7 @@ class FrictionUltimateBot {
                         } catch (attemptError) {
                             console.log(`⚠️ Tentative ${attempts} échouée:`, attemptError.message);
                             buffer = null;
-                            
+
                             if (attempts < maxAttempts) {
                                 const waitTime = attempts * 1000; // Attente progressive
                                 console.log(`⏱️ Attente de ${waitTime}ms avant nouvelle tentative...`);
@@ -816,7 +816,7 @@ class FrictionUltimateBot {
                     try {
                         console.log('🔄 Tentative alternative via stream...');
                         const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-                        
+
                         const stream = await downloadMediaMessage(message, 'stream', {
                             logger: require('pino')({ level: 'silent' }),
                             timeout: 45000 // Plus de temps pour le stream
@@ -826,13 +826,13 @@ class FrictionUltimateBot {
                             console.log('📥 Stream obtenu, assemblage des chunks...');
                             const chunks = [];
                             let totalSize = 0;
-                            
+
                             for await (const chunk of stream) {
                                 chunks.push(chunk);
                                 totalSize += chunk.length;
                                 console.log(`📦 Chunk reçu: ${chunk.length} bytes (total: ${totalSize})`);
                             }
-                            
+
                             const buffer = Buffer.concat(chunks);
 
                             if (buffer.length > 0) {
