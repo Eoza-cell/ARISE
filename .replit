@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["blender", "freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libuuid", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [workflows]
-runButton = "Start Fixed Bot"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Start Friction Bot"
@@ -106,7 +106,7 @@ outputType = "webview"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node index.js"
+args = "npm start"
 waitForPort = 5000
 
 [[workflows.workflow]]
@@ -131,12 +131,12 @@ localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 37133
-externalPort = 3002
-
-[[ports]]
 localPort = 38899
 externalPort = 3000
+
+[[ports]]
+localPort = 40627
+externalPort = 3002
 
 [[ports]]
 localPort = 44667
@@ -144,4 +144,4 @@ externalPort = 3001
 
 [deployment]
 deploymentTarget = "vm"
-run = ["node", "index.js"]
+run = ["npm", "start"]
