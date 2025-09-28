@@ -122,12 +122,38 @@ class SessionManager {
     // Méthode pour supprimer la session
     async deleteSession() {
         try {
-            if (fs.existsSync(this.sessionPath)) {
+            // Supprimer le dossier auth_info_baileys
+            const authDir = 'auth_info_baileys';
+            if (fs.existsSync(authDir)) {
+                fs.rmSync(authDir, { recursive: true, force: true });
+                console.log('🗑️ Session auth_info_baileys supprimée');
+            }
+
+            // Supprimer aussi le sessionPath si différent
+            if (fs.existsSync(this.sessionPath) && this.sessionPath !== authDir) {
                 fs.rmSync(this.sessionPath, { recursive: true, force: true });
                 console.log('🗑️ Session supprimée');
             }
+
+            console.log('✅ Toutes les sessions ont été nettoyées');
         } catch (error) {
             console.error('❌ Erreur suppression session:', error);
+        }
+    }
+
+    async cleanupOldSessions() {
+        try {
+            // Nettoyer les anciennes sessions
+            const sessionsToClean = ['auth_info_baileys', 'auth_info', 'session_data'];
+            
+            for (const sessionDir of sessionsToClean) {
+                if (fs.existsSync(sessionDir)) {
+                    fs.rmSync(sessionDir, { recursive: true, force: true });
+                    console.log(`🧹 Session ${sessionDir} nettoyée`);
+                }
+            }
+        } catch (error) {
+            console.error('❌ Erreur nettoyage sessions:', error);
         }
     }
 

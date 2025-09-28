@@ -231,12 +231,23 @@ class FrictionUltimateBot {
 
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log('❌ Connexion fermée, reconnexion:', shouldReconnect);
+                const errorMessage = lastDisconnect?.error?.message || '';
+                
+                console.log('❌ Connexion fermée:', errorMessage);
+                console.log('🔄 Tentative de reconnexion:', shouldReconnect);
 
-                const errorMessage = lastDisconnect?.error?.message;
-                if (errorMessage && errorMessage.includes('Invalid private key type')) {
-                    console.log('⚠️ Erreur de clé privée détectée - arrêt des tentatives de reconnexion');
-                    console.log('💡 Pour se connecter à WhatsApp, utilisez une vraie session ou scannez le QR code');
+                // Vérifier les erreurs spécifiques
+                if (errorMessage.includes('Invalid private key type') || 
+                    errorMessage.includes('stream errored out') ||
+                    errorMessage.includes('conflict')) {
+                    console.log('🧹 Erreur de session détectée - nettoyage des sessions...');
+                    await sessionManager.cleanupOldSessions();
+                    
+                    // Attendre un peu plus avant de reconnecter après nettoyage
+                    setTimeout(() => {
+                        this.reconnectAttempts = 0;
+                        this.startWhatsApp();
+                    }, 10000);
                     return;
                 }
 
@@ -244,23 +255,24 @@ class FrictionUltimateBot {
                     if (!this.reconnectAttempts) this.reconnectAttempts = 0;
                     this.reconnectAttempts++;
 
-                    if (this.reconnectAttempts > 10) { // Augmenter le nombre de tentatives
-                        console.log('❌ Trop de tentatives de reconnexion - arrêt temporaire');
-                        console.log('💡 Le serveur web continue de fonctionner sur le port 5000');
-                        // Attendre 30 secondes avant de reprendre
+                    if (this.reconnectAttempts > 5) {
+                        console.log('❌ Trop de tentatives - nettoyage complet des sessions...');
+                        await sessionManager.cleanupOldSessions();
+                        
                         setTimeout(() => {
                             this.reconnectAttempts = 0;
+                            console.log('🔄 Redémarrage avec session propre...');
                             this.startWhatsApp();
-                        }, 30000);
+                        }, 15000);
                         return;
                     }
 
-                    const delay = Math.min(5000 * this.reconnectAttempts, 30000); // Délai progressif
-                    console.log(`🔄 Reconnexion dans ${delay/1000}s... (tentative ${this.reconnectAttempts}/10)`);
+                    const delay = Math.min(8000 * this.reconnectAttempts, 45000);
+                    console.log(`🔄 Reconnexion dans ${delay/1000}s... (tentative ${this.reconnectAttempts}/5)`);
                     setTimeout(() => this.startWhatsApp(), delay);
                 } else {
-                    console.log('🔌 Déconnexion permanente. Suppression de la session.');
-                    await sessionManager.deleteSession();
+                    console.log('🔌 Déconnexion permanente. Nettoyage complet...');
+                    await sessionManager.cleanupOldSessions();
                 }
             } else if (connection === 'open') {
                 console.log('✅ Connexion WhatsApp établie !');
