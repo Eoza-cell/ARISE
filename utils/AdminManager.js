@@ -354,6 +354,20 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
     }
 
     /**
+     * Normalise le texte pour la détection de royaume
+     * @param {string} text - Le texte à normaliser
+     * @returns {string} - Le texte normalisé
+     */
+    normalizeTextForDetection(text) {
+        if (!text) return '';
+        return text
+            .toLowerCase()
+            .normalize('NFD') // Sépare les caractères diacritiques
+            .replace(/[\u0300-\u036f]/g, '') // Supprime les diacritiques
+            .replace(/[^a-z0-9\s]/g, ''); // Supprime les caractères non alphanumériques sauf espace
+    }
+
+    /**
      * Détecte automatiquement le royaume basé sur le nom du groupe WhatsApp
      * @param {string} groupName - Nom du groupe
      * @returns {string|null}
@@ -361,22 +375,23 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
     detectKingdomFromGroupName(groupName) {
         if (!groupName) return null;
 
-        const lowerName = groupName.toLowerCase();
+        // Normaliser le nom du groupe (supprimer accents et caractères spéciaux)
+        const lowerName = this.normalizeTextForDetection(groupName.toLowerCase());
 
-        // Mots-clés pour chaque royaume
+        // Mots-clés pour chaque royaume (également normalisés)
         const kingdomKeywords = {
-            'AEGYRIA': ['aegyria', 'aegyr', 'honneur', 'honor', 'plaine', 'valorhall', 'noble', 'paladin', 'lumière'],
-            'SOMBRENUIT': ['sombrenuit', 'sombre', 'nuit', 'darkness', 'shadow', 'ombre', 'forêt', 'murmure', 'lunelame'],
-            'KHELOS': ['khelos', 'désert', 'desert', 'sable', 'sand', 'oasis', 'mirage', 'sablesang', 'dune'],
-            'ABRANTIS': ['abrantis', 'port', 'mer', 'sea', 'ocean', 'marin', 'marée', 'kraken', 'navire', 'bateau'],
-            'VARHA': ['varha', 'montagne', 'mountain', 'neige', 'snow', 'froid', 'cold', 'loup', 'wolf', 'glacierre'],
-            'SYLVARIA': ['sylvaria', 'forêt', 'forest', 'arbre', 'tree', 'nature', 'vert', 'green', 'druide', 'anciens'],
-            'ECLYPSIA': ['eclypsia', 'éclipse', 'eclipse', 'mystique', 'mystic', 'temple', 'magie', 'magic'],
-            'TERRE_DESOLE': ['terre', 'désolé', 'wasteland', 'désert', 'apocalypse', 'ruine', 'survivant'],
-            'DRAK_TARR': ['drak', 'tarr', 'dragon', 'feu', 'fire', 'volcan', 'forge', 'cratère', 'flamme'],
-            'URVALA': ['urvala', 'mort', 'death', 'nécro', 'necro', 'marais', 'swamp', 'laboratoire', 'maudit'],
-            'OMBREFIEL': ['ombrefiel', 'ombre', 'shadow', 'exil', 'exile', 'gris', 'grey', 'citadelle', 'banni'],
-            'KHALDAR': ['khaldar', 'jungle', 'tropical', 'pilotis', 'amazonien', 'tribal', 'shaman', 'nature']
+            'AEGYRIA': ['aegyria', 'honneur', 'honor', 'chevalier', 'knight', 'paladin', 'lumiere', 'light', 'noble', 'oro', 'gold', 'heroic', 'valeur', 'courage'],
+            'SOMBRENUIT': ['sombrenuit', 'ombre', 'shadow', 'dark', 'noir', 'nuit', 'night', 'murmur', 'whisper', 'forest', 'tenebres', 'mysterieux'],
+            'KHELOS': ['khelos', 'desert', 'sable', 'sand', 'mirage', 'oasis', 'chaleur', 'heat', 'dune', 'aride', 'nomade', 'bedouin'],
+            'ABRANTIS': ['abrantis', 'ocean', 'mer', 'sea', 'port', 'marin', 'sailor', 'eau', 'water', 'maritime', 'bateau', 'corsaire', 'pirate'],
+            'VARHA': ['varha', 'glace', 'ice', 'froid', 'cold', 'neige', 'snow', 'montagne', 'mountain', 'loup', 'wolf', 'viking', 'nordic'],
+            'SYLVARIA': ['sylvaria', 'foret', 'forest', 'nature', 'arbre', 'tree', 'elfe', 'elf', 'vert', 'green', 'bois', 'druid', 'fae'],
+            'ECLYPSIA': ['eclypsia', 'eclipse', 'ombre', 'shadow', 'sombre', 'dark', 'mystique', 'mystic', 'magie', 'arcane', 'occult'],
+            'TERRE_DESOLE': ['terre', 'desole', 'wasteland', 'desert', 'ruine', 'ruin', 'apocalypse', 'mort', 'death', 'desolation', 'barren'],
+            'DRAK_TARR': ['drak', 'tarr', 'volcan', 'volcano', 'feu', 'fire', 'lave', 'lava', 'forge', 'demon', 'infernal', 'flamme'],
+            'URVALA': ['urvala', 'marais', 'swamp', 'mort', 'death', 'zombie', 'necro', 'poison', 'maudit', 'curse', 'putrefaction', 'bog'],
+            'OMBREFIEL': ['ombrefiel', 'exil', 'exile', 'gris', 'grey', 'citadelle', 'banni', 'outcast', 'neutral', 'limbo'],
+            'KHALDAR': ['khaldar', 'jungle', 'tropical', 'pilotis', 'amazonien', 'tribal', 'shaman', 'nature', 'primitive', 'sauvage']
         };
 
         // Chercher les correspondances
@@ -389,7 +404,7 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
             }
         }
 
-        // Vérifier si le nom du groupe contient directement le nom du royaume
+        // Vérifier si le nom du groupe contient directement le nom du royaume (après normalisation)
         const validKingdoms = [
             'AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS', 'VARHA', 
             'SYLVARIA', 'ECLYPSIA', 'TERRE_DESOLE', 'DRAK_TARR', 
