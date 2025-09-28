@@ -517,55 +517,105 @@ class FrictionUltimateBot {
             }
 
             if (imageMessage) {
-                // Télécharger l'image avec la bonne méthode
-                console.log('📥 Téléchargement de l\'image...');
+                console.log(`📥 Début téléchargement image - Type: ${imageMessage.mimetype}, Taille annoncée: ${imageMessage.fileLength || 'inconnue'}`);
 
                 try {
                     const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-                    const buffer = await downloadMediaMessage(message, 'buffer', {}, {
-                        logger: require('pino')({ level: 'silent' })
-                    });
+                    
+                    // Augmenter le timeout pour les grandes images
+                    const downloadOptions = {
+                        logger: require('pino')({ level: 'silent' }),
+                        timeout: 30000 // 30 secondes
+                    };
 
-                    if (buffer && buffer.length > 0) {
-                        console.log(`✅ Image téléchargée: ${buffer.length} bytes`);
+                    const buffer = await downloadMediaMessage(message, 'buffer', downloadOptions);
 
-                        // Valider que c'est bien une image
-                        const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-                        const mimetype = imageMessage.mimetype || 'image/jpeg';
-
-                        if (!validImageTypes.includes(mimetype.toLowerCase())) {
-                            console.log(`⚠️ Type d'image non supporté: ${mimetype}`);
-                            return null;
-                        }
-
-                        return {
-                            buffer: buffer,
-                            mimetype: mimetype,
-                            caption: imageMessage.caption || '',
-                            width: imageMessage.width || 0,
-                            height: imageMessage.height || 0,
-                            fileLength: imageMessage.fileLength || buffer.length,
-                            sha256: imageMessage.fileSha256?.toString('hex') || null
-                        };
-                    } else {
-                        console.log('⚠️ Buffer d\'image vide ou invalide');
+                    if (!buffer) {
+                        console.log('❌ Buffer null reçu du téléchargement');
                         return null;
                     }
-                } catch (downloadError) {
-                    console.error('❌ Erreur téléchargement spécifique:', downloadError.message);
 
-                    // Tentative alternative de téléchargement
+                    if (buffer.length === 0) {
+                        console.log('❌ Buffer vide reçu du téléchargement');
+                        return null;
+                    }
+
+                    console.log(`✅ Image téléchargée avec succès: ${buffer.length} bytes`);
+
+                    // Valider que c'est bien une image avec vérification étendue
+                    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+                    const mimetype = (imageMessage.mimetype || 'image/jpeg').toLowerCase();
+
+                    if (!validImageTypes.includes(mimetype)) {
+                        console.log(`⚠️ Type d'image non supporté: ${mimetype} - Types acceptés: ${validImageTypes.join(', ')}`);
+                        return null;
+                    }
+
+                    // Vérification basique du format d'image via les premiers bytes
+                    const imageSignatures = {
+                        'image/jpeg': [0xFF, 0xD8, 0xFF],
+                        'image/jpg': [0xFF, 0xD8, 0xFF],
+                        'image/png': [0x89, 0x50, 0x4E, 0x47],
+                        'image/webp': [0x52, 0x49, 0x46, 0x46],
+                        'image/gif': [0x47, 0x49, 0x46]
+                    };
+
+                    const signature = imageSignatures[mimetype];
+                    if (signature && buffer.length >= signature.length) {
+                        let isValidFormat = true;
+                        for (let i = 0; i < signature.length; i++) {
+                            if (buffer[i] !== signature[i]) {
+                                isValidFormat = false;
+                                break;
+                            }
+                        }
+                        
+                        if (!isValidFormat) {
+                            console.log(`⚠️ Signature de fichier invalide pour ${mimetype}`);
+                            console.log(`📊 Premiers bytes: ${Array.from(buffer.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
+                        }
+                    }
+
+                    const imageData = {
+                        buffer: buffer,
+                        mimetype: mimetype,
+                        caption: imageMessage.caption || '',
+                        width: imageMessage.width || 0,
+                        height: imageMessage.height || 0,
+                        fileLength: imageMessage.fileLength || buffer.length,
+                        sha256: imageMessage.fileSha256?.toString('hex') || null,
+                        downloadTimestamp: Date.now()
+                    };
+
+                    console.log(`📊 Image extraite - Taille: ${buffer.length} bytes, Type: ${mimetype}, Dimensions: ${imageData.width}x${imageData.height}`);
+                    return imageData;
+
+                } catch (downloadError) {
+                    console.error('❌ Erreur téléchargement principal:', downloadError.message);
+                    console.error('❌ Type erreur:', downloadError.name);
+                    console.error('❌ Code erreur:', downloadError.code);
+
+                    // Tentative alternative de téléchargement via stream
                     try {
-                        console.log('🔄 Tentative alternative de téléchargement...');
-                        const stream = await downloadMediaMessage(message, 'stream', {}, {
-                            logger: require('pino')({ level: 'silent' })
+                        console.log('🔄 Tentative alternative via stream...');
+                        const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+                        
+                        const stream = await downloadMediaMessage(message, 'stream', {
+                            logger: require('pino')({ level: 'silent' }),
+                            timeout: 45000 // Plus de temps pour le stream
                         });
 
                         if (stream) {
+                            console.log('📥 Stream obtenu, assemblage des chunks...');
                             const chunks = [];
+                            let totalSize = 0;
+                            
                             for await (const chunk of stream) {
                                 chunks.push(chunk);
+                                totalSize += chunk.length;
+                                console.log(`📦 Chunk reçu: ${chunk.length} bytes (total: ${totalSize})`);
                             }
+                            
                             const buffer = Buffer.concat(chunks);
 
                             if (buffer.length > 0) {
@@ -575,22 +625,32 @@ class FrictionUltimateBot {
                                     mimetype: imageMessage.mimetype || 'image/jpeg',
                                     caption: imageMessage.caption || '',
                                     width: imageMessage.width || 0,
-                                    height: imageMessage.height || 0
+                                    height: imageMessage.height || 0,
+                                    fileLength: buffer.length,
+                                    sha256: imageMessage.fileSha256?.toString('hex') || null,
+                                    downloadTimestamp: Date.now(),
+                                    downloadMethod: 'stream'
                                 };
+                            } else {
+                                console.log('❌ Stream assemblé mais buffer vide');
                             }
+                        } else {
+                            console.log('❌ Stream null reçu');
                         }
                     } catch (streamError) {
                         console.error('❌ Erreur téléchargement stream:', streamError.message);
+                        console.error('❌ Stack stream:', streamError.stack);
                     }
 
+                    console.log('❌ Toutes les méthodes de téléchargement ont échoué');
                     return null;
                 }
             }
 
             return null;
         } catch (error) {
-            console.error('❌ Erreur téléchargement image:', error.message);
-            console.error('❌ Stack trace:', error.stack);
+            console.error('❌ Erreur GLOBALE téléchargement image:', error.message);
+            console.error('❌ Stack trace complète:', error.stack);
             return null;
         }
     }
