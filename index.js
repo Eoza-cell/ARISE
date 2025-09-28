@@ -34,6 +34,9 @@ const HuggingFaceClient = require('./huggingface/HuggingFaceClient');
 // Gestionnaire de session WhatsApp
 const SessionManager = require('./whatsapp/SessionManager');
 
+// IA Frictia pour les groupes de discussion
+const FrictiaAI = require('./ai/FrictiaAI');
+
 class FrictionUltimateBot {
     constructor() {
         this.sock = null;
@@ -45,12 +48,24 @@ class FrictionUltimateBot {
         this.isConnected = false;
         // Système de déduplication optimisé pour économiser la mémoire
         this.processedMessages = new Map(); // ID du message -> timestamp
-        this.maxCacheSize = 500; // Réduire la limite de cache
-        this.cacheCleanupInterval = 2 * 60 * 1000; // Nettoyer le cache toutes les 2 minutes
+        this.maxCacheSize = 200; // Réduire encore plus la limite de cache pour économiser la mémoire
+        this.cacheCleanupInterval = 90 * 1000; // Nettoyer le cache toutes les 90 secondes (plus fréquent)
+        
+        // IA Frictia pour les groupes de discussion
+        this.frictiaAI = new FrictiaAI();
+        
+        // Limitation de QR codes pour éviter la boucle infinie
+        this.qrCodeAttempts = 0;
+        this.maxQrCodeAttempts = 5;
+        this.lastQrCodeTime = 0;
+        this.qrCodeCooldown = 60000; // 1 minute entre tentatives
 
-        // Nettoyage automatique de la mémoire
+        // Nettoyage automatique de la mémoire plus agressif
         setInterval(() => {
             this.cleanupCache();
+            // Nettoyer Frictia aussi
+            this.frictiaAI.cleanup();
+            // Force garbage collection si disponible
             if (global.gc) {
                 global.gc();
             }
@@ -133,8 +148,26 @@ class FrictionUltimateBot {
             const { connection, lastDisconnect, qr } = update;
 
             if (qr) {
-                console.log('📱 QR Code généré - Scannez avec WhatsApp:');
+                const now = Date.now();
+                
+                // Limitation des QR codes pour éviter la boucle infinie
+                if (this.qrCodeAttempts >= this.maxQrCodeAttempts) {
+                    console.log(`❌ Limite de QR codes atteinte (${this.maxQrCodeAttempts}). Arrêt pour éviter la boucle.`);
+                    console.log('💡 Le serveur web continue de fonctionner sur le port 5000');
+                    return;
+                }
+                
+                if (now - this.lastQrCodeTime < this.qrCodeCooldown) {
+                    console.log(`⏳ QR Code en cooldown (${Math.round((this.qrCodeCooldown - (now - this.lastQrCodeTime)) / 1000)}s restants)`);
+                    return;
+                }
+                
+                this.qrCodeAttempts++;
+                this.lastQrCodeTime = now;
+                
+                console.log(`📱 QR Code généré (${this.qrCodeAttempts}/${this.maxQrCodeAttempts}) - Scannez avec WhatsApp:`);
                 qrcode.generate(qr, { small: true });
+                
                 // Sauvegarder le QR code dans le SessionManager si nécessaire
                 await sessionManager.saveQrCode(qr);
             }
@@ -236,77 +269,10 @@ class FrictionUltimateBot {
         // Gestion des erreurs de déchiffrement
         this.sock.ev.on('creds.update', saveCreds);
 
-        // Gestion des erreurs générales
-        this.sock.ev.on('connection.update', async (update) => {
-            const { connection, lastDisconnect, qr } = update;
-
-            if (qr) {
-                console.log('📱 QR Code généré - Scannez avec WhatsApp:');
-                qrcode.generate(qr, { small: true });
-                await sessionManager.saveQrCode(qr);
-            }
-
-            if (connection === 'close') {
-                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                const errorMessage = lastDisconnect?.error?.message || '';
-
-                console.log('❌ Connexion fermée:', errorMessage);
-                console.log('🔄 Tentative de reconnexion:', shouldReconnect);
-
-                // Vérifier les erreurs spécifiques
-                if (errorMessage.includes('Invalid private key type') ||
-                    errorMessage.includes('stream errored out') ||
-                    errorMessage.includes('conflict')) {
-                    console.log('🧹 Erreur de session détectée - nettoyage des sessions...');
-                    await sessionManager.cleanupOldSessions();
-
-                    // Attendre un peu plus avant de reconnecter après nettoyage
-                    setTimeout(() => {
-                        this.reconnectAttempts = 0;
-                        this.startWhatsApp();
-                    }, 10000);
-                    return;
-                }
-
-                if (shouldReconnect) {
-                    if (!this.reconnectAttempts) this.reconnectAttempts = 0;
-                    this.reconnectAttempts++;
-
-                    if (this.reconnectAttempts > 5) {
-                        console.log('❌ Trop de tentatives - nettoyage complet des sessions...');
-                        await sessionManager.cleanupOldSessions();
-
-                        setTimeout(() => {
-                            this.reconnectAttempts = 0;
-                            console.log('🔄 Redémarrage avec session propre...');
-                            this.startWhatsApp();
-                        }, 15000);
-                        return;
-                    }
-
-                    const delay = Math.min(8000 * this.reconnectAttempts, 45000);
-                    console.log(`🔄 Reconnexion dans ${delay/1000}s... (tentative ${this.reconnectAttempts}/5)`);
-                    setTimeout(() => this.startWhatsApp(), delay);
-                } else {
-                    console.log('🔌 Déconnexion permanente. Nettoyage complet...');
-                    await sessionManager.cleanupOldSessions();
-                }
-            } else if (connection === 'open') {
-                console.log('✅ Connexion WhatsApp établie !');
-                this.isConnected = true;
-                this.reconnectAttempts = 0; // Reset des tentatives
-
-                this.buttonManager = new WhatsAppButtonManager(this.sock);
-                console.log('🔘 Gestionnaire de boutons interactifs initialisé');
-
-                await this.sendWelcomeMessage();
-
-                await sessionManager.saveSession({
-                    authDir: session.authDir,
-                    isLoggedIn: true,
-                });
-            }
-        });
+        // SUPPRIMÉ: Deuxième handler connection.update dupliqué qui causait la boucle infinie de QR codes
+        // Le seul handler qui reste est celui avec les limitations QR au-dessus
+        
+        console.log('📱 Bot WhatsApp initialisé');
     }
 
     async sendWelcomeMessage() {
@@ -431,7 +397,76 @@ class FrictionUltimateBot {
                 imageGenerator: this.imageGenerator
             });
 
-            // Envoi de la réponse unifiée
+            // FRICTIA AI - Connectée à TOUTES les commandes et conversations
+            if (messageText) {
+                try {
+                    const groupName = groupMetadata?.subject || 'Conversation privée';
+                    const userName = playerNumber.split('@')[0];
+                    const isGroup = from.includes('@g.us');
+                    const isDirectlyMentioned = messageText.toLowerCase().includes('frictia') || messageText.toLowerCase().includes('erza');
+                    
+                    // Traiter les commandes spéciales de Frictia/Erza d'abord
+                    if (messageText.startsWith('/') || messageText.startsWith('!') || isDirectlyMentioned) {
+                        const command = messageText.replace(/^[\/!]/, '').trim().split(' ')[0];
+                        const commandResponse = await this.frictiaAI.handleCommand(command, userName);
+                        
+                        if (commandResponse) {
+                            // Envoyer la réponse de commande Frictia immédiatement
+                            setTimeout(async () => {
+                                await this.sendResponse(from, {
+                                    text: `⚔️ **Frictia (Erza Scarlet)** ⚔️\n\n${commandResponse}`
+                                });
+                                this.frictiaAI.updateLastActivity(from);
+                            }, 500);
+                        }
+                    }
+                    
+                    // Ajouter TOUS les messages au contexte (groupes ET privé)
+                    this.frictiaAI.addToConversationHistory(from, userName, messageText);
+                    
+                    // Frictia peut répondre dans TOUTES les situations (connectée à tout)
+                    const shouldFrictiaRespond = isDirectlyMentioned || 
+                                               this.frictiaAI.shouldRespond(messageText, from, isDirectlyMentioned);
+                    
+                    if (shouldFrictiaRespond) {
+                        // Obtenir le contexte de conversation
+                        const conversationContext = this.frictiaAI.getConversationContext(from);
+                        
+                        // Générer une réponse de Frictia/Erza
+                        const frictiaResponse = await this.frictiaAI.generateResponse(
+                            messageText, 
+                            groupName, 
+                            userName, 
+                            conversationContext
+                        );
+                        
+                        if (frictiaResponse) {
+                            // Délai différent selon si c'est mention directe ou spontané
+                            const delay = isDirectlyMentioned ? 1000 : (3000 + Math.random() * 4000);
+                            
+                            setTimeout(async () => {
+                                // Ajouter sticker Erza aléatoire parfois
+                                const useSticker = Math.random() < 0.3;
+                                const stickerText = useSticker ? ` ${this.frictiaAI.getRandomErzaSticker()}` : '';
+                                
+                                await this.sendResponse(from, {
+                                    text: `${frictiaResponse}${stickerText}`
+                                });
+                                
+                                // Mettre à jour la dernière activité
+                                this.frictiaAI.updateLastActivity(from);
+                                
+                                // Ajouter la réponse de Frictia au contexte
+                                this.frictiaAI.addToConversationHistory(from, 'Frictia', frictiaResponse);
+                            }, delay);
+                        }
+                    }
+                } catch (frictiaError) {
+                    console.log('⚠️ Erreur Frictia AI:', frictiaError.message);
+                }
+            }
+
+            // Envoi de la réponse unifiée du jeu
             setTimeout(async () => {
                 await this.sendResponse(from, result);
             }, 100);
@@ -832,17 +867,35 @@ class FrictionUltimateBot {
         }
     }
 
-    // Méthode de nettoyage du cache pour éviter les fuites mémoire
+    // Méthode de nettoyage du cache pour éviter les fuites mémoire - OPTIMISÉE
     cleanupCache() {
         const now = Date.now();
-        const maxAge = 10 * 60 * 1000; // 10 minutes
+        const maxAge = 5 * 60 * 1000; // 5 minutes (réduit de 10)
         const sizeBefore = this.processedMessages.size;
 
         // Supprimer les messages anciens
+        let cleaned = 0;
         for (const [key, timestamp] of this.processedMessages.entries()) {
             if (now - timestamp > maxAge) {
                 this.processedMessages.delete(key);
+                cleaned++;
             }
+        }
+
+        // Si le cache est encore trop gros, supprimer les plus anciens
+        if (this.processedMessages.size > this.maxCacheSize) {
+            const entries = Array.from(this.processedMessages.entries())
+                .sort((a, b) => a[1] - b[1]); // Trier par timestamp
+
+            const toDelete = this.processedMessages.size - this.maxCacheSize;
+            for (let i = 0; i < toDelete; i++) {
+                this.processedMessages.delete(entries[i][0]);
+                cleaned++;
+            }
+        }
+
+        if (cleaned > 0) {
+            console.log(`🧹 Cache: ${cleaned} entrées supprimées, taille: ${this.processedMessages.size}/${this.maxCacheSize}`);
         }
 
         // Si le cache est encore trop grand, garder seulement les plus récents
