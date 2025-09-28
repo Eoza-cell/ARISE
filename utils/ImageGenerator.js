@@ -189,7 +189,7 @@ class ImageGenerator {
             }
 
             const imagePath = path.join(customImagesDir, `character_${characterId}.png`);
-            
+
             // Sauvegarder l'image avec gestion d'erreur détaillée
             try {
                 await fs.writeFile(imagePath, imageBuffer);
@@ -495,7 +495,11 @@ class ImageGenerator {
                         return imageBuffer;
                     }
                 } catch (pollinationsError) {
-                    console.log(`⚠️ Erreur Pollinations personnage, fallback vers Freepik:`, pollinatorsError.message);
+                    if (pollinationsError.message.includes('timeout')) {
+                        console.log('⚠️ Timeout Pollinations (>2min), fallback vers Freepik:', pollinationsError.message);
+                    } else {
+                        console.log('⚠️ Erreur Pollinations personnage, fallback vers Freepik:', pollinationsError.message);
+                    }
                 }
             }
 

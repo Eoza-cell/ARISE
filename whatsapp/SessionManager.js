@@ -6,6 +6,7 @@ class SessionManager {
         // Session ID encodée - remplacez par votre propre session
         this.encodedSession = process.env.WHATSAPP_SESSION || this.getDefaultSession();
         this.sessionPath = 'session_data';
+        this.activeSession = null; // Ajout pour gérer l'état de la session active
     }
 
     getDefaultSession() {
@@ -145,19 +146,38 @@ class SessionManager {
         }
     }
 
+    // Helper method to get session path
+    getSessionPath() {
+        return path.join(process.cwd(), this.sessionPath);
+    }
+
+    // Helper method to delete a directory
+    async deleteDirectory(dirPath) {
+        if (fs.existsSync(dirPath)) {
+            await fs.promises.rm(dirPath, { recursive: true, force: true });
+        }
+    }
+
     async cleanupOldSessions() {
         try {
-            // Nettoyer les anciennes sessions
-            const sessionsToClean = ['auth_info_baileys', 'auth_info', 'session_data'];
+            console.log('🧹 Nettoyage des anciennes sessions...');
 
-            for (const sessionDir of sessionsToClean) {
-                if (fs.existsSync(sessionDir)) {
-                    fs.rmSync(sessionDir, { recursive: true, force: true });
-                    console.log(`🧹 Session ${sessionDir} nettoyée`);
-                }
-            }
+            // Supprimer tous les fichiers de session
+            const sessionPath = this.getSessionPath();
+            await this.deleteDirectory(sessionPath);
+
+            // Attendre un peu pour éviter les conflits
+            await new Promise(resolve => setTimeout(resolve, 2000));
+
+            // Créer un nouveau dossier vide
+            await fs.mkdir(sessionPath, { recursive: true });
+
+            // Nettoyer aussi le cache de session
+            this.activeSession = null;
+
+            console.log('✅ Sessions nettoyées avec succès');
         } catch (error) {
-            console.error('❌ Erreur nettoyage sessions:', error);
+            console.error('❌ Erreur nettoyage sessions:', error.message);
         }
     }
 
@@ -166,6 +186,7 @@ class SessionManager {
         try {
             console.log('💾 Session sauvegardée');
             // Implémentation basique - peut être étendue
+            this.activeSession = sessionData; // Stocker la session active
         } catch (error) {
             console.error('❌ Erreur sauvegarde session:', error);
         }
@@ -208,11 +229,11 @@ class SessionManager {
     async ensureSessionDirectory() {
         try {
             // Créer le dossier principal de session
-            await fs.mkdir(this.sessionPath, { recursive: true });
+            await fs.promises.mkdir(this.sessionPath, { recursive: true });
 
             // Créer aussi le dossier auth_info_baileys si nécessaire
             const authPath = path.join(process.cwd(), 'auth_info_baileys');
-            await fs.mkdir(authPath, { recursive: true });
+            await fs.promises.mkdir(authPath, { recursive: true });
 
             console.log(`📁 Dossiers de session créés: ${this.sessionPath} et ${authPath}`);
         } catch (error) {

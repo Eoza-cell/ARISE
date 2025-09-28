@@ -1,4 +1,3 @@
-replit_final_file>
 // The following code integrates RunwayML video generation into the bot's action response system.
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
@@ -255,7 +254,7 @@ class FrictionUltimateBot {
                 console.log('🔄 Tentative de reconnexion:', shouldReconnect);
 
                 // Vérifier les erreurs spécifiques
-                if (errorMessage.includes('Invalid private key type') || 
+                if (errorMessage.includes('Invalid private key type') ||
                     errorMessage.includes('stream errored out') ||
                     errorMessage.includes('conflict')) {
                     console.log('🧹 Erreur de session détectée - nettoyage des sessions...');
@@ -320,7 +319,7 @@ class FrictionUltimateBot {
             const from = message.key.remoteJid;
             const messageId = message.key.id;
 
-            // CORRECTION CRITIQUE : Ignorer les messages de groupe sans participant 
+            // CORRECTION CRITIQUE : Ignorer les messages de groupe sans participant
             // (c'est le premier événement du dupliqué de Baileys)
             if (from.includes('@g.us') && !message.key.participant) {
                 console.log('⚠️ Message de groupe sans participant ignoré (doublon Baileys)');
@@ -798,4 +797,3 @@ bot.initialize().catch(console.error);
 
 console.log('🎮 FRICTION ULTIMATE - Bot WhatsApp RPG');
 console.log('🚀 Démarrage en cours...');
-</replit_final_file>
