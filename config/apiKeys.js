@@ -17,8 +17,8 @@ const apiKeys = {
     },
 
     groq: {
-        apiKey: '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',
-        enabled: true
+        apiKey: process.env.GROQ_API_KEY || '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',
+        enabled: !!(process.env.GROQ_API_KEY || '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')
     },
 
     // Génération d'images
@@ -49,8 +49,8 @@ const apiKeys = {
     },
 
     huggingFace: {
-        token: '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',
-        enabled: true
+        token: process.env.HF_TOKEN || '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',
+        enabled: !!(process.env.HF_TOKEN || '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')
     },
 
     // Synthèse vocale
