@@ -122,10 +122,10 @@ class GameEngine {
         this.rpEncounterManager = null; // Initialisé avec sock pour rencontres RP
 
         this.commandHandlers = {
+            // Core commands that definitely exist
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
             '/créer_personnage': this.handleCreateCharacterCommand.bind(this),
-            '/modifier': this.handleModifyCharacterCommand.bind(this),
             '/fiche': this.handleCharacterSheetCommand.bind(this),
             '/aide': this.handleHelpCommand.bind(this),
             '/help': this.handleHelpCommand.bind(this),
@@ -138,8 +138,6 @@ class GameEngine {
             '/carte': this.handleMapCommand.bind(this),
             '/boutons': this.handleButtonsTestCommand.bind(this),
             '/buttons': this.handleButtonsTestCommand.bind(this),
-            '/autorise': this.handleAuthorizeCommand.bind(this),
-            '/config_royaume': this.handleConfigKingdomCommand.bind(this),
             '/reputation': this.handleReputationCommand.bind(this),
             '/evenements': this.handleEventsCommand.bind(this),
             '/meteo': this.handleWeatherCommand.bind(this),
@@ -147,51 +145,7 @@ class GameEngine {
             '/factions': this.handleFactionsCommand.bind(this),
             '/defis': this.handleChallengesCommand.bind(this),
 
-            // Commandes pour les sorts avec alphabet ancien
-            '/sort': this.handleSpellCommand.bind(this),
-            '/sorts': this.handleSpellbookCommand.bind(this),
-            '/lancer': this.handleCastSpellCommand.bind(this),
-            '/grimoire': this.handleSpellbookCommand.bind(this),
-            '/apprendre': this.handleLearnSpellCommand.bind(this),
-
-            // Commandes d'administration (réservées aux admins)
-            '/admin_stats': this.handleAdminStatsCommand.bind(this),
-            '/admin_give': this.handleAdminGiveCommand.bind(this),
-            '/admin_level': this.handleAdminLevelCommand.bind(this),
-            '/admin_teleport': this.handleAdminTeleportCommand.bind(this),
-            '/admin_heal': this.handleAdminHealCommand.bind(this),
-            '/admin_power': this.handleAdminPowerCommand.bind(this),
-            '/admin_time': this.handleAdminTimeCommand.bind(this),
-            '/admin_weather': this.handleAdminWeatherCommand.bind(this),
-            '/admin_event': this.handleAdminEventCommand.bind(this),
-            '/admin_kingdom': this.handleAdminKingdomCommand.bind(this),
-            '/admin_groups': this.handleAdminGroupsCommand.bind(this),
-            '/admin_reset_kingdom': this.handleAdminResetKingdomCommand.bind(this),
-            '/admin_debug': this.handleAdminDebugCommand.bind(this),
-            '/admin_backup': this.handleAdminBackupCommand.bind(this),
-            '/admin_reload': this.handleAdminReloadCommand.bind(this),
-            '/admin_announce': this.handleAdminAnnounceCommand.bind(this),
-            '/admin_status': this.handleAdminStatusCommand.bind(this),
-            '/admin_logout': this.handleAdminLogoutCommand.bind(this),
-            '/admin_help': this.handleAdminHelpCommand.bind(this),
-            '/admin_groups': this.handleAdminGroupsCommand.bind(this),
-            '/admin_kingdom': this.handleAdminKingdomCommand.bind(this),
-
-            // Commandes de quêtes (10,000 principales + 20,000 secondaires)
-            '/quetes': this.handleQuestsCommand.bind(this),
-            '/quests': this.handleQuestsCommand.bind(this),
-            '/quete': this.handleQuestDetailsCommand.bind(this),
-            '/quest': this.handleQuestDetailsCommand.bind(this),
-            '/accepter': this.handleAcceptQuestCommand.bind(this),
-            '/accept': this.handleAcceptQuestCommand.bind(this),
-            '/abandonner': this.handleAbandonQuestCommand.bind(this),
-            '/abandon': this.handleAbandonQuestCommand.bind(this),
-            '/progression': this.handleQuestProgressCommand.bind(this),
-            '/progress': this.handleQuestProgressCommand.bind(this),
-            '/rechercher_quete': this.handleSearchQuestCommand.bind(this),
-            '/search_quest': this.handleSearchQuestCommand.bind(this),
-
-            // Commandes d'aura (système de 365 jours d'entraînement)
+            // Aura commands that exist
             '/aura': this.handleAuraInfoCommand.bind(this),
             '/aura_info': this.handleAuraInfoCommand.bind(this),
             '/aura_apprendre': this.handleLearnAuraCommand.bind(this),
@@ -207,19 +161,15 @@ class GameEngine {
             '/regenerer_magie': this.handleRegenerateMagicCommand.bind(this),
             '/regenerate_magic': this.handleRegenerateMagicCommand.bind(this),
 
-            // Commandes de temps et météo
+            // Time and weather commands that exist
             '/temps': this.handleTimeCommand.bind(this),
             '/time': this.handleTimeCommand.bind(this),
-            '/meteo': this.handleWeatherCommand.bind(this),
-            '/weather': this.handleWeatherCommand.bind(this),
-            '/evenements': this.handleEventsCommand.bind(this),
-            '/events': this.handleEventsCommand.bind(this),
-            '/calendrier': this.handleCalendarCommand.bind(this),
-            '/calendar': this.handleCalendarCommand.bind(this),
             '/coordonnees': this.handleCoordinatesCommand.bind(this),
             '/coordinates': this.handleCoordinatesCommand.bind(this),
             '/position': this.handleCoordinatesCommand.bind(this),
-            '/time_system': this.handleTimeSystemCommand.bind(this) // Nouvelle commande pour le système temporel
+            '/calendrier': this.handleCalendarCommand.bind(this),
+            '/calendar': this.handleCalendarCommand.bind(this),
+            '/time_system': this.handleTimeSystemCommand.bind(this)
         };
     }
 
@@ -1998,6 +1948,8 @@ Durée : ${socialEvent.duration}
 
 ⚠️ **Impact sur le gameplay en cours...**`;
 
+        return { text: weatherText };
+    }
 
     // ==================== COMMANDES D'AURA ====================
 
@@ -2292,10 +2244,6 @@ Utilisez /aura_techniques pour voir vos techniques disponibles.`
             text: '',
             skipResponse: true // Pas de réponse immédiate, l'animation gère tout
         };
-    }
-
-
-        return { text: weatherText };
     }
 
     async handleMarketCommand({ player, dbManager }) {
