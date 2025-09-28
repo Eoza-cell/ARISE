@@ -507,8 +507,24 @@ class FrictionUltimateBot {
                         if (commandResponse) {
                             // Envoyer la réponse de commande Frictia immédiatement
                             setTimeout(async () => {
+                                // Générer avatar pour les commandes importantes
+                                let commandAvatar = null;
+                                if (['help', 'aide', 'profil', 'avatar'].includes(command)) {
+                                    try {
+                                        const avatarPrompt = "Erza Scarlet from Fairy Tail anime, beautiful warrior woman with long scarlet red hair, wearing magical armor, confident smile, anime style, high quality";
+                                        commandAvatar = await this.imageGenerator.generateImage(avatarPrompt, {
+                                            width: 512,
+                                            height: 512,
+                                            style: 'anime'
+                                        });
+                                    } catch (avatarError) {
+                                        console.log('⚠️ Erreur génération avatar commande:', avatarError.message);
+                                    }
+                                }
+
                                 await this.sendResponse(from, {
-                                    text: `⚔️ **Frictia (Erza Scarlet)** ⚔️\n\n${commandResponse}`
+                                    text: `⚔️ **Frictia (Erza Scarlet)** ⚔️\n\n${commandResponse}`,
+                                    image: commandAvatar
                                 });
                                 this.frictiaAI.updateLastActivity(from);
                             }, 500);
@@ -567,8 +583,27 @@ class FrictionUltimateBot {
                                 const useSticker = Math.random() < 0.3;
                                 const stickerText = useSticker ? ` ${this.frictiaAI.getRandomErzaSticker()}` : '';
 
+                                // Ajouter l'avatar Frictia parfois (30% de chance)
+                                const useAvatar = Math.random() < 0.3;
+                                let avatarImage = null;
+
+                                if (useAvatar) {
+                                    try {
+                                        // Générer l'image d'avatar Erza Scarlet
+                                        const avatarPrompt = "Erza Scarlet from Fairy Tail anime, beautiful warrior woman with long scarlet red hair, wearing armor, confident expression, anime style, high quality, detailed";
+                                        avatarImage = await this.imageGenerator.generateImage(avatarPrompt, {
+                                            width: 512,
+                                            height: 512,
+                                            style: 'anime'
+                                        });
+                                    } catch (avatarError) {
+                                        console.log('⚠️ Erreur génération avatar Frictia:', avatarError.message);
+                                    }
+                                }
+
                                 await this.sendResponse(from, {
-                                    text: `${frictiaResponse}${stickerText}`
+                                    text: `⚔️ **Frictia (Erza Scarlet)** ⚔️\n\n${frictiaResponse}${stickerText}`,
+                                    image: avatarImage
                                 });
 
                                 // Mettre à jour la dernière activité
