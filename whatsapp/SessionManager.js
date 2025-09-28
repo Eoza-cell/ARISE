@@ -99,6 +99,11 @@ class SessionManager {
                 "platform": "web"
             };
 
+            // S'assurer que le dossier existe
+            if (!fs.existsSync(this.sessionPath)) {
+                fs.mkdirSync(this.sessionPath, { recursive: true });
+            }
+
             fs.writeFileSync(credsPath, JSON.stringify(credentials, null, 2));
             console.log('💾 Fichiers de session créés');
 
