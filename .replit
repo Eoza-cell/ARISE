@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["blender", "freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libuuid", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [workflows]
-runButton = "Start Bot Clean"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Start Friction Bot"
@@ -116,25 +116,25 @@ args = "node index.js"
 name = "WhatsApp RPG Bot"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node index.js"
 waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[ports]]
 localPort = 5000
 externalPort = 80
 
 [[ports]]
-localPort = 35511
-externalPort = 3003
-
-[[ports]]
 localPort = 37133
 externalPort = 3002
+
+[[ports]]
+localPort = 38899
+externalPort = 3000
 
 [[ports]]
 localPort = 44667
@@ -142,4 +142,4 @@ externalPort = 3001
 
 [deployment]
 deploymentTarget = "vm"
-run = ["npm", "start"]
+run = ["node", "index.js"]
