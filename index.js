@@ -34,8 +34,6 @@ const HuggingFaceClient = require('./huggingface/HuggingFaceClient');
 // Gestionnaire de session WhatsApp
 const SessionManager = require('./whatsapp/SessionManager');
 
-// IA Frictia pour les groupes de discussion
-const FrictiaAI = require('./ai/FrictiaAI');
 
 class FrictionUltimateBot {
     constructor() {
@@ -51,8 +49,6 @@ class FrictionUltimateBot {
         this.maxCacheSize = 200; // Réduire encore plus la limite de cache pour économiser la mémoire
         this.cacheCleanupInterval = 90 * 1000; // Nettoyer le cache toutes les 90 secondes (plus fréquent)
 
-        // IA Frictia pour les groupes de discussion
-        this.frictiaAI = new FrictiaAI();
 
         // Gestionnaire de temps de réaction (sera initialisé après connexion)
         this.reactionTimeManager = null;
@@ -66,8 +62,6 @@ class FrictionUltimateBot {
         // Nettoyage automatique de la mémoire plus agressif
         setInterval(() => {
             this.cleanupCache();
-            // Nettoyer Frictia aussi
-            this.frictiaAI.cleanup();
             // Force garbage collection si disponible
             if (global.gc) {
                 global.gc();
@@ -293,10 +287,7 @@ class FrictionUltimateBot {
                 this.reactionTimeManager = new ReactionTimeManager(this.gameEngine, this.sock);
                 console.log('⏰ Gestionnaire de temps de réaction initialisé');
 
-                // Connecter Frictia AI aux systèmes de jeu
-                this.frictiaAI.injectGameSystems(this.gameEngine, this.reactionTimeManager, this.sock);
-                this.frictiaAI.startCombatMonitoring();
-                console.log('⚔️ Frictia AI connectée aux systèmes de combat');
+                console.log('⚔️ Système de jeu initialisé');
 
                 await this.sendWelcomeMessage();
 
@@ -479,166 +470,35 @@ class FrictionUltimateBot {
                 console.log(`📸 Image reçue de ${playerNumber}: ${messageImage.mimetype}, ${messageImage.buffer.length} bytes`);
             }
 
-            // IMPORTANT: Vérifier si c'est un groupe taverne
-            const groupName = groupMetadata?.subject || '';
-            const isTaverneGroup = this.frictiaAI.isTaverneGroup(groupName);
+            // Détecter si c'est une commande (/) - PAS DE NARRATION pour les commandes
+            const isCommand = messageText && (messageText.startsWith('/') || messageText.startsWith('!'));
             
-            let result = { text: '' }; // Réponse par défaut vide
-            
-            // Dans les groupes taverne, BLOQUER toutes les fonctions du bot sauf Frictia
-            if (isTaverneGroup) {
-                console.log(`🍺 Groupe taverne détecté: "${groupName}" - Fonctions de jeu BLOQUÉES`);
-                // Pas de traitement par le GameEngine dans les tavernes
-                result = { text: '' }; // Réponse vide
+            if (isCommand) {
+                console.log(`⚡ Commande détectée: ${messageText} - TRAITEMENT SANS NARRATION`);
             } else {
-                // Dans les autres groupes/privé, fonctionnement normal
-                console.log(`🎮 Groupe/privé normal: "${groupName}" - Toutes fonctions ACTIVES`);
-                result = await this.gameEngine.processPlayerMessage({
-                    playerNumber,
-                    chatId: from,
-                    message: normalizedMessage,
-                    originalMessage: messageText, // Garder l'original pour l'affichage
-                    imageMessage: messageImage,
-                    originalMessageObj: message,
-                    sock: this.sock,
-                    dbManager: this.dbManager,
-                    imageGenerator: this.imageGenerator
-                });
+                console.log(`🎮 Action RPG détectée: ${messageText || '[image]'} - NARRATION ACTIVÉE`);
             }
+            
+            // Traitement du message par le moteur de jeu
+            const result = await this.gameEngine.processPlayerMessage({
+                playerNumber,
+                chatId: from,
+                message: normalizedMessage,
+                originalMessage: messageText,
+                imageMessage: messageImage,
+                originalMessageObj: message,
+                sock: this.sock,
+                dbManager: this.dbManager,
+                imageGenerator: this.imageGenerator,
+                isCommand: isCommand // Indiquer au GameEngine si c'est une commande
+            });
 
-            // FRICTIA AI - Connectée à TOUTES les commandes et conversations
-            if (messageText) {
-                try {
-                    const groupName = groupMetadata?.subject || 'Conversation privée';
-                    const userName = playerNumber.split('@')[0];
-                    const isGroup = from.includes('@g.us');
-                    const isDirectlyMentioned = messageText.toLowerCase().includes('frictia') || messageText.toLowerCase().includes('erza');
 
-                    // Traiter les commandes spéciales de Frictia/Erza d'abord
-                    if (messageText.startsWith('/') || messageText.startsWith('!') || isDirectlyMentioned) {
-                        const command = messageText.replace(/^[\/!]/, '').trim().split(' ')[0];
-                        const commandResponse = await this.frictiaAI.handleCommand(command, userName);
 
-                        if (commandResponse) {
-                            // Envoyer la réponse de commande Frictia immédiatement
-                            setTimeout(async () => {
-                                // Générer avatar pour les commandes importantes
-                                let commandAvatar = null;
-                                if (['help', 'aide', 'profil', 'avatar'].includes(command)) {
-                                    try {
-                                        const avatarPrompt = "Erza Scarlet from Fairy Tail anime, beautiful warrior woman with long scarlet red hair, wearing magical armor, confident smile, anime style, high quality";
-                                        commandAvatar = await this.imageGenerator.generateImage(avatarPrompt, {
-                                            width: 512,
-                                            height: 512,
-                                            style: 'anime'
-                                        });
-                                    } catch (avatarError) {
-                                        console.log('⚠️ Erreur génération avatar commande:', avatarError.message);
-                                    }
-                                }
 
-                                await this.sendResponse(from, {
-                                    text: `⚔️ **Frictia (Erza Scarlet)** ⚔️\n\n${commandResponse}`,
-                                    image: commandAvatar
-                                });
-                                this.frictiaAI.updateLastActivity(from);
-                            }, 500);
-                        }
-                    }
-
-                    // Frictia surveille automatiquement les mentions de combat et de réaction
-                    const combatKeywords = ['attaque', 'combat', 'réaction', 'défense', 'esquive', 'temps', 'timer'];
-                    const containsCombatKeyword = combatKeywords.some(keyword =>
-                        messageText.toLowerCase().includes(keyword)
-                    );
-
-                    if (containsCombatKeyword && Math.random() < 0.7) {
-                        setTimeout(async () => {
-                            const combatResponse = await this.frictiaAI.generateResponse(
-                                `En tant qu'Erza, commente cette action de combat: "${messageText}"`,
-                                groupName,
-                                userName,
-                                this.frictiaAI.getConversationContext(from)
-                            );
-
-                            if (combatResponse) {
-                                await this.sendResponse(from, {
-                                    text: `⚔️ **Frictia surveille** ⚔️\n\n${combatResponse}`
-                                });
-                                this.frictiaAI.updateLastActivity(from);
-                            }
-                        }, 1500);
-                    }
-
-                    // Ajouter TOUS les messages au contexte (groupes ET privé)
-                    this.frictiaAI.addToConversationHistory(from, userName, messageText);
-
-                    // Frictia peut répondre dans TOUTES les situations (connectée à tout)
-                    const shouldFrictiaRespond = isDirectlyMentioned ||
-                                               this.frictiaAI.shouldRespond(messageText, from, isDirectlyMentioned, groupName);
-
-                    if (shouldFrictiaRespond) {
-                        // Obtenir le contexte de conversation
-                        const conversationContext = this.frictiaAI.getConversationContext(from);
-
-                        // Générer une réponse de Frictia/Erza
-                        const frictiaResponse = await this.frictiaAI.generateResponse(
-                            messageText,
-                            groupName,
-                            userName,
-                            conversationContext
-                        );
-
-                        if (frictiaResponse) {
-                            // Délai différent selon si c'est mention directe ou spontané
-                            const delay = isDirectlyMentioned ? 1000 : (3000 + Math.random() * 4000);
-
-                            setTimeout(async () => {
-                                // Ajouter sticker Erza aléatoire parfois
-                                const useSticker = Math.random() < 0.3;
-                                const stickerText = useSticker ? ` ${this.frictiaAI.getRandomErzaSticker()}` : '';
-
-                                // Ajouter l'avatar Frictia parfois (30% de chance)
-                                const useAvatar = Math.random() < 0.3;
-                                let avatarImage = null;
-
-                                if (useAvatar) {
-                                    try {
-                                        // Générer l'image d'avatar Erza Scarlet
-                                        const avatarPrompt = "Erza Scarlet from Fairy Tail anime, beautiful warrior woman with long scarlet red hair, wearing armor, confident expression, anime style, high quality, detailed";
-                                        avatarImage = await this.imageGenerator.generateImage(avatarPrompt, {
-                                            width: 512,
-                                            height: 512,
-                                            style: 'anime'
-                                        });
-                                    } catch (avatarError) {
-                                        console.log('⚠️ Erreur génération avatar Frictia:', avatarError.message);
-                                    }
-                                }
-
-                                await this.sendResponse(from, {
-                                    text: `⚔️ **Frictia (Erza Scarlet)** ⚔️\n\n${frictiaResponse}${stickerText}`,
-                                    image: avatarImage
-                                });
-
-                                // Mettre à jour la dernière activité
-                                this.frictiaAI.updateLastActivity(from);
-
-                                // Ajouter la réponse de Frictia au contexte
-                                this.frictiaAI.addToConversationHistory(from, 'Frictia', frictiaResponse);
-                            }, delay);
-                        }
-                    }
-                } catch (frictiaError) {
-                    console.log('⚠️ Erreur Frictia AI:', frictiaError.message);
-                }
-            }
-
-            // Envoi de la réponse unifiée du jeu SEULEMENT si ce n'est pas un groupe taverne
-            if (!isTaverneGroup && result.text && result.text.trim() !== '') {
-                setTimeout(async () => {
-                    await this.sendResponse(from, result);
-                }, 100);
+            // Envoi de la réponse du jeu
+            if (result.text && result.text.trim() !== '') {
+                await this.sendResponse(from, result);
             }
 
         } catch (error) {

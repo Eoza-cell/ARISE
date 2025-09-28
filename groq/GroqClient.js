@@ -77,40 +77,44 @@ class GroqClient {
         return this.isAvailable && this.client;
     }
 
-    async generateNarration(prompt, maxTokens = 1500) {
+    async generateNarration(prompt, maxTokens = 150) {
         try {
             if (!this.hasValidClient()) {
                 throw new Error('Client Groq non disponible');
             }
 
-            // Améliorer le prompt pour une narration ultra-détaillée
-            const enhancedPrompt = `Tu es un narrateur IA ULTRA-DÉTAILLÉ pour un RPG épique comme Game of Thrones/Lord of the Rings.
+            // Narration objective et concise comme un arbitre impartial
+            const enhancedPrompt = `Tu es un arbitre RPG impartial qui rapporte uniquement les faits observables.
 
-RÈGLES DE NARRATION ULTRA-IMMERSIVE :
-🎭 STYLE : Narrateur omniscient, descriptif, cinématographique
-📚 LONGUEUR : Minimum 3-4 paragraphes détaillés (800-1200 mots)
-🌍 DÉTAILS : Décris TOUT - environnement, sensations, émotions, atmosphère
-⚔️ ACTION : Chaque mouvement est décrit avec précision chirurgicale
-👥 PNJ : Réactions détaillées, expressions faciales, langage corporel
-🏛️ MONDE : Architecture, odeurs, sons, textures, température
-💭 PSYCHOLOGIE : Pensées internes, motivations, peurs, espoirs
-🎬 CINÉMA : Angles de caméra, ralentis, gros plans, panoramiques
+RÈGLES STRICTES DE NARRATION :
+📏 LONGUEUR : Maximum 700 caractères (STRICT)
+🎯 STYLE : Factuel, objectif, neutre comme un journaliste
+⚖️ IMPARTIAL : Aucun jugement, aucune émotion personnelle
+🔍 OBSERVABLE : Seulement ce qui peut être vu, entendu, mesuré
+❌ INTERDIT : Power ups gratuits, modifications instantanées, téléportation
+⚔️ LOGIQUE : Toute action doit avoir une cause et conséquence logique
+🚫 PAS DE : "soudain", "miraculeusement", "par magie", "instantanément"
 
 CONTEXTE DE L'ACTION :
 ${prompt}
 
-Génère une narration ÉPIQUE et ULTRA-DÉTAILLÉE qui transporte le lecteur dans ce monde fantastique. Chaque phrase doit peindre une image vivante dans l'esprit du lecteur.
-
-Style : Immersif, poétique, dramatique, avec des détails sensoriels riches.`;
+Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 caractères.`;
 
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: enhancedPrompt }],
                 model: this.model,
                 max_tokens: maxTokens,
-                temperature: 0.85 // Légèrement plus créatif
+                temperature: 1.9 // Créativité élevée mais contrôlée
             });
 
-            return response.choices[0]?.message?.content?.trim() || '';
+            let narration = response.choices[0]?.message?.content?.trim() || '';
+            
+            // Forcer la limite de 700 caractères
+            if (narration.length > 700) {
+                narration = narration.substring(0, 697) + '...';
+            }
+
+            return narration;
 
         } catch (error) {
             console.error('❌ Erreur Groq narration:', error.message);
@@ -118,7 +122,7 @@ Style : Immersif, poétique, dramatique, avec des détails sensoriels riches.`;
         }
     }
 
-    async generateCombatNarration(combatData, maxTokens = 100) {
+    async generateCombatNarration(combatData, maxTokens = 80) {
         // Logique pour la continuité des actions et la gestion des PV en combat
         let actionDescription = `Le combat entre ${combatData.attacker} et ${combatData.defender} continue.`;
         if (combatData.action) {
@@ -136,15 +140,13 @@ Style : Immersif, poétique, dramatique, avec des détails sensoriels riches.`;
             }
         }
 
-        const prompt = `Décris cette action de combat RPG dans un monde médiéval-steampunk :
-        Attaquant: ${combatData.attacker} (Niveau ${combatData.attackerLevel})
-        Défenseur: ${combatData.defender} (Niveau ${combatData.defenderLevel})
+        const prompt = `Arbitre de combat RPG - Rapport factuel :
+        Combattants: ${combatData.attacker} (${combatData.attackerLevel}) vs ${combatData.defender} (${combatData.defenderLevel})
         ${actionDescription}
         ${damageInfo}
-        Résultat général: ${combatData.result || 'Aucun résultat spécifié'}
+        Résultat: ${combatData.result || 'Action observée'}
 
-        Contexte: Combat rapide dans un monde médiéval-steampunk.
-        Style: Court et direct, 2 phrases maximum.`;
+        Rapport objectif et factuel. Max 500 caractères. Aucune dramaturgie.`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);

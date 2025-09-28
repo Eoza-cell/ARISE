@@ -184,7 +184,7 @@ class GameEngine {
         };
     }
 
-    async processPlayerMessage({ playerNumber, chatId, message, imageMessage, originalMessage, sock, dbManager, imageGenerator }) {
+    async processPlayerMessage({ playerNumber, chatId, message, imageMessage, originalMessage, sock, dbManager, imageGenerator, isCommand = false }) {
         // Gestion spéciale pour l'authentification admin
         if (message && this.adminManager.containsAuthCode(message)) {
             const authResult = this.adminManager.authenticateAdmin(playerNumber, message);
@@ -339,6 +339,22 @@ Tu es maintenant enregistré en tant que : **${username}**
 
 
             if (!response) {
+                // Si c'est une commande non reconnue, retourner aide sans narration IA
+                if (isCommand) {
+                    console.log(`⚡ Commande inconnue: ${message} - AUCUNE NARRATION`);
+                    return {
+                        text: `❓ **Commande inconnue : ${message}**
+
+📱 **Commandes disponibles :**
+• /menu - Menu principal
+• /créer - Créer ton personnage  
+• /aide - Liste complète des commandes
+• /jouer - Entrer en mode jeu
+
+💡 Tapez /aide pour voir toutes les commandes disponibles.`
+                    };
+                }
+                
                 const character = await dbManager.getCharacterByPlayer(player.id);
 
                 if (!character) {
@@ -358,6 +374,8 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
                     return await this.processDialogueAction({ player, character, message, dbManager, imageGenerator });
                 }
 
+                // Action RPG normale - NARRATION IA ACTIVÉE
+                console.log(`🎭 Action RPG: ${message} - NARRATION IA GÉNÉRÉE`);
                 return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
             }
 
