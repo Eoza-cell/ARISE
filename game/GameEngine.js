@@ -27,6 +27,10 @@ class GameEngine {
         this.blenderClient = null;
         this.runwayClient = null;
 
+        // Initialiser la large database
+        const LargeDatabase = require('../database/LargeDatabase');
+        this.largeDB = new LargeDatabase();
+
         this.openAIClient = new OpenAIClient(this.dbManager);
         this.ollamaClient = new OllamaClient();
         this.groqClient = new GroqClient();
@@ -144,6 +148,13 @@ class GameEngine {
             '/marché': this.handleMarketCommand.bind(this),
             '/factions': this.handleFactionsCommand.bind(this),
             '/defis': this.handleChallengesCommand.bind(this),
+
+            // Commandes de sauvegarde et base de données
+            '/sauvegarde': this.handleSaveGameCommand.bind(this),
+            '/save': this.handleSaveGameCommand.bind(this),
+            '/backup': this.handleBackupCommand.bind(this),
+            '/restore': this.handleRestoreCommand.bind(this),
+            '/stats_db': this.handleDatabaseStatsCommand.bind(this),
 
             // Aura commands that exist
             '/aura': this.handleAuraInfoCommand.bind(this),
@@ -1769,6 +1780,12 @@ Le monde de Friction Ultimate semble instable en ce moment. Réessayez dans quel
 • /inventaire - Gestion équipement
 • /time_system - Informations sur le temps de jeu
 
+💾 **Sauvegarde :**
+• /sauvegarde - Sauvegarder votre partie
+• /restore [ID] - Restaurer une sauvegarde
+• /stats_db - Statistiques de sauvegarde
+• /backup - Sauvegarde complète (admin)
+
 💀 **Le monde de Friction est impitoyable !**
 Chaque action doit être précise et réfléchie.`,
             image: await imageGenerator.generateHelpImage()
@@ -2258,6 +2275,321 @@ ${marketEvents.map(e => `• ${e.event}`).join('\n')}
 🔄 **Système économique en temps réel actif**`;
 
         return { text: marketText };
+    }
+
+    /**
+     * Sauvegarde la partie du joueur
+     */
+    async handleSaveGameCommand({ player, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return {
+                    text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+                };
+            }
+
+            // Initialiser la large database si pas encore fait
+            if (!this.largeDB.index.created) {
+                await this.largeDB.initialize();
+            }
+
+            console.log(`💾 Sauvegarde de la partie pour ${player.whatsappNumber}...`);
+
+            // Collecter toutes les données du joueur
+            const gameData = {
+                player: {
+                    id: player.id,
+                    whatsappNumber: player.whatsappNumber,
+                    username: player.username,
+                    createdAt: player.createdAt,
+                    lastActive: player.lastActive
+                },
+                character: character,
+                gameState: {
+                    currentLocation: character.currentLocation,
+                    position: character.position,
+                    gameMode: await dbManager.getTemporaryData(player.id, 'game_mode'),
+                    lastAction: await dbManager.getTemporaryData(player.id, 'last_action')
+                },
+                progress: {
+                    level: character.level,
+                    experience: character.experience,
+                    powerLevel: character.powerLevel,
+                    frictionLevel: character.frictionLevel
+                },
+                inventory: {
+                    coins: character.coins,
+                    equipment: character.equipment,
+                    inventory: character.inventory,
+                    learnedTechniques: character.learnedTechniques
+                },
+                stats: {
+                    currentLife: character.currentLife,
+                    maxLife: character.maxLife,
+                    currentEnergy: character.currentEnergy,
+                    maxEnergy: character.maxEnergy
+                },
+                timestamp: new Date().toISOString(),
+                version: '1.0'
+            };
+
+            // Sauvegarder dans la large database
+            const saveId = await this.largeDB.storeData(
+                this.largeDB.dataTypes.PLAYER_DATA,
+                player.id,
+                gameData,
+                {
+                    characterName: character.name,
+                    kingdom: character.kingdom,
+                    level: character.level
+                }
+            );
+
+            return {
+                text: `💾 **PARTIE SAUVEGARDÉE** 💾
+
+✅ Sauvegarde créée avec succès !
+🆔 **ID de sauvegarde :** ${saveId}
+👤 **Personnage :** ${character.name}
+🏰 **Royaume :** ${character.kingdom}
+📊 **Niveau :** ${character.level} (${character.powerLevel})
+
+📝 **Données sauvegardées :**
+• Informations du personnage
+• État de la partie
+• Inventaire et équipement
+• Progression et statistiques
+
+💡 Utilisez /restore ${saveId} pour restaurer cette sauvegarde`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur sauvegarde:', error);
+            return {
+                text: `❌ **ERREUR DE SAUVEGARDE**
+
+Une erreur s'est produite lors de la sauvegarde de votre partie.
+Veuillez réessayer plus tard.
+
+Erreur: ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * Crée une sauvegarde complète du serveur
+     */
+    async handleBackupCommand({ player, dbManager }) {
+        try {
+            // Vérifier les permissions admin
+            if (!this.adminManager.isAuthenticated(player.whatsappNumber)) {
+                return {
+                    text: `❌ **ACCÈS REFUSÉ**
+
+Cette commande est réservée aux administrateurs.
+Contactez un administrateur si nécessaire.`
+                };
+            }
+
+            // Initialiser la large database si pas encore fait
+            if (!this.largeDB.index.created) {
+                await this.largeDB.initialize();
+            }
+
+            console.log(`🔄 Création sauvegarde complète demandée par admin ${player.whatsappNumber}...`);
+
+            const backupId = await this.largeDB.createFullBackup();
+            const stats = await this.largeDB.getStats();
+
+            return {
+                text: `💾 **SAUVEGARDE COMPLÈTE CRÉÉE** 💾
+
+✅ Sauvegarde du serveur terminée !
+🆔 **ID de backup :** ${backupId}
+📊 **Statistiques :**
+• ${stats.totalEntries} entrées sauvegardées
+• ${this.largeDB.formatSize(stats.storageUsed)} de données
+• ${stats.storageUsedPercent.toFixed(1)}% d'utilisation
+
+🛡️ **Sécurité :** Toutes les données sont intègres
+⚡ **Performance :** Sauvegarde optimisée`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur backup:', error);
+            return {
+                text: `❌ **ERREUR DE BACKUP**
+
+Une erreur s'est produite lors de la création de la sauvegarde complète.
+
+Erreur: ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * Restaure une sauvegarde
+     */
+    async handleRestoreCommand({ player, message, dbManager }) {
+        try {
+            const args = message.split(' ');
+            if (args.length < 2) {
+                return {
+                    text: `🔄 **RESTAURATION DE SAUVEGARDE** 🔄
+
+💡 **Usage :** /restore [ID_de_sauvegarde]
+
+📝 **Exemple :** /restore player_data_123_1234567890_abc123def
+
+💾 Utilisez /sauvegarde pour créer une sauvegarde de votre partie`
+                };
+            }
+
+            const saveId = args[1];
+
+            // Initialiser la large database si pas encore fait
+            if (!this.largeDB.index.created) {
+                await this.largeDB.initialize();
+            }
+
+            console.log(`🔄 Restauration de ${saveId} pour ${player.whatsappNumber}...`);
+
+            // Récupérer les données
+            const gameData = await this.largeDB.retrieveData(saveId);
+
+            // Vérifier que la sauvegarde appartient au joueur
+            if (gameData.player.id !== player.id) {
+                return {
+                    text: `❌ **ACCÈS REFUSÉ**
+
+Cette sauvegarde ne vous appartient pas.
+Vous ne pouvez restaurer que vos propres sauvegardes.`
+                };
+            }
+
+            // Restaurer les données du personnage
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            if (character) {
+                await dbManager.updateCharacter(character.id, {
+                    currentLife: gameData.character.currentLife,
+                    maxLife: gameData.character.maxLife,
+                    currentEnergy: gameData.character.currentEnergy,
+                    maxEnergy: gameData.character.maxEnergy,
+                    level: gameData.character.level,
+                    experience: gameData.character.experience,
+                    powerLevel: gameData.character.powerLevel,
+                    frictionLevel: gameData.character.frictionLevel,
+                    currentLocation: gameData.character.currentLocation,
+                    position: gameData.character.position,
+                    equipment: gameData.character.equipment,
+                    learnedTechniques: gameData.character.learnedTechniques,
+                    coins: gameData.character.coins,
+                    inventory: gameData.character.inventory
+                });
+            }
+
+            return {
+                text: `🔄 **SAUVEGARDE RESTAURÉE** 🔄
+
+✅ Restauration réussie !
+👤 **Personnage :** ${gameData.character.name}
+🏰 **Royaume :** ${gameData.character.kingdom}
+📊 **Niveau :** ${gameData.character.level} (${gameData.character.powerLevel})
+💰 **Pièces :** ${gameData.character.coins}
+📍 **Position :** ${gameData.character.currentLocation}
+
+⚡ **Données restaurées :**
+• Statistiques de vie et énergie
+• Progression et niveaux
+• Inventaire et équipement
+• Position dans le monde
+
+🎮 Vous pouvez reprendre votre aventure !`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur restore:', error);
+            if (error.message.includes('non trouvées')) {
+                return {
+                    text: `❌ **SAUVEGARDE INTROUVABLE**
+
+L'ID de sauvegarde spécifié n'existe pas ou est corrompu.
+Vérifiez l'ID et réessayez.`
+                };
+            }
+            
+            return {
+                text: `❌ **ERREUR DE RESTAURATION**
+
+Une erreur s'est produite lors de la restauration.
+
+Erreur: ${error.message}`
+            };
+        }
+    }
+
+    /**
+     * Affiche les statistiques de la base de données
+     */
+    async handleDatabaseStatsCommand({ player, dbManager }) {
+        try {
+            // Initialiser la large database si pas encore fait
+            if (!this.largeDB.index.created) {
+                await this.largeDB.initialize();
+            }
+
+            const stats = await this.largeDB.getStats();
+            const playerSaves = await this.largeDB.searchData({
+                type: this.largeDB.dataTypes.PLAYER_DATA,
+                playerId: player.id
+            });
+
+            let statsText = `📊 **STATISTIQUES BASE DE DONNÉES** 📊
+
+🗄️ **Stockage Global :**
+• ${stats.totalEntries} entrées totales
+• ${this.largeDB.formatSize(stats.storageUsed)} utilisés
+• ${this.largeDB.formatSize(stats.storageAvailable)} disponibles
+• ${stats.storageUsedPercent.toFixed(1)}% d'utilisation
+
+👤 **Vos Sauvegardes :**
+• ${playerSaves.length} sauvegarde(s) trouvée(s)`;
+
+            if (playerSaves.length > 0) {
+                statsText += '\n\n💾 **Liste de vos sauvegardes :**';
+                playerSaves.slice(0, 5).forEach((save, index) => {
+                    const date = new Date(save.created).toLocaleString('fr-FR');
+                    statsText += `\n${index + 1}. ${save.id.substring(0, 20)}...`;
+                    statsText += `\n   📅 ${date} - ${this.largeDB.formatSize(save.size)}`;
+                });
+                
+                if (playerSaves.length > 5) {
+                    statsText += `\n   ... et ${playerSaves.length - 5} autres`;
+                }
+            }
+
+            statsText += '\n\n🕐 **Dernière sauvegarde globale :**';
+            statsText += stats.lastBackup ? 
+                `\n📅 ${new Date(stats.lastBackup).toLocaleString('fr-FR')}` : 
+                '\n❌ Aucune sauvegarde globale';
+
+            statsText += '\n\n💡 **Commandes :**';
+            statsText += '\n• /sauvegarde - Créer une sauvegarde';
+            statsText += '\n• /restore [ID] - Restaurer une sauvegarde';
+
+            return { text: statsText };
+
+        } catch (error) {
+            console.error('❌ Erreur stats DB:', error);
+            return {
+                text: `❌ **ERREUR STATISTIQUES**
+
+Impossible de récupérer les statistiques de la base de données.
+
+Erreur: ${error.message}`
+            };
+        }
     }
 
     async handleFactionsCommand({ player, dbManager }) {

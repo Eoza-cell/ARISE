@@ -90,6 +90,12 @@ class FrictionUltimateBot {
             await this.dbManager.initialize();
             console.log('✅ Base de données initialisée');
 
+            // Initialiser la large database
+            if (this.gameEngine.largeDB) {
+                await this.gameEngine.largeDB.initialize();
+                console.log('✅ Large Database initialisée');
+            }
+
             // Initialiser les données du jeu (royaumes, ordres, etc.)
             await initializeGameData(this.dbManager);
             console.log('✅ Données du jeu initialisées');
