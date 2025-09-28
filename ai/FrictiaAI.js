@@ -12,6 +12,19 @@ class FrictiaAI {
         this.name = "Frictia";
         this.avatar = "Erza Scarlet"; // Avatar basé sur Erza Scarlet
         
+        // Référence aux systèmes du jeu (sera injectée)
+        this.gameEngine = null;
+        this.reactionTimeManager = null;
+        this.sock = null;
+        
+        // Rôle d'administrateur de combat
+        this.isAdmin = true;
+        this.adminLevel = 'COMBAT_MODERATOR';
+        
+        // Surveillance des actions de combat
+        this.activeCombats = new Map();
+        this.reactionTimers = new Map();
+        
         // Personnalité inspirée d'Erza Scarlet
         this.personality = {
             traits: [
@@ -69,8 +82,147 @@ class FrictiaAI {
         this.supportedCommands = [
             'aide', 'help', 'info', 'status', 'ping', 'time', 'date',
             'motivation', 'conseil', 'citation', 'force', 'courage',
-            'profil', 'avatar', 'sticker', 'erza', 'frictia'
+            'profil', 'avatar', 'sticker', 'erza', 'frictia',
+            // Commandes d'administration de combat
+            'combat_status', 'reactions', 'timers', 'verdict', 'force_reaction'
         ];
+    }
+
+    /**
+     * Injecte les références aux systèmes du jeu
+     */
+    injectGameSystems(gameEngine, reactionTimeManager, sock) {
+        this.gameEngine = gameEngine;
+        this.reactionTimeManager = reactionTimeManager;
+        this.sock = sock;
+        console.log('⚔️ Frictia AI connectée aux systèmes de combat');
+    }
+
+    /**
+     * Surveille les temps de réaction et envoie des comptes à rebours
+     */
+    async monitorReactionTimes() {
+        if (!this.reactionTimeManager) return;
+
+        const activeReactions = this.reactionTimeManager.activeReactions;
+        
+        for (const [actionId, reactionData] of activeReactions.entries()) {
+            if (reactionData.status === 'waiting') {
+                const timeLeft = reactionData.endTime - Date.now();
+                const secondsLeft = Math.floor(timeLeft / 1000);
+                
+                // Envoyer des rappels Frictia à des moments critiques
+                if (secondsLeft === 30 || secondsLeft === 10 || secondsLeft === 5) {
+                    await this.sendReactionReminder(reactionData, secondsLeft);
+                }
+                
+                // Verdict final quand le temps expire
+                if (timeLeft <= 0 && !this.reactionTimers.has(actionId + '_verdict')) {
+                    this.reactionTimers.set(actionId + '_verdict', true);
+                    await this.deliverCombatVerdict(reactionData);
+                }
+            }
+        }
+    }
+
+    /**
+     * Envoie un rappel de temps de réaction avec style Erza
+     */
+    async sendReactionReminder(reactionData, secondsLeft) {
+        if (!this.sock) return;
+
+        const character = await this.getCharacterInfo(reactionData.defenderId);
+        const name = character?.name || 'Guerrier';
+
+        let message;
+        if (secondsLeft === 30) {
+            message = `⚔️ **Frictia surveille le combat** ⚔️
+
+${name} ! Il te reste **30 secondes** pour réagir !
+⏰ Ton rang ${character?.powerLevel || 'inconnu'} te donne ce délai
+
+💪 Montre ta détermination ! L'heure n'est plus aux hésitations !`;
+        } else if (secondsLeft === 10) {
+            message = `🛡️ **DERNIERS INSTANTS !** 🛡️
+
+${name} ! **10 secondes** avant l'impact !
+⚡ C'est maintenant que se révèlent les vrais guerriers !
+
+🔥 RÉAGIS MAINTENANT ! Prouve que tu mérites ton rang !`;
+        } else if (secondsLeft === 5) {
+            message = `⚠️ **FRICTIA COMPTE À REBOURS FINAL !** ⚠️
+
+${name} ! **5... 4... 3... 2... 1...**
+💀 L'attaque va frapper ! Dernière chance !
+
+⚔️ Un vrai guerrier n'abandonne jamais ! MAINTENANT !`;
+        }
+
+        await this.sock.sendMessage(reactionData.chatId, { text: message });
+    }
+
+    /**
+     * Délivre le verdict final du combat
+     */
+    async deliverCombatVerdict(reactionData) {
+        if (!this.sock) return;
+
+        const character = await this.getCharacterInfo(reactionData.defenderId);
+        const name = character?.name || 'Guerrier';
+        const isNPC = reactionData.defenderId.startsWith('npc_');
+
+        const verdictMessage = `⚔️ **VERDICT DE FRICTIA** ⚔️
+
+${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
+⏰ Temps de réaction écoulé pour rang ${character?.powerLevel || 'inconnu'}
+
+🗿 **CONSÉQUENCES :**
+• Aucune défense appliquée
+• Subira l'attaque complète  
+• Pénalité de réaction lente
+
+⚡ **Mon jugement :** ${this.getRandomVerdict()}
+
+💀 L'action continue sans opposition...`;
+
+        await this.sock.sendMessage(reactionData.chatId, { text: verdictMessage });
+    }
+
+    /**
+     * Obtient un verdict aléatoire dans le style d'Erza
+     */
+    getRandomVerdict() {
+        const verdicts = [
+            "Un guerrier doit toujours rester vigilant !",
+            "La lenteur en combat peut être fatale !",
+            "Tu dois t'entraîner davantage !",
+            "L'hésitation n'a pas sa place au combat !",
+            "Seuls les forts survivent aux batailles !",
+            "Tu as failli à tes responsabilités de combattant !",
+            "Un vrai guerrier réagit par instinct !"
+        ];
+        return verdicts[Math.floor(Math.random() * verdicts.length)];
+    }
+
+    /**
+     * Obtient les informations d'un personnage
+     */
+    async getCharacterInfo(playerId) {
+        if (!this.gameEngine) return null;
+        
+        if (playerId.startsWith('npc_')) {
+            return {
+                name: `PNJ-${playerId.slice(-5)}`,
+                powerLevel: 'G' // Par défaut pour PNJ
+            };
+        }
+        
+        try {
+            return await this.gameEngine.dbManager.getCharacterByPlayer(playerId);
+        } catch (error) {
+            console.error('❌ Erreur récupération personnage:', error);
+            return null;
+        }
     }
 
     /**
@@ -265,10 +417,35 @@ Je protège mes amis avec ma vie ! 🛡️✨`;
 
             case 'profil':
                 return `👑 **Frictia** (Erza Scarlet)
-⚔️ Rôle: Guerrière protectrice
-🛡️ Spécialité: Magie de réquipement
+⚔️ Rôle: Guerrière protectrice & Modératrice de combat
+🛡️ Spécialité: Magie de réquipement & Surveillance des réactions
 💪 Devise: "La force vient du cœur"
-✨ Guilde: Tes amis WhatsApp !`;
+✨ Guilde: Tes amis WhatsApp !
+🏛️ Rang: Administrateur de Combat`;
+
+            case 'combat_status':
+                return this.getCombatStatus();
+
+            case 'reactions':
+                return this.getActiveReactions();
+
+            case 'timers':
+                return this.getTimerStatus();
+
+            case 'verdict':
+                if (!this.reactionTimeManager) return "❌ Système de combat non disponible";
+                return `⚔️ **Verdicts de Frictia disponibles** ⚔️
+                
+Je surveille tous les combats et délivre des verdicts justes !
+💪 Mon rôle : Assurer que chaque guerrier respecte son temps de réaction
+🛡️ Justice : Aucune faveur, seule la rapidité compte !`;
+
+            case 'force_reaction':
+                return `⚡ **Force de réaction** ⚡
+                
+En tant qu'Erza, je peux forcer une réaction si nécessaire.
+⚔️ Utilise cette commande en cas de problème technique
+🛡️ Seuls les vrais problèmes justifient cette intervention !`;
 
             default:
                 return null;
@@ -335,6 +512,91 @@ Je protège mes amis avec ma vie ! 🛡️✨`;
         }
 
         console.log(`🧹 Frictia: Nettoyage effectué - ${this.conversationHistory.size} groupes actifs`);
+    }
+
+    /**
+     * Obtient le statut des combats actifs
+     */
+    getCombatStatus() {
+        if (!this.reactionTimeManager) {
+            return "❌ Système de combat non connecté";
+        }
+
+        const activeReactions = this.reactionTimeManager.activeReactions;
+        if (activeReactions.size === 0) {
+            return `⚔️ **Statut des combats** ⚔️
+
+🕊️ Aucun combat actif en ce moment
+✨ Tous les guerriers sont en paix
+🛡️ Je veille toujours sur vous !`;
+        }
+
+        let status = `⚔️ **Combats actifs surveillés par Frictia** ⚔️\n\n`;
+        for (const [actionId, data] of activeReactions.entries()) {
+            const timeLeft = Math.max(0, Math.floor((data.endTime - Date.now()) / 1000));
+            status += `🗡️ Combat ${actionId.slice(-6)}\n`;
+            status += `   ⏰ Temps restant: ${timeLeft}s\n`;
+            status += `   🎯 Action: ${data.actionDescription}\n\n`;
+        }
+
+        return status;
+    }
+
+    /**
+     * Obtient les réactions actives
+     */
+    getActiveReactions() {
+        if (!this.reactionTimeManager) {
+            return "❌ Système de réaction non connecté";
+        }
+
+        const activeCount = this.reactionTimeManager.activeReactions.size;
+        return `🛡️ **Réactions surveillées** 🛡️
+
+📊 Réactions actives: ${activeCount}
+⚔️ En tant qu'Erza, je supervise chaque temps de réaction
+💪 Aucun guerrier ne peut échapper à ma vigilance !
+
+${activeCount > 0 ? '⏰ Comptes à rebours en cours...' : '✨ Tous les guerriers sont prêts !'}`;
+    }
+
+    /**
+     * Obtient le statut des timers
+     */
+    getTimerStatus() {
+        if (!this.reactionTimeManager) {
+            return "❌ Timers non disponibles";
+        }
+
+        const reactionTimes = this.reactionTimeManager.reactionTimes;
+        let status = `⏰ **Temps de réaction par rang** ⏰\n\n`;
+        
+        for (const [rank, time] of Object.entries(reactionTimes)) {
+            const seconds = Math.floor(time / 1000);
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            
+            let timeDisplay = minutes > 0 ? 
+                `${minutes}m ${remainingSeconds}s` : 
+                `${seconds}s`;
+                
+            status += `⚔️ **${rank}**: ${timeDisplay}\n`;
+        }
+
+        status += `\n💪 Plus tu es fort, moins tu as de temps !`;
+        return status;
+    }
+
+    /**
+     * Démarre la surveillance automatique des combats
+     */
+    startCombatMonitoring() {
+        // Surveillance toutes les 2 secondes
+        setInterval(() => {
+            this.monitorReactionTimes();
+        }, 2000);
+        
+        console.log('⚔️ Frictia: Surveillance des combats activée');
     }
 }
 

@@ -53,6 +53,9 @@ class FrictionUltimateBot {
 
         // IA Frictia pour les groupes de discussion
         this.frictiaAI = new FrictiaAI();
+        
+        // Gestionnaire de temps de réaction (sera initialisé après connexion)
+        this.reactionTimeManager = null;
 
         // Limitation de QR codes pour éviter la boucle infinie
         this.qrCodeAttempts = 0;
@@ -285,6 +288,16 @@ class FrictionUltimateBot {
                 this.buttonManager = new WhatsAppButtonManager(this.sock);
                 console.log('🔘 Gestionnaire de boutons interactifs initialisé');
 
+                // Initialiser le gestionnaire de temps de réaction
+                const ReactionTimeManager = require('./utils/ReactionTimeManager');
+                this.reactionTimeManager = new ReactionTimeManager(this.gameEngine, this.sock);
+                console.log('⏰ Gestionnaire de temps de réaction initialisé');
+
+                // Connecter Frictia AI aux systèmes de jeu
+                this.frictiaAI.injectGameSystems(this.gameEngine, this.reactionTimeManager, this.sock);
+                this.frictiaAI.startCombatMonitoring();
+                console.log('⚔️ Frictia AI connectée aux systèmes de combat');
+
                 await this.sendWelcomeMessage();
 
                 // Sauvegarder les informations de session une fois connecté
@@ -502,6 +515,30 @@ class FrictionUltimateBot {
                         }
                     }
 
+                    // Frictia surveille automatiquement les mentions de combat et de réaction
+                    const combatKeywords = ['attaque', 'combat', 'réaction', 'défense', 'esquive', 'temps', 'timer'];
+                    const containsCombatKeyword = combatKeywords.some(keyword => 
+                        messageText.toLowerCase().includes(keyword)
+                    );
+
+                    if (containsCombatKeyword && Math.random() < 0.7) {
+                        setTimeout(async () => {
+                            const combatResponse = await this.frictiaAI.generateResponse(
+                                `En tant qu'Erza, commente cette action de combat: "${messageText}"`,
+                                groupName,
+                                userName,
+                                this.frictiaAI.getConversationContext(from)
+                            );
+                            
+                            if (combatResponse) {
+                                await this.sendResponse(from, {
+                                    text: `⚔️ **Frictia surveille** ⚔️\n\n${combatResponse}`
+                                });
+                                this.frictiaAI.updateLastActivity(from);
+                            }
+                        }, 1500);
+                    }
+
                     // Ajouter TOUS les messages au contexte (groupes ET privé)
                     this.frictiaAI.addToConversationHistory(from, userName, messageText);
 
@@ -667,7 +704,7 @@ class FrictionUltimateBot {
                 '🅄': 'U', '🅅': 'V', '🅆': 'W', '🅇': 'X', '🅈': 'Y', '🅉': 'Z',
 
                 // Caractères spéciaux de ponctuation
-                '‹': '<', '›': '>', '«': '"', '»': '"', '„': '"', '"': '"', '"': '"', ''': "'", ''': "'",
+                '‹': '<', '›': '>', '«': '"', '»': '"', '„': '"', '"': '"', '"': '"', "'": "'", "'": "'",
                 '…': '...', '–': '-', '—': '-', '•': '*', '·': '.', '‚': ',', '‛': "'",
 
                 // Autres caractères stylés communs
