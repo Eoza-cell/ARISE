@@ -183,19 +183,93 @@ class FrictionUltimateBot {
             }
         });
 
-        // Sauvegarde des credentials
-        this.sock.ev.on('creds.update', saveCreds);
+        // Sauvegarde des credentials avec gestion d'erreur
+        this.sock.ev.on('creds.update', async (creds) => {
+            try {
+                await saveCreds(creds);
+            } catch (error) {
+                console.error('⚠️ Erreur sauvegarde credentials:', error.message);
+            }
+        });
 
         // Gestion des messages entrants
         this.sock.ev.on('messages.upsert', async (m) => {
-            const message = m.messages[0];
-            if (!message.key.fromMe && message.message) {
-                // Vérifier si c'est un vote de sondage (bouton simulé)
-                if (message.message.pollUpdateMessage) {
-                    await this.handlePollVote(message);
-                } else {
-                    await this.handleIncomingMessage(message);
+            try {
+                const message = m.messages[0];
+                if (!message.key.fromMe && message.message) {
+                    // Vérifier si c'est un vote de sondage (bouton simulé)
+                    if (message.message.pollUpdateMessage) {
+                        await this.handlePollVote(message);
+                    } else {
+                        await this.handleIncomingMessage(message);
+                    }
                 }
+            } catch (error) {
+                console.error('❌ Erreur lors du traitement du message upsert:', error.message);
+                // Continuer sans arrêter le bot
+            }
+        });
+
+        // Gestion des erreurs de déchiffrement
+        this.sock.ev.on('creds.update', saveCreds);
+        
+        // Gestion des erreurs générales
+        this.sock.ev.on('connection.update', async (update) => {
+            const { connection, lastDisconnect, qr } = update;
+
+            if (qr) {
+                console.log('📱 QR Code généré - Scannez avec WhatsApp:');
+                qrcode.generate(qr, { small: true });
+                await sessionManager.saveQrCode(qr);
+            }
+
+            if (connection === 'close') {
+                const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
+                console.log('❌ Connexion fermée, reconnexion:', shouldReconnect);
+
+                const errorMessage = lastDisconnect?.error?.message;
+                if (errorMessage && errorMessage.includes('Invalid private key type')) {
+                    console.log('⚠️ Erreur de clé privée détectée - arrêt des tentatives de reconnexion');
+                    console.log('💡 Pour se connecter à WhatsApp, utilisez une vraie session ou scannez le QR code');
+                    return;
+                }
+
+                if (shouldReconnect) {
+                    if (!this.reconnectAttempts) this.reconnectAttempts = 0;
+                    this.reconnectAttempts++;
+
+                    if (this.reconnectAttempts > 10) { // Augmenter le nombre de tentatives
+                        console.log('❌ Trop de tentatives de reconnexion - arrêt temporaire');
+                        console.log('💡 Le serveur web continue de fonctionner sur le port 5000');
+                        // Attendre 30 secondes avant de reprendre
+                        setTimeout(() => {
+                            this.reconnectAttempts = 0;
+                            this.startWhatsApp();
+                        }, 30000);
+                        return;
+                    }
+
+                    const delay = Math.min(5000 * this.reconnectAttempts, 30000); // Délai progressif
+                    console.log(`🔄 Reconnexion dans ${delay/1000}s... (tentative ${this.reconnectAttempts}/10)`);
+                    setTimeout(() => this.startWhatsApp(), delay);
+                } else {
+                    console.log('🔌 Déconnexion permanente. Suppression de la session.');
+                    await sessionManager.deleteSession();
+                }
+            } else if (connection === 'open') {
+                console.log('✅ Connexion WhatsApp établie !');
+                this.isConnected = true;
+                this.reconnectAttempts = 0; // Reset des tentatives
+
+                this.buttonManager = new WhatsAppButtonManager(this.sock);
+                console.log('🔘 Gestionnaire de boutons interactifs initialisé');
+
+                await this.sendWelcomeMessage();
+
+                await sessionManager.saveSession({
+                    authDir: session.authDir,
+                    isLoggedIn: true,
+                });
             }
         });
     }
@@ -269,6 +343,10 @@ class FrictionUltimateBot {
             }
             if (messageText) {
                 console.log(`📝 Message texte: "${messageText}"`);
+                // Détecter si le message contient des polices spéciales
+                if (messageText !== this.normalizeStyledText(messageText)) {
+                    console.log(`🎨 Police spéciale détectée - normalisé: "${this.normalizeStyledText(messageText)}"`);
+                }
             }
 
             // Extraction CORRECTE du numéro WhatsApp du joueur
@@ -299,12 +377,15 @@ class FrictionUltimateBot {
             }
 
             // Traitement du message par le moteur de jeu
+            const normalizedMessage = messageText ? this.normalizeStyledText(messageText.trim()) : null;
+            
             const result = await this.gameEngine.processPlayerMessage({
                 playerNumber,
                 chatId: from,
-                message: messageText ? messageText.trim() : null,
+                message: normalizedMessage,
+                originalMessage: messageText, // Garder l'original pour l'affichage
                 imageMessage: messageImage,
-                originalMessage: message,
+                originalMessageObj: message,
                 sock: this.sock,
                 dbManager: this.dbManager,
                 imageGenerator: this.imageGenerator
@@ -324,13 +405,63 @@ class FrictionUltimateBot {
     }
 
     extractMessageText(message) {
+        let text = null;
+        
         if (message.message?.conversation) {
-            return message.message.conversation;
+            text = message.message.conversation;
+        } else if (message.message?.extendedTextMessage?.text) {
+            text = message.message.extendedTextMessage.text;
+        } else if (message.message?.imageMessage?.caption) {
+            text = message.message.imageMessage.caption;
+        } else if (message.message?.videoMessage?.caption) {
+            text = message.message.videoMessage.caption;
         }
-        if (message.message?.extendedTextMessage?.text) {
-            return message.message.extendedTextMessage.text;
+        
+        // Normaliser les polices spéciales et caractères Unicode
+        if (text) {
+            // Convertir les polices stylées en texte normal
+            text = this.normalizeStyledText(text);
         }
-        return null;
+        
+        return text;
+    }
+
+    normalizeStyledText(text) {
+        if (!text) return text;
+        
+        // Mapping des caractères stylés vers du texte normal
+        const styleMap = {
+            // Bold Mathematical (𝐀-𝐳)
+            '𝐀': 'A', '𝐁': 'B', '𝐂': 'C', '𝐃': 'D', '𝐄': 'E', '𝐅': 'F', '𝐆': 'G', '𝐇': 'H', '𝐈': 'I', '𝐉': 'J',
+            '𝐊': 'K', '𝐋': 'L', '𝐌': 'M', '𝐍': 'N', '𝐎': 'O', '𝐏': 'P', '𝐐': 'Q', '𝐑': 'R', '𝐒': 'S', '𝐓': 'T',
+            '𝐔': 'U', '𝐕': 'V', '𝐖': 'W', '𝐗': 'X', '𝐘': 'Y', '𝐙': 'Z',
+            '𝐚': 'a', '𝐛': 'b', '𝐜': 'c', '𝐝': 'd', '𝐞': 'e', '𝐟': 'f', '𝐠': 'g', '𝐡': 'h', '𝐢': 'i', '𝐣': 'j',
+            '𝐤': 'k', '𝐥': 'l', '𝐦': 'm', '𝐧': 'n', '𝐨': 'o', '𝐩': 'p', '𝐪': 'q', '𝐫': 'r', '𝐬': 's', '𝐭': 't',
+            '𝐮': 'u', '𝐯': 'v', '𝐰': 'w', '𝐱': 'x', '𝐲': 'y', '𝐳': 'z',
+            
+            // Small Capitals (ᴀ-ᴢ)
+            'ᴀ': 'A', 'ʙ': 'B', 'ᴄ': 'C', 'ᴅ': 'D', 'ᴇ': 'E', 'ғ': 'F', 'ɢ': 'G', 'ʜ': 'H', 'ɪ': 'I', 'ᴊ': 'J',
+            'ᴋ': 'K', 'ʟ': 'L', 'ᴍ': 'M', 'ɴ': 'N', 'ᴏ': 'O', 'ᴘ': 'P', 'Q': 'Q', 'ʀ': 'R', 'ꜱ': 'S', 'ᴛ': 'T',
+            'ᴜ': 'U', 'ᴠ': 'V', 'ᴡ': 'W', 'x': 'X', 'ʏ': 'Y', 'ᴢ': 'Z',
+            
+            // Circled characters (Ⓐ-ⓩ)
+            'Ⓐ': 'A', 'Ⓑ': 'B', 'Ⓒ': 'C', 'Ⓓ': 'D', 'Ⓔ': 'E', 'Ⓕ': 'F', 'Ⓖ': 'G', 'Ⓗ': 'H', 'Ⓘ': 'I', 'Ⓙ': 'J',
+            'Ⓚ': 'K', 'Ⓛ': 'L', 'Ⓜ': 'M', 'Ⓝ': 'N', 'Ⓞ': 'O', 'Ⓟ': 'P', 'Ⓠ': 'Q', 'Ⓡ': 'R', 'Ⓢ': 'S', 'Ⓣ': 'T',
+            'Ⓤ': 'U', 'Ⓥ': 'V', 'Ⓦ': 'W', 'Ⓧ': 'X', 'Ⓨ': 'Y', 'Ⓩ': 'Z',
+            
+            // Autres caractères spéciaux courants
+            '①': '1', '②': '2', '③': '3', '④': '4', '⑤': '5', '⑥': '6', '⑦': '7', '⑧': '8', '⑨': '9', '⑩': '10'
+        };
+        
+        let normalizedText = text;
+        
+        // Remplacer les caractères stylés
+        for (const [styled, normal] of Object.entries(styleMap)) {
+            normalizedText = normalizedText.replace(new RegExp(styled, 'g'), normal);
+        }
+        
+        // Normaliser la casse pour détecter les commandes
+        return normalizedText;
     }
 
     async extractMessageImage(message) {
