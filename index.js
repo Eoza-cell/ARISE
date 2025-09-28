@@ -97,6 +97,80 @@ class FrictionUltimateBot {
         }
     }
 
+
+
+    // Méthodes de validation d'image
+    validateImageBuffer(buffer, expectedMimetype) {
+        try {
+            if (!Buffer.isBuffer(buffer) || buffer.length < 10) {
+                return false;
+            }
+
+            // Vérification des signatures d'image
+            const imageSignatures = {
+                'image/jpeg': [[0xFF, 0xD8, 0xFF]],
+                'image/jpg': [[0xFF, 0xD8, 0xFF]],
+                'image/png': [[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]],
+                'image/webp': [[0x52, 0x49, 0x46, 0x46]],
+                'image/gif': [[0x47, 0x49, 0x46, 0x38]]
+            };
+
+            // Vérifier toutes les signatures possibles
+            for (const [mimeType, signatures] of Object.entries(imageSignatures)) {
+                for (const signature of signatures) {
+                    if (buffer.length >= signature.length) {
+                        let matches = true;
+                        for (let i = 0; i < signature.length; i++) {
+                            if (buffer[i] !== signature[i]) {
+                                matches = false;
+                                break;
+                            }
+                        }
+                        if (matches) {
+                            console.log(`✅ Image validée comme ${mimeType}`);
+                            return true;
+                        }
+                    }
+                }
+            }
+
+            console.log(`⚠️ Aucune signature d'image valide trouvée`);
+            console.log(`📊 Premiers bytes: ${Array.from(buffer.slice(0, 10)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
+            return false;
+        } catch (error) {
+            console.error('❌ Erreur validation image:', error.message);
+            return false;
+        }
+    }
+
+    detectImageType(buffer) {
+        if (!Buffer.isBuffer(buffer) || buffer.length < 10) {
+            return null;
+        }
+
+        // JPEG
+        if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+            return 'image/jpeg';
+        }
+        
+        // PNG
+        if (buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47) {
+            return 'image/png';
+        }
+        
+        // WebP
+        if (buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46) {
+            return 'image/webp';
+        }
+        
+        // GIF
+        if (buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46) {
+            return 'image/gif';
+        }
+        
+        return null;
+    }
+
     async initialize() {
         console.log('🎮 Initialisation de Friction Ultimate Bot...');
 
@@ -560,12 +634,12 @@ class FrictionUltimateBot {
                     // Augmenter le timeout pour les grandes images
                     const downloadOptions = {
                         logger: require('pino')({ level: 'silent' }),
-                        timeout: 45000 // 45 secondes pour les images plus lourdes
+                        timeout: 90000 // 90 secondes pour les images plus lourdes
                     };
 
                     let buffer = null;
                     let attempts = 0;
-                    const maxAttempts = 3;
+                    const maxAttempts = 5; // Plus de tentatives
                     
                     // Plusieurs tentatives de téléchargement
                     while (!buffer && attempts < maxAttempts) {
@@ -576,6 +650,21 @@ class FrictionUltimateBot {
                             buffer = await downloadMediaMessage(message, 'buffer', downloadOptions);
                             
                             if (buffer && buffer.length > 0) {
+                                // Validation améliorée du buffer
+                                if (!Buffer.isBuffer(buffer)) {
+                                    console.log(`⚠️ Tentative ${attempts} - Buffer invalide (pas un Buffer)`);
+                                    buffer = null;
+                                    continue;
+                                }
+                                
+                                // Vérifier que c'est vraiment une image valide
+                                const isValidImage = this.validateImageBuffer(buffer, imageMessage.mimetype);
+                                if (!isValidImage) {
+                                    console.log(`⚠️ Tentative ${attempts} - Image invalide ou corrompue`);
+                                    buffer = null;
+                                    continue;
+                                }
+                                
                                 console.log(`✅ Téléchargement réussi à la tentative ${attempts}`);
                                 break;
                             } else {
@@ -587,8 +676,9 @@ class FrictionUltimateBot {
                             buffer = null;
                             
                             if (attempts < maxAttempts) {
-                                console.log(`⏱️ Attente de 2 secondes avant nouvelle tentative...`);
-                                await new Promise(resolve => setTimeout(resolve, 2000));
+                                const waitTime = attempts * 1000; // Attente progressive
+                                console.log(`⏱️ Attente de ${waitTime}ms avant nouvelle tentative...`);
+                                await new Promise(resolve => setTimeout(resolve, waitTime));
                             }
                         }
                     }
@@ -603,41 +693,28 @@ class FrictionUltimateBot {
                         return null;
                     }
 
+                    // Validation finale de la taille
+                    if (buffer.length < 500) { // Minimum 500 bytes pour une image valide
+                        console.log(`❌ Image trop petite: ${buffer.length} bytes (minimum: 500 bytes)`);
+                        return null;
+                    }
+
+                    if (buffer.length > 10 * 1024 * 1024) { // Maximum 10MB
+                        console.log(`❌ Image trop grosse: ${buffer.length} bytes (maximum: 10MB)`);
+                        return null;
+                    }
+
                     console.log(`✅ Image téléchargée avec succès: ${buffer.length} bytes`);
 
                     // Valider que c'est bien une image avec vérification étendue
-                    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-                    const mimetype = (imageMessage.mimetype || 'image/jpeg').toLowerCase();
+                    const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                    let mimetype = (imageMessage.mimetype || 'image/jpeg').toLowerCase();
 
                     if (!validImageTypes.includes(mimetype)) {
                         console.log(`⚠️ Type d'image non supporté: ${mimetype} - Types acceptés: ${validImageTypes.join(', ')}`);
-                        // Ne pas retourner null mais continuer avec un mimetype par défaut
-                        console.log('🔄 Utilisation du type JPEG par défaut...');
-                    }
-
-                    // Vérification basique du format d'image via les premiers bytes
-                    const imageSignatures = {
-                        'image/jpeg': [0xFF, 0xD8, 0xFF],
-                        'image/jpg': [0xFF, 0xD8, 0xFF],
-                        'image/png': [0x89, 0x50, 0x4E, 0x47],
-                        'image/webp': [0x52, 0x49, 0x46, 0x46],
-                        'image/gif': [0x47, 0x49, 0x46]
-                    };
-
-                    const signature = imageSignatures[mimetype];
-                    if (signature && buffer.length >= signature.length) {
-                        let isValidFormat = true;
-                        for (let i = 0; i < signature.length; i++) {
-                            if (buffer[i] !== signature[i]) {
-                                isValidFormat = false;
-                                break;
-                            }
-                        }
-                        
-                        if (!isValidFormat) {
-                            console.log(`⚠️ Signature de fichier invalide pour ${mimetype}`);
-                            console.log(`📊 Premiers bytes: ${Array.from(buffer.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ')}`);
-                        }
+                        // Essayer de détecter le type à partir des bytes
+                        mimetype = this.detectImageType(buffer) || 'image/jpeg';
+                        console.log(`🔄 Type détecté/par défaut: ${mimetype}`);
                     }
 
                     const imageData = {
@@ -648,7 +725,8 @@ class FrictionUltimateBot {
                         height: imageMessage.height || 0,
                         fileLength: imageMessage.fileLength || buffer.length,
                         sha256: imageMessage.fileSha256?.toString('hex') || null,
-                        downloadTimestamp: Date.now()
+                        downloadTimestamp: Date.now(),
+                        isValidated: true
                     };
 
                     console.log(`📊 Image extraite - Taille: ${buffer.length} bytes, Type: ${mimetype}, Dimensions: ${imageData.width}x${imageData.height}`);

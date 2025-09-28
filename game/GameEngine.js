@@ -500,7 +500,7 @@ Le message image n'a pas pu être traité. Réessaie d'envoyer ta photo.`
             }
 
             const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-            
+
             // Améliorer la gestion du téléchargement avec retry
             let imageBuffer = null;
             let attempts = 0;
@@ -509,7 +509,7 @@ Le message image n'a pas pu être traité. Réessaie d'envoyer ta photo.`
             while (attempts < maxAttempts && !imageBuffer) {
                 try {
                     console.log(`🔄 Tentative de téléchargement ${attempts + 1}/${maxAttempts}...`);
-                    
+
                     imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, {
                         logger: require('pino')({ level: 'silent' })
                     });
@@ -525,7 +525,7 @@ Le message image n'a pas pu être traité. Réessaie d'envoyer ta photo.`
                     console.error(`❌ Tentative ${attempts + 1} échouée:`, downloadError.message);
                     imageBuffer = null;
                 }
-                
+
                 attempts++;
                 if (attempts < maxAttempts) {
                     await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1 seconde
@@ -554,29 +554,58 @@ Type reçu: ${mimetype}
                     };
                 }
 
-                // Vérifier la taille de l'image (max 10MB)
-                const maxSize = 10 * 1024 * 1024; // 10MB
-                if (imageBuffer.length > maxSize) {
-                    return {
-                        text: `❌ **Image trop volumineuse**
-
-Taille maximum: 10MB
-Taille reçue: ${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB
-
-📸 Réessaie avec une image plus petite.`
-                    };
-                }
-
-                // Vérification minimum de taille pour éviter les images corrompues
-                if (imageBuffer.length < 1000) { // Au moins 1KB
+                // Validation renforcée de l'image
+                if (imageBuffer.length < 500) { // Au moins 500 bytes
                     console.log(`⚠️ Image très petite détectée: ${imageBuffer.length} bytes`);
                     return {
                         text: `❌ **Image trop petite ou corrompue**
 
 Taille reçue: ${imageBuffer.length} bytes
-Minimum requis: 1KB
+Minimum requis: 500 bytes
 
-📸 Réessaie avec une image valide de ton personnage.`
+📸 **Conseils pour une bonne image :**
+• Utilise une photo claire de ton visage
+• Format JPEG ou PNG recommandé
+• Taille minimum 500 bytes
+• Évite les captures d'écran floues
+
+Réessaie avec une image valide de ton personnage.`
+                    };
+                }
+
+                if (imageBuffer.length > 10 * 1024 * 1024) { // Maximum 10MB
+                    console.log(`⚠️ Image trop grosse détectée: ${imageBuffer.length} bytes`);
+                    return {
+                        text: `❌ **Image trop volumineuse**
+
+Taille reçue: ${(imageBuffer.length / 1024 / 1024).toFixed(1)} MB
+Maximum autorisé: 10 MB
+
+📸 **Pour réduire la taille :**
+• Compresse l'image avant envoi
+• Utilise une résolution plus petite
+• Change le format (JPEG compresse mieux)
+
+Réessaie avec une image plus petite.`
+                    };
+                }
+
+                // Vérifier si l'image a été validée
+                if (imageMessage.isValidated === false) {
+                    return {
+                        text: `❌ **Format d'image non valide**
+
+📸 **Formats acceptés :**
+• JPEG/JPG ✅
+• PNG ✅  
+• WebP ✅
+
+⚠️ **Évite :**
+• Captures d'écran de mauvaise qualité
+• Images corrompues
+• Formats non supportés
+
+Réessaie avec une vraie photo en format JPEG ou PNG.`
                     };
                 }
 
@@ -639,7 +668,7 @@ La photo n'a pas pu être téléchargée après plusieurs tentatives.
         } catch (error) {
             console.error('❌ Erreur critique traitement photo:', error);
             console.error('❌ Stack trace:', error.stack);
-            
+
             return {
                 text: `❌ **Erreur critique lors du traitement de la photo**
 
@@ -1152,9 +1181,7 @@ En mode libre, je ne traite pas les actions de jeu.`
 
         if (!character) {
             return {
-                text: `❌ Tu dois d'abord créer un personnage avec /créer !
-
-Utilise /menu pour sortir du mode jeu.`
+                text: `❌ Tu dois d'abord créer un personnage avec /créer !`
             };
         }
 
@@ -2115,7 +2142,7 @@ Durée : ${socialEvent.duration}
     }
 
     async handleLearnAuraCommand({ player, message, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2191,7 +2218,7 @@ Vous avez déjà un entraînement d'aura actif. Terminez-le avant d'en commencer
     }
 
     async handleAuraSessionCommand({ player, dbManager, sock, chatId }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2363,7 +2390,9 @@ Utilisez /aura_techniques pour voir vos techniques disponibles.`
         const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+                text: `❌ Tu n'as pas encore de personnage !
+
+Utilise /créer pour créer ton personnage.`
             };
         }
 
@@ -2375,6 +2404,7 @@ Utilisez /aura_techniques pour voir vos techniques disponibles.`
             skipResponse: true // Pas de réponse immédiate, l'animation gère tout
         };
     }
+
 
     async handleMarketCommand({ player, dbManager }) {
         const marketEvents = this.advancedMechanics.economyEngine.marketEvents;
@@ -2395,7 +2425,7 @@ ${marketEvents.map(e => `• ${e.event}`).join('\n')}
      */
     async handleSaveGameCommand({ player, dbManager }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
             if (!character) {
                 return {
                     text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2631,7 +2661,7 @@ L'ID de sauvegarde spécifié n'existe pas ou est corrompu.
 Vérifiez l'ID et réessayez.`
                 };
             }
-            
+
             return {
                 text: `❌ **ERREUR DE RESTAURATION**
 
@@ -2676,7 +2706,7 @@ Erreur: ${error.message}`
                     statsText += `\n${index + 1}. ${save.id.substring(0, 20)}...`;
                     statsText += `\n   📅 ${date} - ${this.largeDB.formatSize(save.size)}`;
                 });
-                
+
                 if (playerSaves.length > 5) {
                     statsText += `\n   ... et ${playerSaves.length - 5} autres`;
                 }
