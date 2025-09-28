@@ -525,18 +525,46 @@ class FrictionUltimateBot {
                     // Augmenter le timeout pour les grandes images
                     const downloadOptions = {
                         logger: require('pino')({ level: 'silent' }),
-                        timeout: 30000 // 30 secondes
+                        timeout: 45000 // 45 secondes pour les images plus lourdes
                     };
 
-                    const buffer = await downloadMediaMessage(message, 'buffer', downloadOptions);
+                    let buffer = null;
+                    let attempts = 0;
+                    const maxAttempts = 3;
+                    
+                    // Plusieurs tentatives de téléchargement
+                    while (!buffer && attempts < maxAttempts) {
+                        attempts++;
+                        console.log(`📥 Tentative ${attempts}/${maxAttempts} de téléchargement...`);
+                        
+                        try {
+                            buffer = await downloadMediaMessage(message, 'buffer', downloadOptions);
+                            
+                            if (buffer && buffer.length > 0) {
+                                console.log(`✅ Téléchargement réussi à la tentative ${attempts}`);
+                                break;
+                            } else {
+                                console.log(`⚠️ Tentative ${attempts} échouée - buffer invalide`);
+                                buffer = null;
+                            }
+                        } catch (attemptError) {
+                            console.log(`⚠️ Tentative ${attempts} échouée:`, attemptError.message);
+                            buffer = null;
+                            
+                            if (attempts < maxAttempts) {
+                                console.log(`⏱️ Attente de 2 secondes avant nouvelle tentative...`);
+                                await new Promise(resolve => setTimeout(resolve, 2000));
+                            }
+                        }
+                    }
 
                     if (!buffer) {
-                        console.log('❌ Buffer null reçu du téléchargement');
+                        console.log('❌ Toutes les tentatives de téléchargement ont échoué');
                         return null;
                     }
 
                     if (buffer.length === 0) {
-                        console.log('❌ Buffer vide reçu du téléchargement');
+                        console.log('❌ Buffer vide après téléchargement');
                         return null;
                     }
 
@@ -548,7 +576,8 @@ class FrictionUltimateBot {
 
                     if (!validImageTypes.includes(mimetype)) {
                         console.log(`⚠️ Type d'image non supporté: ${mimetype} - Types acceptés: ${validImageTypes.join(', ')}`);
-                        return null;
+                        // Ne pas retourner null mais continuer avec un mimetype par défaut
+                        console.log('🔄 Utilisation du type JPEG par défaut...');
                     }
 
                     // Vérification basique du format d'image via les premiers bytes

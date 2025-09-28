@@ -175,6 +175,12 @@ class ImageGenerator {
         try {
             console.log(`💾 Début sauvegarde image pour personnage: ${characterId}`);
             console.log(`📊 Type imageBuffer: ${typeof imageBuffer}, Taille: ${imageBuffer ? imageBuffer.length : 'undefined'}`);
+            
+            // Debug approfondi du buffer
+            if (imageBuffer && Buffer.isBuffer(imageBuffer)) {
+                const firstBytes = Array.from(imageBuffer.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
+                console.log(`🔍 Premiers bytes de l'image: ${firstBytes}`);
+            }
 
             // Vérifier que l'imageBuffer est valide
             if (!imageBuffer) {

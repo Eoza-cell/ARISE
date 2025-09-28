@@ -567,6 +567,19 @@ Taille reçue: ${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB
                     };
                 }
 
+                // Vérification minimum de taille pour éviter les images corrompues
+                if (imageBuffer.length < 1000) { // Au moins 1KB
+                    console.log(`⚠️ Image très petite détectée: ${imageBuffer.length} bytes`);
+                    return {
+                        text: `❌ **Image trop petite ou corrompue**
+
+Taille reçue: ${imageBuffer.length} bytes
+Minimum requis: 1KB
+
+📸 Réessaie avec une image valide de ton personnage.`
+                    };
+                }
+
                 try {
                     await imageGenerator.saveCustomCharacterImage(player.id, imageBuffer, {
                         mimetype: mimetype,
