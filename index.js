@@ -62,6 +62,7 @@ class FrictionUltimateBot {
         // Nettoyage automatique de la mémoire plus agressif
         setInterval(() => {
             this.cleanupCache();
+            this.cleanupMemory();
             // Force garbage collection si disponible
             if (global.gc) {
                 global.gc();
@@ -326,7 +327,7 @@ class FrictionUltimateBot {
             }
         });
 
-        // Gestion des messages entrants
+        // Gestion des messages entrants avec meilleure gestion d'erreurs
         this.sock.ev.on('messages.upsert', async (m) => {
             try {
                 const message = m.messages[0];
@@ -339,13 +340,29 @@ class FrictionUltimateBot {
                     }
                 }
             } catch (error) {
-                console.error('❌ Erreur lors du traitement du message upsert:', error.message);
+                // Gestion spécifique des erreurs de déchiffrement
+                if (error.message && error.message.includes('decrypt')) {
+                    console.log('⚠️ Message non déchiffrable ignoré (probablement un message système)');
+                } else if (error.code === 'ERR_INVALID_ARG_TYPE') {
+                    console.log('⚠️ Type de données invalide ignoré');
+                } else {
+                    console.error('❌ Erreur traitement message:', error.message);
+                }
                 // Continuer sans arrêter le bot
             }
         });
 
-        // Gestion des erreurs de déchiffrement
+        // Gestion des erreurs de déchiffrement et messages corrompus
         this.sock.ev.on('creds.update', saveCreds);
+        
+        // Gestionnaire d'erreurs pour messages non déchiffrables
+        this.sock.ev.on('connection.update', (update) => {
+            // Ignorer silencieusement les erreurs de déchiffrement courantes
+            if (update.lastDisconnect?.error?.message?.includes('decrypt')) {
+                console.log('🔐 Erreur de déchiffrement détectée - continuons');
+                return;
+            }
+        });
 
         // SUPPRIMÉ: Deuxième handler connection.update dupliqué qui causait la boucle infinie de QR codes
         // Le seul handler qui reste est celui avec les limitations QR au-dessus
@@ -366,7 +383,12 @@ class FrictionUltimateBot {
             // CORRECTION CRITIQUE : Ignorer les messages de groupe sans participant
             // (c'est le premier événement du dupliqué de Baileys)
             if (from.includes('@g.us') && !message.key.participant) {
-                console.log('⚠️ Message de groupe sans participant ignoré (doublon Baileys)');
+                // Ignorer silencieusement pour réduire les logs
+                return;
+            }
+
+            // Ignorer les messages système ou corrompus
+            if (!message.message || Object.keys(message.message).length === 0) {
                 return;
             }
 
@@ -428,10 +450,11 @@ class FrictionUltimateBot {
                 console.log('📸 Message avec image détecté');
             }
             if (messageText) {
-                console.log(`📝 Message texte: "${messageText}"`);
-                // Détecter si le message contient des polices spéciales
-                if (messageText !== this.normalizeStyledText(messageText)) {
-                    console.log(`🎨 Police spéciale détectée - normalisé: "${this.normalizeStyledText(messageText)}"`);
+                // Log simplifié pour économiser la mémoire
+                if (messageText.length < 50) {
+                    console.log(`📝 Message: "${messageText}"`);
+                } else {
+                    console.log(`📝 Message long reçu (${messageText.length} chars)`);
                 }
             }
 
@@ -966,6 +989,43 @@ class FrictionUltimateBot {
 
         } catch (error) {
             console.error('❌ Erreur démonstration boutons:', error);
+        }
+    }
+
+    // Méthode de nettoyage mémoire spécialisée
+    cleanupMemory() {
+        try {
+            // Nettoyer les références circulaires
+            if (this.regenerationSystem) {
+                for (const [key, data] of this.regenerationSystem.entries()) {
+                    if (Date.now() - data.startTime > 300000) { // 5 minutes
+                        clearInterval(data.interval);
+                        this.regenerationSystem.delete(key);
+                    }
+                }
+            }
+
+            // Nettoyer les actions actives expirées
+            if (this.activeActions) {
+                for (const [key, action] of this.activeActions.entries()) {
+                    if (Date.now() - action.startTime > 600000) { // 10 minutes
+                        this.activeActions.delete(key);
+                    }
+                }
+            }
+
+            // Vérifier l'utilisation mémoire
+            const memUsage = process.memoryUsage();
+            const memUsagePercent = (memUsage.heapUsed / memUsage.heapTotal) * 100;
+            
+            if (memUsagePercent > 95) {
+                console.log(`🧹 Nettoyage mémoire d'urgence: ${memUsagePercent.toFixed(1)}%`);
+                // Réduire drastiquement le cache
+                this.maxCacheSize = Math.max(50, this.maxCacheSize / 2);
+                this.cleanupCache();
+            }
+        } catch (error) {
+            console.error('❌ Erreur nettoyage mémoire:', error.message);
         }
     }
 
