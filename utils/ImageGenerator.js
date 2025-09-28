@@ -172,29 +172,65 @@ class ImageGenerator {
 
     async saveCustomCharacterImage(characterId, imageBuffer, metadata = {}) {
         try {
+            // Vérifier que l'imageBuffer est valide
+            if (!Buffer.isBuffer(imageBuffer) || imageBuffer.length === 0) {
+                throw new Error('Buffer d\'image invalide ou vide');
+            }
+
             // Créer le dossier si nécessaire
             const customImagesDir = path.join(this.assetsPath, 'custom_images');
             await fs.mkdir(customImagesDir, { recursive: true });
 
+            // Vérifier que le dossier a été créé
+            try {
+                await fs.access(customImagesDir);
+            } catch (dirError) {
+                throw new Error(`Impossible de créer/accéder au dossier: ${customImagesDir}`);
+            }
+
             const imagePath = path.join(customImagesDir, `character_${characterId}.png`);
-            await fs.writeFile(imagePath, imageBuffer);
+            
+            // Sauvegarder l'image avec gestion d'erreur détaillée
+            try {
+                await fs.writeFile(imagePath, imageBuffer);
+                console.log(`✅ Image écrite: ${imagePath}`);
+            } catch (writeError) {
+                throw new Error(`Erreur écriture fichier: ${writeError.message}`);
+            }
+
+            // Vérifier que le fichier a été créé correctement
+            try {
+                const stats = await fs.stat(imagePath);
+                if (stats.size !== imageBuffer.length) {
+                    throw new Error(`Taille fichier incorrecte: attendu ${imageBuffer.length}, obtenu ${stats.size}`);
+                }
+            } catch (statError) {
+                throw new Error(`Impossible de vérifier le fichier sauvegardé: ${statError.message}`);
+            }
 
             // Sauvegarder aussi les métadonnées si fournies
             if (metadata && Object.keys(metadata).length > 0) {
-                const metadataPath = path.join(customImagesDir, `character_${characterId}_metadata.json`);
-                await fs.writeFile(metadataPath, JSON.stringify({
-                    ...metadata,
-                    savedAt: new Date().toISOString(),
-                    imageSize: imageBuffer.length
-                }, null, 2));
-                console.log(`✅ Métadonnées image sauvegardées: ${metadataPath}`);
+                try {
+                    const metadataPath = path.join(customImagesDir, `character_${characterId}_metadata.json`);
+                    await fs.writeFile(metadataPath, JSON.stringify({
+                        ...metadata,
+                        savedAt: new Date().toISOString(),
+                        imageSize: imageBuffer.length,
+                        imagePath: imagePath
+                    }, null, 2));
+                    console.log(`✅ Métadonnées image sauvegardées: ${metadataPath}`);
+                } catch (metadataError) {
+                    console.warn('⚠️ Erreur sauvegarde métadonnées (image OK):', metadataError.message);
+                }
             }
 
             console.log(`✅ Image personnalisée sauvegardée: ${imagePath} (${imageBuffer.length} bytes)`);
             return imagePath;
         } catch (error) {
-            console.error('❌ Erreur sauvegarde image personnalisée:', error);
-            throw error;
+            console.error('❌ Erreur détaillée sauvegarde image personnalisée:', error);
+            console.error('❌ Type error:', typeof error);
+            console.error('❌ Error stack:', error.stack);
+            throw new Error(`Sauvegarde image échouée: ${error.message}`);
         }
     }
 

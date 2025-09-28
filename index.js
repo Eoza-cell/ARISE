@@ -1,3 +1,4 @@
+replit_final_file>
 // The following code integrates RunwayML video generation into the bot's action response system.
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
@@ -195,7 +196,7 @@ class FrictionUltimateBot {
                 await saveCreds(creds);
             } catch (error) {
                 console.error('⚠️ Erreur sauvegarde credentials:', error.message);
-                
+
                 // Tenter de créer le dossier et réessayer
                 if (error.code === 'ENOENT') {
                     try {
@@ -204,7 +205,7 @@ class FrictionUltimateBot {
                         const authDir = path.join(process.cwd(), 'auth_info_baileys');
                         await fs.mkdir(authDir, { recursive: true });
                         console.log('📁 Dossier auth_info_baileys créé');
-                        
+
                         // Réessayer la sauvegarde
                         await saveCreds(creds);
                         console.log('✅ Credentials sauvegardés après création du dossier');
@@ -235,7 +236,7 @@ class FrictionUltimateBot {
 
         // Gestion des erreurs de déchiffrement
         this.sock.ev.on('creds.update', saveCreds);
-        
+
         // Gestion des erreurs générales
         this.sock.ev.on('connection.update', async (update) => {
             const { connection, lastDisconnect, qr } = update;
@@ -249,7 +250,7 @@ class FrictionUltimateBot {
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
                 const errorMessage = lastDisconnect?.error?.message || '';
-                
+
                 console.log('❌ Connexion fermée:', errorMessage);
                 console.log('🔄 Tentative de reconnexion:', shouldReconnect);
 
@@ -259,7 +260,7 @@ class FrictionUltimateBot {
                     errorMessage.includes('conflict')) {
                     console.log('🧹 Erreur de session détectée - nettoyage des sessions...');
                     await sessionManager.cleanupOldSessions();
-                    
+
                     // Attendre un peu plus avant de reconnecter après nettoyage
                     setTimeout(() => {
                         this.reconnectAttempts = 0;
@@ -275,7 +276,7 @@ class FrictionUltimateBot {
                     if (this.reconnectAttempts > 5) {
                         console.log('❌ Trop de tentatives - nettoyage complet des sessions...');
                         await sessionManager.cleanupOldSessions();
-                        
+
                         setTimeout(() => {
                             this.reconnectAttempts = 0;
                             console.log('🔄 Redémarrage avec session propre...');
@@ -320,7 +321,7 @@ class FrictionUltimateBot {
             const messageId = message.key.id;
 
             // CORRECTION CRITIQUE : Ignorer les messages de groupe sans participant 
-            // (c'est le premier événement dupliqué de Baileys)
+            // (c'est le premier événement du dupliqué de Baileys)
             if (from.includes('@g.us') && !message.key.participant) {
                 console.log('⚠️ Message de groupe sans participant ignoré (doublon Baileys)');
                 return;
@@ -333,10 +334,10 @@ class FrictionUltimateBot {
                 try {
                     groupMetadata = await this.sock.groupMetadata(from);
                     const groupName = groupMetadata.subject;
-                    
+
                     // Détecter automatiquement le royaume via le nom du groupe
                     detectedKingdom = this.gameEngine.adminManager.detectKingdomFromGroupName(groupName);
-                    
+
                     if (detectedKingdom) {
                         // Auto-assigner le groupe au royaume détecté
                         this.gameEngine.adminManager.kingdomGroups.set(from, detectedKingdom);
@@ -413,12 +414,12 @@ class FrictionUltimateBot {
 
             // Traitement du message par le moteur de jeu
             const normalizedMessage = messageText ? this.normalizeStyledText(messageText.trim()) : null;
-            
+
             // Ajouter des logs pour debugging
             if (messageImage) {
                 console.log(`📸 Image reçue de ${playerNumber}: ${messageImage.mimetype}, ${messageImage.buffer.length} bytes`);
             }
-            
+
             const result = await this.gameEngine.processPlayerMessage({
                 playerNumber,
                 chatId: from,
@@ -446,7 +447,7 @@ class FrictionUltimateBot {
 
     extractMessageText(message) {
         let text = null;
-        
+
         if (message.message?.conversation) {
             text = message.message.conversation;
         } else if (message.message?.extendedTextMessage?.text) {
@@ -456,19 +457,19 @@ class FrictionUltimateBot {
         } else if (message.message?.videoMessage?.caption) {
             text = message.message.videoMessage.caption;
         }
-        
+
         // Normaliser les polices spéciales et caractères Unicode
         if (text) {
             // Convertir les polices stylées en texte normal
             text = this.normalizeStyledText(text);
         }
-        
+
         return text;
     }
 
     normalizeStyledText(text) {
         if (!text) return text;
-        
+
         // Mapping des caractères stylés vers du texte normal
         const styleMap = {
             // Bold Mathematical (𝐀-𝐳)
@@ -478,28 +479,28 @@ class FrictionUltimateBot {
             '𝐚': 'a', '𝐛': 'b', '𝐜': 'c', '𝐝': 'd', '𝐞': 'e', '𝐟': 'f', '𝐠': 'g', '𝐡': 'h', '𝐢': 'i', '𝐣': 'j',
             '𝐤': 'k', '𝐥': 'l', '𝐦': 'm', '𝐧': 'n', '𝐨': 'o', '𝐩': 'p', '𝐪': 'q', '𝐫': 'r', '𝐬': 's', '𝐭': 't',
             '𝐮': 'u', '𝐯': 'v', '𝐰': 'w', '𝐱': 'x', '𝐲': 'y', '𝐳': 'z',
-            
+
             // Small Capitals (ᴀ-ᴢ)
             'ᴀ': 'A', 'ʙ': 'B', 'ᴄ': 'C', 'ᴅ': 'D', 'ᴇ': 'E', 'ғ': 'F', 'ɢ': 'G', 'ʜ': 'H', 'ɪ': 'I', 'ᴊ': 'J',
             'ᴋ': 'K', 'ʟ': 'L', 'ᴍ': 'M', 'ɴ': 'N', 'ᴏ': 'O', 'ᴘ': 'P', 'Q': 'Q', 'ʀ': 'R', 'ꜱ': 'S', 'ᴛ': 'T',
             'ᴜ': 'U', 'ᴠ': 'V', 'ᴡ': 'W', 'x': 'X', 'ʏ': 'Y', 'ᴢ': 'Z',
-            
+
             // Circled characters (Ⓐ-ⓩ)
             'Ⓐ': 'A', 'Ⓑ': 'B', 'Ⓒ': 'C', 'Ⓓ': 'D', 'Ⓔ': 'E', 'Ⓕ': 'F', 'Ⓖ': 'G', 'Ⓗ': 'H', 'Ⓘ': 'I', 'Ⓙ': 'J',
             'Ⓚ': 'K', 'Ⓛ': 'L', 'Ⓜ': 'M', 'Ⓝ': 'N', 'Ⓞ': 'O', 'Ⓟ': 'P', 'Ⓠ': 'Q', 'Ⓡ': 'R', 'Ⓢ': 'S', 'Ⓣ': 'T',
             'Ⓤ': 'U', 'Ⓥ': 'V', 'Ⓦ': 'W', 'Ⓧ': 'X', 'Ⓨ': 'Y', 'Ⓩ': 'Z',
-            
+
             // Autres caractères spéciaux courants
             '①': '1', '②': '2', '③': '3', '④': '4', '⑤': '5', '⑥': '6', '⑦': '7', '⑧': '8', '⑨': '9', '⑩': '10'
         };
-        
+
         let normalizedText = text;
-        
+
         // Remplacer les caractères stylés
         for (const [styled, normal] of Object.entries(styleMap)) {
             normalizedText = normalizedText.replace(new RegExp(styled, 'g'), normal);
         }
-        
+
         // Normaliser la casse pour détecter les commandes
         return normalizedText;
     }
@@ -519,7 +520,7 @@ class FrictionUltimateBot {
             if (imageMessage) {
                 // Télécharger l'image avec la bonne méthode
                 console.log('📥 Téléchargement de l\'image...');
-                
+
                 try {
                     const { downloadMediaMessage } = require('@whiskeysockets/baileys');
                     const buffer = await downloadMediaMessage(message, 'buffer', {}, {
@@ -528,16 +529,16 @@ class FrictionUltimateBot {
 
                     if (buffer && buffer.length > 0) {
                         console.log(`✅ Image téléchargée: ${buffer.length} bytes`);
-                        
+
                         // Valider que c'est bien une image
                         const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
                         const mimetype = imageMessage.mimetype || 'image/jpeg';
-                        
+
                         if (!validImageTypes.includes(mimetype.toLowerCase())) {
                             console.log(`⚠️ Type d'image non supporté: ${mimetype}`);
                             return null;
                         }
-                        
+
                         return {
                             buffer: buffer,
                             mimetype: mimetype,
@@ -553,21 +554,21 @@ class FrictionUltimateBot {
                     }
                 } catch (downloadError) {
                     console.error('❌ Erreur téléchargement spécifique:', downloadError.message);
-                    
+
                     // Tentative alternative de téléchargement
                     try {
                         console.log('🔄 Tentative alternative de téléchargement...');
                         const stream = await downloadMediaMessage(message, 'stream', {}, {
                             logger: require('pino')({ level: 'silent' })
                         });
-                        
+
                         if (stream) {
                             const chunks = [];
                             for await (const chunk of stream) {
                                 chunks.push(chunk);
                             }
                             const buffer = Buffer.concat(chunks);
-                            
+
                             if (buffer.length > 0) {
                                 console.log(`✅ Image téléchargée via stream: ${buffer.length} bytes`);
                                 return {
@@ -582,7 +583,7 @@ class FrictionUltimateBot {
                     } catch (streamError) {
                         console.error('❌ Erreur téléchargement stream:', streamError.message);
                     }
-                    
+
                     return null;
                 }
             }
@@ -797,3 +798,4 @@ bot.initialize().catch(console.error);
 
 console.log('🎮 FRICTION ULTIMATE - Bot WhatsApp RPG');
 console.log('🚀 Démarrage en cours...');
+</replit_final_file>

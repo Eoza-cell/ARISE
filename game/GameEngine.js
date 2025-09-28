@@ -489,22 +489,100 @@ Après ta photo, décris ton personnage idéal :
         try {
             console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
 
+            // Vérifier que originalMessage existe et contient une image
+            if (!originalMessage || !originalMessage.message) {
+                console.error('❌ Message original manquant ou invalide');
+                return {
+                    text: `❌ **Erreur de message**
+
+Le message image n'a pas pu être traité. Réessaie d'envoyer ta photo.`
+                };
+            }
+
             const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-            const imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, {
-                logger: require('pino')({ level: 'silent' })
-            });
+            
+            // Améliorer la gestion du téléchargement avec retry
+            let imageBuffer = null;
+            let attempts = 0;
+            const maxAttempts = 3;
+
+            while (attempts < maxAttempts && !imageBuffer) {
+                try {
+                    console.log(`🔄 Tentative de téléchargement ${attempts + 1}/${maxAttempts}...`);
+                    
+                    imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, {
+                        logger: require('pino')({ level: 'silent' })
+                    });
+
+                    if (imageBuffer && imageBuffer.length > 0) {
+                        console.log(`✅ Image téléchargée: ${imageBuffer.length} bytes`);
+                        break;
+                    } else {
+                        console.log('⚠️ Buffer vide, nouvelle tentative...');
+                        imageBuffer = null;
+                    }
+                } catch (downloadError) {
+                    console.error(`❌ Tentative ${attempts + 1} échouée:`, downloadError.message);
+                    imageBuffer = null;
+                }
+                
+                attempts++;
+                if (attempts < maxAttempts) {
+                    await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1 seconde
+                }
+            }
 
             if (imageBuffer && imageBuffer.length > 0) {
-                await imageGenerator.saveCustomCharacterImage(player.id, imageBuffer);
+                // Valider le type d'image
+                const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                let mimetype = 'image/jpeg'; // Défaut
 
-                await dbManager.setTemporaryData(player.id, 'photo_received', true);
+                if (originalMessage.message.imageMessage) {
+                    mimetype = originalMessage.message.imageMessage.mimetype || 'image/jpeg';
+                } else if (originalMessage.message.viewOnceMessage?.message?.imageMessage) {
+                    mimetype = originalMessage.message.viewOnceMessage.message.imageMessage.mimetype || 'image/jpeg';
+                }
 
-                console.log(`✅ Photo sauvegardée pour ${player.whatsappNumber}`);
+                if (!validImageTypes.includes(mimetype.toLowerCase())) {
+                    return {
+                        text: `❌ **Type d'image non supporté**
 
-                return {
-                    text: `📸 **PHOTO REÇUE AVEC SUCCÈS !** 📸
+Types supportés: JPEG, PNG, WebP
+Type reçu: ${mimetype}
+
+📸 Réessaie avec une image dans un format supporté.`
+                    };
+                }
+
+                // Vérifier la taille de l'image (max 10MB)
+                const maxSize = 10 * 1024 * 1024; // 10MB
+                if (imageBuffer.length > maxSize) {
+                    return {
+                        text: `❌ **Image trop volumineuse**
+
+Taille maximum: 10MB
+Taille reçue: ${(imageBuffer.length / 1024 / 1024).toFixed(2)}MB
+
+📸 Réessaie avec une image plus petite.`
+                    };
+                }
+
+                try {
+                    await imageGenerator.saveCustomCharacterImage(player.id, imageBuffer, {
+                        mimetype: mimetype,
+                        originalSize: imageBuffer.length,
+                        uploadedAt: new Date().toISOString()
+                    });
+
+                    await dbManager.setTemporaryData(player.id, 'photo_received', true);
+
+                    console.log(`✅ Photo sauvegardée pour ${player.whatsappNumber} (${imageBuffer.length} bytes)`);
+
+                    return {
+                        text: `📸 **PHOTO REÇUE AVEC SUCCÈS !** 📸
 
 ✅ Ton visage a été enregistré pour la création du personnage.
+📊 **Taille:** ${(imageBuffer.length / 1024).toFixed(1)} KB
 
 📝 **MAINTENANT, DÉCRIS TON PERSONNAGE :**
 
@@ -521,22 +599,44 @@ Décris le personnage que tu veux incarner :
 • Histoire/objectifs
 
 🚀 **Écris ta description maintenant !**`
-                };
+                    };
+                } catch (saveError) {
+                    console.error('❌ Erreur sauvegarde image:', saveError);
+                    return {
+                        text: `❌ **Erreur de sauvegarde**
+
+L'image a été téléchargée mais n'a pas pu être sauvegardée.
+📸 Réessaie d'envoyer ta photo.`
+                    };
+                }
             } else {
+                console.log('❌ Impossible de télécharger l\'image après plusieurs tentatives');
                 return {
                     text: `❌ **Erreur de téléchargement de photo**
 
-La photo n'a pas pu être traitée.
-📸 Réessaie d'envoyer une photo claire de ton visage.`
+La photo n'a pas pu être téléchargée après plusieurs tentatives.
+
+🔧 **Solutions :**
+• Vérifie ta connexion internet
+• Assure-toi que l'image est claire et bien éclairée
+• Réessaie d'envoyer la photo
+• Utilise un format supporté (JPEG, PNG, WebP)`
                 };
             }
         } catch (error) {
-            console.error('❌ Erreur traitement photo:', error);
+            console.error('❌ Erreur critique traitement photo:', error);
+            console.error('❌ Stack trace:', error.stack);
+            
             return {
-                text: `❌ **Erreur lors du traitement de la photo**
+                text: `❌ **Erreur critique lors du traitement de la photo**
 
-Une erreur s'est produite. Réessaie d'envoyer ta photo.
-💡 Assure-toi que l'image est claire et bien éclairée.`
+Détails: ${error.message}
+
+🔧 **Solutions :**
+• Réessaie d'envoyer ta photo
+• Utilise une image plus petite
+• Assure-toi d'utiliser un format supporté (JPEG, PNG)
+• Contacte l'administrateur si le problème persiste`
             };
         }
     }
