@@ -228,13 +228,27 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
     /**
      * Détermine si Frictia doit répondre à un message
      */
-    shouldRespond(message, groupId, isDirectlyMentioned = false) {
+    shouldRespond(message, groupId, isDirectlyMentioned = false, groupName = '') {
         const now = Date.now();
         const lastTime = this.lastActivity.get(groupId) || 0;
         
+        // Détecter si c'est un groupe taverne
+        const isTaverneGroup = this.isTaverneGroup(groupName);
+        
         // Si mentionnée directement, toujours répondre (sauf si trop récent)
         if (isDirectlyMentioned) {
-            return (now - lastTime) > 5000; // 5 secondes minimum
+            return (now - lastTime) > 3000; // 3 secondes minimum pour les mentions
+        }
+
+        // Dans les groupes taverne, Frictia est TRÈS active
+        if (isTaverneGroup) {
+            const timeSinceLastResponse = now - lastTime;
+            // Répondre plus fréquemment dans les tavernes (10 secondes au lieu de 20)
+            if (timeSinceLastResponse < 10000) {
+                return false;
+            }
+            // 60% de chance de répondre dans les tavernes
+            return Math.random() < 0.6;
         }
 
         // Sinon, répondre occasionnellement selon des critères
@@ -281,6 +295,9 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
                 ? `\nContexte récent de la conversation:\n${contextMessages.map(msg => `${msg.user}: ${msg.message}`).join('\n')}`
                 : '';
 
+            // Détecter si c'est un groupe taverne
+            const isTaverneGroup = this.isTaverneGroup(groupName);
+            
             const prompt = `Tu es Frictia, une IA avec la personnalité d'Erza Scarlet de Fairy Tail. Tu participes aux discussions WhatsApp comme une amie loyale et protectrice.
 
 **Ta personnalité (Erza Scarlet):**
@@ -294,12 +311,13 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
 - Tu utilises des émojis liés à la force: ⚔️ 🛡️ ✨ 💪 🔥 ⭐
 
 **Contexte:**
-- Groupe: ${groupName}
+- Groupe: ${groupName}${isTaverneGroup ? ' (TAVERNE - lieu de discussion des joueurs)' : ''}
 - Utilisateur: ${userName}
 - Message: "${message}"${contextString}
 
 **Instructions:**
 - Réponds comme Erza Scarlet le ferait - avec force et bienveillance
+${isTaverneGroup ? '- Tu es dans une TAVERNE, sois plus sociable et accueillante avec les joueurs\n- Encourage les discussions entre joueurs et crée une ambiance conviviale\n- Tu peux poser des questions pour animer la conversation' : ''}
 - Sois directe mais encourageante
 - Utilise un langage noble mais accessible
 - Offre ton aide et ta protection si nécessaire
@@ -310,10 +328,7 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
 
 Réponds uniquement avec le message de Frictia/Erza, sans préfixe ni explication:`;
 
-            const response = await this.groqClient.generateText(prompt, {
-                maxTokens: 150,
-                temperature: 0.8
-            });
+            const response = await this.groqClient.generateNarration(prompt, 150);
 
             if (!response || response.trim().length === 0) {
                 return this.getRandomFallbackResponse();
@@ -343,6 +358,25 @@ Réponds uniquement avec le message de Frictia/Erza, sans préfixe ni explicatio
         ];
         
         return erzaFallbacks[Math.floor(Math.random() * erzaFallbacks.length)];
+    }
+
+    /**
+     * Détecte si un groupe est une taverne
+     */
+    isTaverneGroup(groupName) {
+        if (!groupName) return false;
+        
+        const taverneKeywords = [
+            'taverne', 'tavern', 'chat', 'discussion', 'bar', 'auberge',
+            'inn', 'pub', 'cafe', 'salon', 'lounge', 'gathering'
+        ];
+        
+        const normalizedName = groupName.toLowerCase()
+            .normalize('NFKD')
+            .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
+            .replace(/[^a-z0-9\s]/g, ''); // Supprime les caractères spéciaux
+        
+        return taverneKeywords.some(keyword => normalizedName.includes(keyword));
     }
 
     /**

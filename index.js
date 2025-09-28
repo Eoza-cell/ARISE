@@ -544,7 +544,7 @@ class FrictionUltimateBot {
 
                     // Frictia peut répondre dans TOUTES les situations (connectée à tout)
                     const shouldFrictiaRespond = isDirectlyMentioned ||
-                                               this.frictiaAI.shouldRespond(messageText, from, isDirectlyMentioned);
+                                               this.frictiaAI.shouldRespond(messageText, from, isDirectlyMentioned, groupName);
 
                     if (shouldFrictiaRespond) {
                         // Obtenir le contexte de conversation
