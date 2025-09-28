@@ -1,4 +1,3 @@
-
 const fs = require('fs');
 const path = require('path');
 
@@ -25,19 +24,19 @@ class SessionManager {
 
     async initializeSession() {
         console.log('🔐 Initialisation de la session WhatsApp...');
-        
+
         try {
             // Utiliser uniquement le système d'authentification QR natif de Baileys
             console.log('📱 Démarrage en mode QR Code');
             console.log('💡 Scannez le QR Code avec WhatsApp pour vous connecter');
-            
+
             // Créer le dossier d'authentification par défaut
             const authDir = 'auth_info_baileys';
             if (!fs.existsSync(authDir)) {
                 fs.mkdirSync(authDir, { recursive: true });
                 console.log('📁 Dossier d\'authentification créé');
             }
-            
+
             return authDir;
 
         } catch (error) {
@@ -63,7 +62,7 @@ class SessionManager {
         try {
             // Créer les fichiers de session nécessaires
             const credsPath = path.join(this.sessionPath, 'creds.json');
-            
+
             const credentials = {
                 "noiseKey": {
                     "private": sessionData.encKey,
@@ -150,7 +149,7 @@ class SessionManager {
         try {
             // Nettoyer les anciennes sessions
             const sessionsToClean = ['auth_info_baileys', 'auth_info', 'session_data'];
-            
+
             for (const sessionDir of sessionsToClean) {
                 if (fs.existsSync(sessionDir)) {
                     fs.rmSync(sessionDir, { recursive: true, force: true });
@@ -176,10 +175,10 @@ class SessionManager {
     encodeYourSession(sessionPath = 'auth_info') {
         try {
             const credsPath = path.join(sessionPath, 'creds.json');
-            
+
             if (fs.existsSync(credsPath)) {
                 const creds = JSON.parse(fs.readFileSync(credsPath, 'utf8'));
-                
+
                 const sessionData = {
                     clientID: creds.me?.id || "Friction-Ultimate-" + Date.now(),
                     serverToken: creds.pairingEphemeralKeyPair?.public || "1@" + this.generateRandomString(160),
@@ -189,11 +188,11 @@ class SessionManager {
                 };
 
                 const encoded = "FRICTION-ULTIMATE-SESSION-V1.0.0-" + Buffer.from(JSON.stringify(sessionData)).toString('base64');
-                
+
                 console.log('🔐 VOTRE SESSION ENCODÉE:');
                 console.log('📋 Copiez cette ligne dans votre .env comme WHATSAPP_SESSION:');
                 console.log(encoded);
-                
+
                 return encoded;
             } else {
                 console.log('❌ Aucun fichier de session trouvé à encoder');
@@ -203,6 +202,24 @@ class SessionManager {
         } catch (error) {
             console.error('❌ Erreur encodage session:', error);
             return null;
+        }
+    }
+
+    async ensureSessionDirectory() {
+        try {
+            // Créer le dossier principal de session
+            await fs.mkdir(this.sessionPath, { recursive: true });
+
+            // Créer aussi le dossier auth_info_baileys si nécessaire
+            const authPath = path.join(process.cwd(), 'auth_info_baileys');
+            await fs.mkdir(authPath, { recursive: true });
+
+            console.log(`📁 Dossiers de session créés: ${this.sessionPath} et ${authPath}`);
+        } catch (error) {
+            if (error.code !== 'EEXIST') {
+                console.error('❌ Erreur création dossier session:', error);
+                throw error;
+            }
         }
     }
 }

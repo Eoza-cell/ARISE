@@ -189,12 +189,29 @@ class FrictionUltimateBot {
             }
         });
 
-        // Sauvegarde des credentials avec gestion d'erreur
+        // Sauvegarde des credentials avec gestion d'erreur améliorée
         this.sock.ev.on('creds.update', async (creds) => {
             try {
                 await saveCreds(creds);
             } catch (error) {
                 console.error('⚠️ Erreur sauvegarde credentials:', error.message);
+                
+                // Tenter de créer le dossier et réessayer
+                if (error.code === 'ENOENT') {
+                    try {
+                        const fs = require('fs');
+                        const path = require('path');
+                        const authDir = path.join(process.cwd(), 'auth_info_baileys');
+                        await fs.mkdir(authDir, { recursive: true });
+                        console.log('📁 Dossier auth_info_baileys créé');
+                        
+                        // Réessayer la sauvegarde
+                        await saveCreds(creds);
+                        console.log('✅ Credentials sauvegardés après création du dossier');
+                    } catch (retryError) {
+                        console.error('❌ Échec sauvegarde après création dossier:', retryError.message);
+                    }
+                }
             }
         });
 
@@ -397,6 +414,11 @@ class FrictionUltimateBot {
             // Traitement du message par le moteur de jeu
             const normalizedMessage = messageText ? this.normalizeStyledText(messageText.trim()) : null;
             
+            // Ajouter des logs pour debugging
+            if (messageImage) {
+                console.log(`📸 Image reçue de ${playerNumber}: ${messageImage.mimetype}, ${messageImage.buffer.length} bytes`);
+            }
+            
             const result = await this.gameEngine.processPlayerMessage({
                 playerNumber,
                 chatId: from,
@@ -497,26 +519,78 @@ class FrictionUltimateBot {
             if (imageMessage) {
                 // Télécharger l'image avec la bonne méthode
                 console.log('📥 Téléchargement de l\'image...');
-                const { downloadMediaMessage } = require('@whiskeysockets/baileys');
-                const buffer = await downloadMediaMessage(message, 'buffer', {}, {
-                    logger: require('pino')({ level: 'silent' })
-                });
+                
+                try {
+                    const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+                    const buffer = await downloadMediaMessage(message, 'buffer', {}, {
+                        logger: require('pino')({ level: 'silent' })
+                    });
 
-                if (buffer) {
-                    console.log(`✅ Image téléchargée: ${buffer.length} bytes`);
-                    return {
-                        buffer: buffer,
-                        mimetype: imageMessage.mimetype || 'image/jpeg',
-                        caption: imageMessage.caption || '',
-                        width: imageMessage.width || 0,
-                        height: imageMessage.height || 0
-                    };
+                    if (buffer && buffer.length > 0) {
+                        console.log(`✅ Image téléchargée: ${buffer.length} bytes`);
+                        
+                        // Valider que c'est bien une image
+                        const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+                        const mimetype = imageMessage.mimetype || 'image/jpeg';
+                        
+                        if (!validImageTypes.includes(mimetype.toLowerCase())) {
+                            console.log(`⚠️ Type d'image non supporté: ${mimetype}`);
+                            return null;
+                        }
+                        
+                        return {
+                            buffer: buffer,
+                            mimetype: mimetype,
+                            caption: imageMessage.caption || '',
+                            width: imageMessage.width || 0,
+                            height: imageMessage.height || 0,
+                            fileLength: imageMessage.fileLength || buffer.length,
+                            sha256: imageMessage.fileSha256?.toString('hex') || null
+                        };
+                    } else {
+                        console.log('⚠️ Buffer d\'image vide ou invalide');
+                        return null;
+                    }
+                } catch (downloadError) {
+                    console.error('❌ Erreur téléchargement spécifique:', downloadError.message);
+                    
+                    // Tentative alternative de téléchargement
+                    try {
+                        console.log('🔄 Tentative alternative de téléchargement...');
+                        const stream = await downloadMediaMessage(message, 'stream', {}, {
+                            logger: require('pino')({ level: 'silent' })
+                        });
+                        
+                        if (stream) {
+                            const chunks = [];
+                            for await (const chunk of stream) {
+                                chunks.push(chunk);
+                            }
+                            const buffer = Buffer.concat(chunks);
+                            
+                            if (buffer.length > 0) {
+                                console.log(`✅ Image téléchargée via stream: ${buffer.length} bytes`);
+                                return {
+                                    buffer: buffer,
+                                    mimetype: imageMessage.mimetype || 'image/jpeg',
+                                    caption: imageMessage.caption || '',
+                                    width: imageMessage.width || 0,
+                                    height: imageMessage.height || 0
+                                };
+                            }
+                        }
+                    } catch (streamError) {
+                        console.error('❌ Erreur téléchargement stream:', streamError.message);
+                    }
+                    
+                    return null;
                 }
             }
 
             return null;
         } catch (error) {
-            console.error('❌ Erreur téléchargement image:', error);
+            console.error('❌ Erreur téléchargement image:', error.message);
+            console.error('❌ Stack trace:', error.stack);
             return null;
         }
     }
