@@ -1,5 +1,6 @@
 const sharp = require('sharp');
 const fs = require('fs').promises;
+const fsSync = require('fs');
 const path = require('path');
 const WorldMapGenerator = require('./WorldMapGenerator');
 const FreepikClient = require('../freepik/FreepikClient');
@@ -177,120 +178,113 @@ class ImageGenerator {
 
             // Vérifier que l'imageBuffer est valide
             if (!imageBuffer) {
-                throw new Error('Buffer d\'image manquant (null ou undefined)');
+                throw new Error('Buffer d\'image manquant');
             }
 
             if (!Buffer.isBuffer(imageBuffer)) {
-                console.log('⚠️ imageBuffer n\'est pas un Buffer, tentative de conversion...');
-                try {
-                    imageBuffer = Buffer.from(imageBuffer);
-                    console.log(`✅ Conversion réussie: ${imageBuffer.length} bytes`);
-                } catch (convError) {
-                    throw new Error(`Impossible de convertir en Buffer: ${convError.message}`);
-                }
+                console.log('⚠️ Conversion en Buffer...');
+                imageBuffer = Buffer.from(imageBuffer);
             }
 
             if (imageBuffer.length === 0) {
-                throw new Error('Buffer d\'image vide (0 bytes)');
+                throw new Error('Buffer d\'image vide');
             }
 
             if (imageBuffer.length < 100) {
-                throw new Error(`Buffer d\'image trop petit (${imageBuffer.length} bytes) - probablement corrompu`);
+                throw new Error(`Buffer d\'image trop petit (${imageBuffer.length} bytes)`);
             }
 
-            // Créer le dossier si nécessaire avec permissions explicites
+            // S'assurer que les dossiers existent
             const customImagesDir = path.join(this.assetsPath, 'custom_images');
-            console.log(`📁 Création dossier: ${customImagesDir}`);
             
-            try {
-                await fs.mkdir(customImagesDir, { recursive: true, mode: 0o755 });
-                console.log(`✅ Dossier créé/vérifié: ${customImagesDir}`);
-            } catch (mkdirError) {
-                console.error(`❌ Erreur création dossier: ${mkdirError.message}`);
-                throw new Error(`Impossible de créer le dossier: ${mkdirError.message}`);
+            // Utiliser fsSync pour créer le dossier de manière synchrone
+            if (!fsSync.existsSync(customImagesDir)) {
+                fsSync.mkdirSync(customImagesDir, { recursive: true });
+                console.log(`📁 Dossier créé: ${customImagesDir}`);
+            }
+            
+            if (!fsSync.existsSync(this.tempPath)) {
+                fsSync.mkdirSync(this.tempPath, { recursive: true });
+                console.log(`📁 Dossier temp créé: ${this.tempPath}`);
             }
 
-            // Nettoyer l'ID du personnage pour éviter les caractères problématiques
+            // Nettoyer l'ID du personnage
             const cleanCharacterId = characterId.toString().replace(/[^a-zA-Z0-9_-]/g, '_');
             const imagePath = path.join(customImagesDir, `character_${cleanCharacterId}.png`);
             
-            console.log(`💾 Chemin de sauvegarde: ${imagePath}`);
+            console.log(`💾 Sauvegarde vers: ${imagePath}`);
 
-            // Sauvegarder l'image avec gestion d'erreur détaillée
-            try {
-                await fs.writeFile(imagePath, imageBuffer, { mode: 0o644 });
-                console.log(`✅ Image écrite avec succès: ${imagePath}`);
-            } catch (writeError) {
-                console.error(`❌ Erreur écriture spécifique: ${writeError.message}`);
-                console.error(`❌ Code erreur: ${writeError.code}`);
-                console.error(`❌ Errno: ${writeError.errno}`);
-                
-                // Essayer dans un autre dossier si problème de permissions
-                if (writeError.code === 'EACCES' || writeError.code === 'EPERM') {
-                    console.log('🔄 Tentative sauvegarde dans temp/...');
-                    const tempPath = path.join(this.tempPath, `character_${cleanCharacterId}.png`);
-                    await fs.writeFile(tempPath, imageBuffer);
-                    console.log(`✅ Image sauvegardée dans temp: ${tempPath}`);
-                    return tempPath;
-                }
-                
-                throw new Error(`Erreur écriture fichier: ${writeError.message}`);
-            }
+            // Sauvegarder l'image
+            await fs.writeFile(imagePath, imageBuffer);
+            
+            // Vérifier que le fichier a été créé
+            const stats = await fs.stat(imagePath);
+            console.log(`✅ Image sauvegardée: ${stats.size} bytes`);
 
-            // Vérifier que le fichier a été créé correctement
-            try {
-                const stats = await fs.stat(imagePath);
-                console.log(`📊 Fichier créé - Taille: ${stats.size} bytes (attendu: ${imageBuffer.length})`);
-                
-                if (Math.abs(stats.size - imageBuffer.length) > 10) { // Tolérance de 10 bytes
-                    console.warn(`⚠️ Différence de taille détectée mais acceptable`);
-                }
-            } catch (statError) {
-                console.warn(`⚠️ Impossible de vérifier le fichier (mais probablement OK): ${statError.message}`);
-            }
-
-            // Sauvegarder aussi les métadonnées si fournies
+            // Sauvegarder les métadonnées
             if (metadata && Object.keys(metadata).length > 0) {
-                try {
-                    const metadataPath = path.join(customImagesDir, `character_${cleanCharacterId}_metadata.json`);
-                    const metadataContent = {
-                        ...metadata,
-                        savedAt: new Date().toISOString(),
-                        imageSize: imageBuffer.length,
-                        imagePath: imagePath,
-                        characterId: cleanCharacterId
-                    };
-                    
-                    await fs.writeFile(metadataPath, JSON.stringify(metadataContent, null, 2));
-                    console.log(`✅ Métadonnées sauvegardées: ${metadataPath}`);
-                } catch (metadataError) {
-                    console.warn('⚠️ Erreur sauvegarde métadonnées (image OK):', metadataError.message);
-                }
+                const metadataPath = path.join(customImagesDir, `character_${cleanCharacterId}_metadata.json`);
+                const metadataContent = {
+                    ...metadata,
+                    savedAt: new Date().toISOString(),
+                    imageSize: imageBuffer.length,
+                    imagePath: imagePath,
+                    characterId: cleanCharacterId
+                };
+                
+                await fs.writeFile(metadataPath, JSON.stringify(metadataContent, null, 2));
+                console.log(`✅ Métadonnées sauvegardées`);
             }
 
-            console.log(`✅ Image personnalisée sauvegardée avec succès: ${imagePath} (${imageBuffer.length} bytes)`);
             return imagePath;
 
         } catch (error) {
-            console.error('❌ Erreur COMPLÈTE sauvegarde image personnalisée:');
-            console.error('❌ Message:', error.message);
-            console.error('❌ Type error:', typeof error);
-            console.error('❌ Error name:', error.name);
-            console.error('❌ Error code:', error.code);
-            console.error('❌ Stack trace:', error.stack);
+            console.error('❌ Erreur sauvegarde image:', error.message);
+            console.error('❌ Stack:', error.stack);
             
-            // Retourner une erreur plus claire pour l'utilisateur
-            throw new Error(`❌ Impossible de sauvegarder votre image de personnage: ${error.message}. Veuillez réessayer avec une autre image.`);
+            // Essayer de sauvegarder dans le dossier temp
+            try {
+                const cleanCharacterId = characterId.toString().replace(/[^a-zA-Z0-9_-]/g, '_');
+                const tempImagePath = path.join(this.tempPath, `character_${cleanCharacterId}.png`);
+                
+                console.log(`🔄 Tentative sauvegarde dans temp: ${tempImagePath}`);
+                await fs.writeFile(tempImagePath, imageBuffer);
+                
+                console.log(`✅ Image sauvegardée en temp: ${tempImagePath}`);
+                return tempImagePath;
+                
+            } catch (tempError) {
+                console.error('❌ Erreur sauvegarde temp:', tempError.message);
+                throw new Error(`Impossible de sauvegarder l'image: ${error.message}`);
+            }
         }
     }
 
     async getCustomCharacterImage(characterId) {
         try {
-            const imagePath = path.join(this.assetsPath, 'custom_images', `character_${characterId}.png`);
-            const imageBuffer = await fs.readFile(imagePath);
-            return imageBuffer;
+            const cleanCharacterId = characterId.toString().replace(/[^a-zA-Z0-9_-]/g, '_');
+            
+            // Chercher d'abord dans custom_images
+            const imagePath = path.join(this.assetsPath, 'custom_images', `character_${cleanCharacterId}.png`);
+            if (fsSync.existsSync(imagePath)) {
+                const imageBuffer = await fs.readFile(imagePath);
+                console.log(`✅ Image personnalisée trouvée: ${imagePath}`);
+                return imageBuffer;
+            }
+            
+            // Chercher ensuite dans temp
+            const tempImagePath = path.join(this.tempPath, `character_${cleanCharacterId}.png`);
+            if (fsSync.existsSync(tempImagePath)) {
+                const imageBuffer = await fs.readFile(tempImagePath);
+                console.log(`✅ Image personnalisée trouvée en temp: ${tempImagePath}`);
+                return imageBuffer;
+            }
+            
+            console.log(`⚠️ Aucune image personnalisée trouvée pour: ${characterId}`);
+            return null;
+            
         } catch (error) {
-            // Image personnalisée non trouvée, retourner null
+            console.error('❌ Erreur lecture image personnalisée:', error.message);
             return null;
         }
     }
