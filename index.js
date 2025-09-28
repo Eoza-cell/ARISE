@@ -53,7 +53,7 @@ class FrictionUltimateBot {
 
         // IA Frictia pour les groupes de discussion
         this.frictiaAI = new FrictiaAI();
-        
+
         // Gestionnaire de temps de réaction (sera initialisé après connexion)
         this.reactionTimeManager = null;
 
@@ -517,7 +517,7 @@ class FrictionUltimateBot {
 
                     // Frictia surveille automatiquement les mentions de combat et de réaction
                     const combatKeywords = ['attaque', 'combat', 'réaction', 'défense', 'esquive', 'temps', 'timer'];
-                    const containsCombatKeyword = combatKeywords.some(keyword => 
+                    const containsCombatKeyword = combatKeywords.some(keyword =>
                         messageText.toLowerCase().includes(keyword)
                     );
 
@@ -529,7 +529,7 @@ class FrictionUltimateBot {
                                 userName,
                                 this.frictiaAI.getConversationContext(from)
                             );
-                            
+
                             if (combatResponse) {
                                 await this.sendResponse(from, {
                                     text: `⚔️ **Frictia surveille** ⚔️\n\n${combatResponse}`

@@ -489,59 +489,25 @@ Après ta photo, décris ton personnage idéal :
         try {
             console.log(`📸 Photo reçue pour création personnage de ${player.whatsappNumber}`);
 
-            // Vérifier que originalMessage existe et contient une image
-            if (!originalMessage || !originalMessage.message) {
-                console.error('❌ Message original manquant ou invalide');
+            // Vérifier que nous avons une image à traiter
+            if (!imageMessage || !imageMessage.buffer) {
+                console.error('❌ ImageMessage manquant ou invalide');
                 return {
                     text: `❌ **Erreur de message**
 
-Le message image n'a pas pu être traité. Réessaie d'envoyer ta photo.`
+L'image n'a pas pu être traitée. Réessaie d'envoyer ta photo.`
                 };
             }
 
-            const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+            // Utiliser directement le buffer de imageMessage qui a déjà été téléchargé
+            const imageBuffer = imageMessage.buffer;
+            const mimetype = imageMessage.mimetype || 'image/jpeg';
 
-            // Améliorer la gestion du téléchargement avec retry
-            let imageBuffer = null;
-            let attempts = 0;
-            const maxAttempts = 3;
-
-            while (attempts < maxAttempts && !imageBuffer) {
-                try {
-                    console.log(`🔄 Tentative de téléchargement ${attempts + 1}/${maxAttempts}...`);
-
-                    imageBuffer = await downloadMediaMessage(originalMessage, 'buffer', {}, {
-                        logger: require('pino')({ level: 'silent' })
-                    });
-
-                    if (imageBuffer && imageBuffer.length > 0) {
-                        console.log(`✅ Image téléchargée: ${imageBuffer.length} bytes`);
-                        break;
-                    } else {
-                        console.log('⚠️ Buffer vide, nouvelle tentative...');
-                        imageBuffer = null;
-                    }
-                } catch (downloadError) {
-                    console.error(`❌ Tentative ${attempts + 1} échouée:`, downloadError.message);
-                    imageBuffer = null;
-                }
-
-                attempts++;
-                if (attempts < maxAttempts) {
-                    await new Promise(resolve => setTimeout(resolve, 1000)); // Attendre 1 seconde
-                }
-            }
+            console.log(`✅ Utilisation image déjà téléchargée: ${imageBuffer.length} bytes`);
 
             if (imageBuffer && imageBuffer.length > 0) {
                 // Valider le type d'image
                 const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-                let mimetype = 'image/jpeg'; // Défaut
-
-                if (originalMessage.message.imageMessage) {
-                    mimetype = originalMessage.message.imageMessage.mimetype || 'image/jpeg';
-                } else if (originalMessage.message.viewOnceMessage?.message?.imageMessage) {
-                    mimetype = originalMessage.message.viewOnceMessage.message.imageMessage.mimetype || 'image/jpeg';
-                }
 
                 if (!validImageTypes.includes(mimetype.toLowerCase())) {
                     return {
@@ -590,24 +556,7 @@ Réessaie avec une image plus petite.`
                     };
                 }
 
-                // Vérifier si l'image a été validée
-                if (imageMessage.isValidated === false) {
-                    return {
-                        text: `❌ **Format d'image non valide**
-
-📸 **Formats acceptés :**
-• JPEG/JPG ✅
-• PNG ✅  
-• WebP ✅
-
-⚠️ **Évite :**
-• Captures d'écran de mauvaise qualité
-• Images corrompues
-• Formats non supportés
-
-Réessaie avec une vraie photo en format JPEG ou PNG.`
-                    };
-                }
+                // L'image a déjà été validée lors de l'extraction
 
                 try {
                     await imageGenerator.saveCustomCharacterImage(player.id, imageBuffer, {
