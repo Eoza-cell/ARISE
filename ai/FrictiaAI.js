@@ -11,26 +11,26 @@ class FrictiaAI {
         this.groqClient = new GroqClient();
         this.name = "Frictia";
         this.avatar = "Erza Scarlet"; // Avatar basé sur Erza Scarlet
-        
+
         // Référence aux systèmes du jeu (sera injectée)
         this.gameEngine = null;
         this.reactionTimeManager = null;
         this.sock = null;
-        
+
         // Rôle d'administrateur de combat
         this.isAdmin = true;
         this.adminLevel = 'COMBAT_MODERATOR';
-        
+
         // Surveillance des actions de combat
         this.activeCombats = new Map();
         this.reactionTimers = new Map();
-        
+
         // Personnalité inspirée d'Erza Scarlet
         this.personality = {
             traits: [
                 "Forte et déterminée comme une guerrière",
                 "Loyale envers ses amis",
-                "Stricte mais juste", 
+                "Stricte mais juste",
                 "Protectrice des autres",
                 "Passionnée par la justice et l'honneur",
                 "Directe dans ses paroles",
@@ -48,7 +48,7 @@ class FrictiaAI {
             "justice et honneur",
             "magie et pouvoirs",
             "armures et équipements",
-            "discipline et entraînement", 
+            "discipline et entraînement",
             "loyauté et camaraderie",
             "défense des innocents",
             "force intérieure",
@@ -59,25 +59,25 @@ class FrictiaAI {
 
         // Stickers Erza Scarlet pour WhatsApp
         this.erzaStickers = [
-            "⚔️", "🛡️", "✨", "💪", "🔥", "⭐", "🌟", "💎", 
+            "⚔️", "🛡️", "✨", "💪", "🔥", "⭐", "🌟", "💎",
             "🏆", "👑", "🗡️", "🌸", "💫", "🦄", "🌺", "⚡"
         ];
 
         // URLs d'images d'Erza Scarlet (avatar)
         this.erzaAvatars = [
             "https://i.pinimg.com/736x/8c/9a/8c/8c9a8c5c1c4c4c4c4c4c4c4c4c4c4c4c.jpg",
-            "https://wallpaperaccess.com/full/1878877.jpg", 
+            "https://wallpaperaccess.com/full/1878877.jpg",
             "https://i.pinimg.com/originals/4e/3a/9a/4e3a9a9a9a9a9a9a9a9a9a9a9a9a9a9a.jpg"
         ];
 
         // Cache des conversations récentes pour le contexte
         this.conversationHistory = new Map();
         this.maxHistoryPerGroup = 15; // Plus d'historique pour Erza
-        
+
         // Dernière activité par groupe pour gérer le timing
         this.lastActivity = new Map();
         this.minIntervalBetweenMessages = 20000; // 20 secondes (plus réactive)
-        
+
         // Commandes que Frictia peut exécuter
         this.supportedCommands = [
             'aide', 'help', 'info', 'status', 'ping', 'time', 'date',
@@ -105,17 +105,17 @@ class FrictiaAI {
         if (!this.reactionTimeManager) return;
 
         const activeReactions = this.reactionTimeManager.activeReactions;
-        
+
         for (const [actionId, reactionData] of activeReactions.entries()) {
             if (reactionData.status === 'waiting') {
                 const timeLeft = reactionData.endTime - Date.now();
                 const secondsLeft = Math.floor(timeLeft / 1000);
-                
+
                 // Envoyer des rappels Frictia à des moments critiques
                 if (secondsLeft === 30 || secondsLeft === 10 || secondsLeft === 5) {
                     await this.sendReactionReminder(reactionData, secondsLeft);
                 }
-                
+
                 // Verdict final quand le temps expire
                 if (timeLeft <= 0 && !this.reactionTimers.has(actionId + '_verdict')) {
                     this.reactionTimers.set(actionId + '_verdict', true);
@@ -178,7 +178,7 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
 
 🗿 **CONSÉQUENCES :**
 • Aucune défense appliquée
-• Subira l'attaque complète  
+• Subira l'attaque complète
 • Pénalité de réaction lente
 
 ⚡ **Mon jugement :** ${this.getRandomVerdict()}
@@ -209,14 +209,14 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
      */
     async getCharacterInfo(playerId) {
         if (!this.gameEngine) return null;
-        
+
         if (playerId.startsWith('npc_')) {
             return {
                 name: `PNJ-${playerId.slice(-5)}`,
                 powerLevel: 'G' // Par défaut pour PNJ
             };
         }
-        
+
         try {
             return await this.gameEngine.dbManager.getCharacterByPlayer(playerId);
         } catch (error) {
@@ -231,10 +231,10 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
     shouldRespond(message, groupId, isDirectlyMentioned = false, groupName = '') {
         const now = Date.now();
         const lastTime = this.lastActivity.get(groupId) || 0;
-        
+
         // Détecter si c'est un groupe taverne
         const isTaverneGroup = this.isTaverneGroup(groupName);
-        
+
         // Si mentionnée directement, toujours répondre (sauf si trop récent)
         if (isDirectlyMentioned) {
             return (now - lastTime) > 3000; // 3 secondes minimum pour les mentions
@@ -251,10 +251,12 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
             return Math.random() < 0.6;
         }
 
-        // Sinon, répondre occasionnellement selon des critères
-        const timeSinceLastResponse = now - lastTime;
-        
+        // Si ce n'est PAS un groupe taverne, Frictia doit être moins active
+        // et ne doit pas interagir avec les joueurs pour les commandes de jeu.
+        // Les autres fonctions du bot doivent fonctionner normalement dans ces groupes.
+
         // Ne pas répondre si trop récent
+        const timeSinceLastResponse = now - lastTime;
         if (timeSinceLastResponse < this.minIntervalBetweenMessages) {
             return false;
         }
@@ -269,7 +271,7 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
 
         const lowerMessage = message.toLowerCase();
         const containsTrigger = triggerWords.some(word => lowerMessage.includes(word));
-        
+
         // Erza est plus proactive que l'ancienne Frictia
         if (containsTrigger) {
             return Math.random() < 0.8; // 80% de chance si mot-clé
@@ -291,13 +293,13 @@ ${isNPC ? '🤖' : '👤'} **${name}** n'a pas réagi à temps !
         try {
             // Construire le contexte de la conversation
             const contextMessages = conversationContext.slice(-5); // 5 derniers messages max
-            const contextString = contextMessages.length > 0 
+            const contextString = contextMessages.length > 0
                 ? `\nContexte récent de la conversation:\n${contextMessages.map(msg => `${msg.user}: ${msg.message}`).join('\n')}`
                 : '';
 
             // Détecter si c'est un groupe taverne
             const isTaverneGroup = this.isTaverneGroup(groupName);
-            
+
             const prompt = `Tu es Frictia, une IA avec la personnalité d'Erza Scarlet de Fairy Tail. Tu participes aux discussions WhatsApp comme une amie loyale et protectrice.
 
 **Ta personnalité (Erza Scarlet):**
@@ -356,7 +358,7 @@ Réponds uniquement avec le message de Frictia/Erza, sans préfixe ni explicatio
             "Tu as raison de chercher à comprendre. La connaissance est une arme puissante 💎",
             "Ton point de vue honore ta sagesse ! 🌟"
         ];
-        
+
         return erzaFallbacks[Math.floor(Math.random() * erzaFallbacks.length)];
     }
 
@@ -365,17 +367,17 @@ Réponds uniquement avec le message de Frictia/Erza, sans préfixe ni explicatio
      */
     isTaverneGroup(groupName) {
         if (!groupName) return false;
-        
+
         const taverneKeywords = [
             'taverne', 'tavern', 'chat', 'discussion', 'bar', 'auberge',
             'inn', 'pub', 'cafe', 'salon', 'lounge', 'gathering'
         ];
-        
+
         const normalizedName = groupName.toLowerCase()
             .normalize('NFKD')
             .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
             .replace(/[^a-z0-9\s]/g, ''); // Supprime les caractères spéciaux
-        
+
         return taverneKeywords.some(keyword => normalizedName.includes(keyword));
     }
 
@@ -398,12 +400,12 @@ Réponds uniquement avec le message de Frictia/Erza, sans préfixe ni explicatio
      */
     async handleCommand(command, userName) {
         const cmd = command.toLowerCase().replace('/', '').replace('!', '');
-        
+
         switch(cmd) {
             case 'aide':
             case 'help':
                 return `Salut ${userName} ! Je suis Frictia, ton amie guerrière ! ⚔️
-                
+
 Commandes disponibles:
 • /motivation - Reçois un message motivant
 • /conseil - Demande un conseil d'Erza
@@ -436,13 +438,13 @@ Je peux aussi discuter de tout - pose-moi tes questions ! 💪`;
             case 'force':
             case 'courage':
                 return `"La magie n'est pas déterminée par la naissance. Elle provient du cœur." ✨
-                
+
 Cette citation me guide chaque jour. Ta force véritable vient de l'intérieur ! ⚔️`;
 
             case 'avatar':
             case 'erza':
                 return `Je suis Erza Scarlet, la guerrière écarlate ! ⚔️
-                
+
 Mon armure change selon mes besoins, mais ma détermination reste inébranlable.
 Je protège mes amis avec ma vie ! 🛡️✨`;
 
@@ -469,14 +471,14 @@ Je protège mes amis avec ma vie ! 🛡️✨`;
             case 'verdict':
                 if (!this.reactionTimeManager) return "❌ Système de combat non disponible";
                 return `⚔️ **Verdicts de Frictia disponibles** ⚔️
-                
+
 Je surveille tous les combats et délivre des verdicts justes !
 💪 Mon rôle : Assurer que chaque guerrier respecte son temps de réaction
 🛡️ Justice : Aucune faveur, seule la rapidité compte !`;
 
             case 'force_reaction':
                 return `⚡ **Force de réaction** ⚡
-                
+
 En tant qu'Erza, je peux forcer une réaction si nécessaire.
 ⚔️ Utilise cette commande en cas de problème technique
 🛡️ Seuls les vrais problèmes justifient cette intervention !`;
@@ -588,7 +590,7 @@ En tant qu'Erza, je peux forcer une réaction si nécessaire.
         return `🛡️ **Réactions surveillées** 🛡️
 
 📊 Réactions actives: ${activeCount}
-⚔️ En tant qu'Erza, je supervise chaque temps de réaction
+⚔️ En tant qu'Erza, je supervois chaque temps de réaction
 💪 Aucun guerrier ne peut échapper à ma vigilance !
 
 ${activeCount > 0 ? '⏰ Comptes à rebours en cours...' : '✨ Tous les guerriers sont prêts !'}`;
@@ -604,16 +606,16 @@ ${activeCount > 0 ? '⏰ Comptes à rebours en cours...' : '✨ Tous les guerrie
 
         const reactionTimes = this.reactionTimeManager.reactionTimes;
         let status = `⏰ **Temps de réaction par rang** ⏰\n\n`;
-        
+
         for (const [rank, time] of Object.entries(reactionTimes)) {
             const seconds = Math.floor(time / 1000);
             const minutes = Math.floor(seconds / 60);
             const remainingSeconds = seconds % 60;
-            
-            let timeDisplay = minutes > 0 ? 
-                `${minutes}m ${remainingSeconds}s` : 
+
+            let timeDisplay = minutes > 0 ?
+                `${minutes}m ${remainingSeconds}s` :
                 `${seconds}s`;
-                
+
             status += `⚔️ **${rank}**: ${timeDisplay}\n`;
         }
 
@@ -629,7 +631,7 @@ ${activeCount > 0 ? '⏰ Comptes à rebours en cours...' : '✨ Tous les guerrie
         setInterval(() => {
             this.monitorReactionTimes();
         }, 2000);
-        
+
         console.log('⚔️ Frictia: Surveillance des combats activée');
     }
 }

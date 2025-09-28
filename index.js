@@ -479,17 +479,32 @@ class FrictionUltimateBot {
                 console.log(`📸 Image reçue de ${playerNumber}: ${messageImage.mimetype}, ${messageImage.buffer.length} bytes`);
             }
 
-            const result = await this.gameEngine.processPlayerMessage({
-                playerNumber,
-                chatId: from,
-                message: normalizedMessage,
-                originalMessage: messageText, // Garder l'original pour l'affichage
-                imageMessage: messageImage,
-                originalMessageObj: message,
-                sock: this.sock,
-                dbManager: this.dbManager,
-                imageGenerator: this.imageGenerator
-            });
+            // IMPORTANT: Vérifier si c'est un groupe taverne
+            const groupName = groupMetadata?.subject || '';
+            const isTaverneGroup = this.frictiaAI.isTaverneGroup(groupName);
+            
+            let result = { text: '' }; // Réponse par défaut vide
+            
+            // Dans les groupes taverne, BLOQUER toutes les fonctions du bot sauf Frictia
+            if (isTaverneGroup) {
+                console.log(`🍺 Groupe taverne détecté: "${groupName}" - Fonctions de jeu BLOQUÉES`);
+                // Pas de traitement par le GameEngine dans les tavernes
+                result = { text: '' }; // Réponse vide
+            } else {
+                // Dans les autres groupes/privé, fonctionnement normal
+                console.log(`🎮 Groupe/privé normal: "${groupName}" - Toutes fonctions ACTIVES`);
+                result = await this.gameEngine.processPlayerMessage({
+                    playerNumber,
+                    chatId: from,
+                    message: normalizedMessage,
+                    originalMessage: messageText, // Garder l'original pour l'affichage
+                    imageMessage: messageImage,
+                    originalMessageObj: message,
+                    sock: this.sock,
+                    dbManager: this.dbManager,
+                    imageGenerator: this.imageGenerator
+                });
+            }
 
             // FRICTIA AI - Connectée à TOUTES les commandes et conversations
             if (messageText) {
@@ -619,10 +634,12 @@ class FrictionUltimateBot {
                 }
             }
 
-            // Envoi de la réponse unifiée du jeu
-            setTimeout(async () => {
-                await this.sendResponse(from, result);
-            }, 100);
+            // Envoi de la réponse unifiée du jeu SEULEMENT si ce n'est pas un groupe taverne
+            if (!isTaverneGroup && result.text && result.text.trim() !== '') {
+                setTimeout(async () => {
+                    await this.sendResponse(from, result);
+                }, 100);
+            }
 
         } catch (error) {
             console.error('❌ Erreur lors du traitement du message:', error);
