@@ -356,7 +356,7 @@ Tu es maintenant enregistré en tant que : **${username}**
 
 📱 **Commandes disponibles :**
 • /menu - Menu principal
-• /créer - Créer ton personnage  
+• /créer - Créer ton personnage
 • /aide - Liste complète des commandes
 • /jouer - Entrer en mode jeu
 
@@ -964,7 +964,7 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
     /**
      * Traite une réaction PNJ automatique
      */
-    processNPCReaction(actionId, npcData, npcReaction) {
+    processNPCReaction(npcData, npcReaction) {
         console.log(`🤖 Traitement réaction PNJ: ${npcData.name} - ${npcReaction.action}`);
 
         // Logique future pour traiter les réactions PNJ
@@ -1692,37 +1692,111 @@ Le destin semble retenir son souffle...`;
 
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
-            console.log(`🎭 Traitement action IA pour ${character.name}: ${message}`);
+            console.log(`🎭 Action RPG: ${message} pour ${character.name}`);
 
-            // Générer une narration enrichie avec l'IA
-            let narration = '';
-            if (this.groqClient && this.groqClient.hasValidClient()) {
-                try {
-                    const prompt = `Tu es le narrateur du jeu RPG "Friction Ultimate". Le personnage ${character.name} (niveau ${character.level}, rang ${character.powerLevel}) du royaume ${character.kingdom} effectue l'action suivante: "${message}".
+            // Vérifier si le personnage a assez d'énergie pour l'action
+            if (character.currentEnergy < 5) {
+                return {
+                    text: `⚡ **ÉPUISEMENT TOTAL** ⚡
 
-Localisation actuelle: ${character.currentLocation}
+${character.name} est complètement épuisé !
 
-Génère une narration immersive et captivante qui:
-1. Décrit l'action du personnage de manière épique
-2. Inclut des détails sur l'environnement
-3. Mentionne les sensations physiques du personnage
-4. Ajoute des éléments atmosphériques
-5. Garde un ton médiéval-fantastique
+❤️ **Vie :** ${character.currentLife}/${character.maxLife}
+⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}
 
-Narration (200 mots maximum):`;
-
-                    narration = await this.groqClient.generateNarration(prompt, 300);
-                    console.log(`✅ Narration IA enrichie générée: ${narration.substring(0, 100)}...`);
-                } catch (narrationError) {
-                    console.error('❌ Erreur génération narration IA:', narrationError);
-                    narration = `${character.name} effectue l'action demandée dans ${character.currentLocation}.`;
-                }
-            } else {
-                narration = `${character.name} effectue "${message}" dans ${character.currentLocation}.`;
+🛌 Vous devez vous reposer avant de pouvoir agir.
+💡 Tapez "je me repose" pour récupérer de l'énergie.`
+                };
             }
 
-            // Générer une image pour l'action
+            // Traitement spécial pour le repos
+            if (message.toLowerCase().includes('me repose') || message.toLowerCase().includes('repos')) {
+                const energyRecovered = Math.min(25, character.maxEnergy - character.currentEnergy);
+                const newEnergy = Math.min(character.maxEnergy, character.currentEnergy + energyRecovered);
+
+                await dbManager.updateCharacter(character.id, {
+                    currentEnergy: newEnergy
+                });
+
+                return {
+                    text: `😴 **REPOS RÉPARATEUR** 😴
+
+${character.name} prend un moment de repos dans ${character.currentLocation}.
+
+⚡ **Énergie récupérée :** +${energyRecovered}
+⚡ **Énergie totale :** ${newEnergy}/${character.maxEnergy}
+
+🌟 Vous vous sentez revigoré et prêt pour de nouveaux défis !`
+                };
+            }
+
+            // Analyser l'action pour plus de contexte
+            const actionContext = this.analyzeActionForContext(message, character);
+
+            // Générer la narration avec l'IA la plus performante disponible
+            let narration = '';
             let actionImage = null;
+
+            if (this.groqClient && this.groqClient.hasValidClient()) {
+                try {
+                    console.log('🤖 Génération narration avec Groq...');
+                    const sessionId = `player_${player.id}`;
+
+                    // Contexte enrichi pour une meilleure narration
+                    const enrichedContext = {
+                        character: character,
+                        action: message,
+                        location: character.currentLocation,
+                        actionType: actionContext.type,
+                        previousActions: await this.getRecentPlayerActions(player.id),
+                        environmentalFactors: this.getEnvironmentalFactors(character.currentLocation),
+                        timeOfDay: await this.getGameTimeOfDay(player.id)
+                    };
+
+                    narration = await this.groqClient.generateExplorationNarration(
+                        character.currentLocation,
+                        message,
+                        sessionId,
+                        character
+                    );
+
+                    // Ajouter des éléments narratifs supplémentaires selon le type d'action
+                    narration = this.enhanceNarrationWithContext(narration, actionContext, character);
+
+                } catch (error) {
+                    console.error('❌ Erreur Groq, fallback vers Gemini:', error);
+                    if (this.geminiClient && this.geminiClient.isAvailable) {
+                        narration = await this.geminiClient.generateNarration({
+                            character: character,
+                            action: message,
+                            location: character.currentLocation
+                        }, `player_${player.id}`);
+                    }
+                }
+            } else if (this.geminiClient && this.geminiClient.isAvailable) {
+                console.log('🤖 Génération narration avec Gemini...');
+                narration = await this.geminiClient.generateNarration({
+                    character: character,
+                    action: message,
+                    location: character.currentLocation
+                }, `player_${player.id}`);
+            }
+
+            // Si aucune IA n'est disponible, utiliser la narration immersive
+            if (!narration || narration.length < 10) {
+                console.log('📖 Génération narration immersive fallback...');
+                const ImmersiveNarrationManager = require('../utils/ImmersiveNarrationManager');
+                const immersiveManager = new ImmersiveNarrationManager(dbManager);
+                const immersiveResult = await immersiveManager.generateImmersiveNarration(
+                    character,
+                    message,
+                    character.currentLocation
+                );
+                narration = immersiveResult.text;
+            }
+
+
+            // Générer une image pour l'action
             try {
                 actionImage = await imageGenerator.generateCharacterActionImage(character, message, narration, {
                     style: '3d',
@@ -1773,6 +1847,7 @@ Narration (200 mots maximum):`;
                 console.error('❌ Erreur génération vidéo action:', videoError.message);
             }
 
+
             // Traiter l'action et mettre à jour le personnage
             const actionResult = {
                 energyCost: Math.floor(Math.random() * 10) + 5,
@@ -1780,7 +1855,11 @@ Narration (200 mots maximum):`;
                 newLocation: character.currentLocation // Peut être modifié selon l'action
             };
 
+            // Mettre à jour le personnage avec le système de difficulté
             await this.updateCharacterAfterAction(character, message, actionResult, dbManager);
+            // Sauvegarder l'action pour la continuité narrative
+            await this.savePlayerAction(player.id, message, actionResult);
+
 
             const response = {
                 text: `🎭 **${character.name}** - ${character.currentLocation}
@@ -1980,7 +2059,7 @@ ${narration}
         }
 
         // XP bonus basé sur le niveau de l'adversaire (si applicable)
-        // Cette partie nécessiterait une analyse plus poussée de 'action' pour identifier l'adversaire
+        // Cette partie nécessiterait une analyse plus approfondie de 'action' pour identifier l'adversaire
 
         return Math.floor(xp);
     }
@@ -2261,6 +2340,172 @@ Crée une narration qui donne envie de connaître la suite !`;
             'KHALDAR': ["circuits lumineux", "bourdonnements électriques", "technologies mystiques"]
         };
         return elements[kingdom] || ["éléments mystérieux"];
+    }
+
+    /**
+     * Analyse une action pour déterminer son contexte et son type
+     */
+    analyzeActionForContext(message, character) {
+        const lowerMessage = message.toLowerCase();
+
+        const actionTypes = {
+            combat: ['attaque', 'frappe', 'combat', 'coup', 'se bat', 'uppercut', 'crochet'],
+            social: ['parle', 'dit', 'demande', 'salue', 'questionne', 'crie'],
+            exploration: ['explore', 'cherche', 'examine', 'regarde', 'fouille', 'inspecte'],
+            movement: ['va', 'marche', 'cours', 'avance', 'entre', 'sort', 'monte', 'descend'],
+            rest: ['repose', 'repos', 'dort', 'médite', 'se détend']
+        };
+
+        for (const [type, keywords] of Object.entries(actionTypes)) {
+            if (keywords.some(keyword => lowerMessage.includes(keyword))) {
+                return {
+                    type: type,
+                    keywords: keywords.filter(k => lowerMessage.includes(k)),
+                    complexity: this.calculateActionComplexity(message),
+                    riskLevel: this.assessActionRisk(message, type)
+                };
+            }
+        }
+
+        return {
+            type: 'generic',
+            keywords: [],
+            complexity: 'simple',
+            riskLevel: 'low'
+        };
+    }
+
+    /**
+     * Calcule la complexité d'une action
+     */
+    calculateActionComplexity(message) {
+        if (message.length < 20) return 'simple';
+        if (message.length < 50) return 'moderate';
+        return 'complex';
+    }
+
+    /**
+     * Évalue le niveau de risque d'une action
+     */
+    assessActionRisk(message, actionType) {
+        const riskKeywords = {
+            high: ['attaque', 'combat', 'tue', 'massacre', 'détruit'],
+            moderate: ['explore', 'cherche', 'court', 'grimpe'],
+            low: ['parle', 'regarde', 'marche', 'dit']
+        };
+
+        for (const [level, keywords] of Object.entries(riskKeywords)) {
+            if (keywords.some(keyword => message.toLowerCase().includes(keyword))) {
+                return level;
+            }
+        }
+
+        return actionType === 'combat' ? 'high' : 'low';
+    }
+
+    /**
+     * Améliore la narration avec du contexte supplémentaire
+     */
+    enhanceNarrationWithContext(narration, actionContext, character) {
+        let enhanced = narration;
+
+        // Ajouter des éléments contextuels selon le type d'action
+        if (actionContext.type === 'combat') {
+            enhanced += `\n\n⚔️ **État de combat :** ${character.name} entre en mode bataille !`;
+        } else if (actionContext.type === 'exploration') {
+            enhanced += `\n\n🔍 **Exploration :** Vos sens sont en alerte...`;
+        } else if (actionContext.type === 'social') {
+            enhanced += `\n\n💬 **Interaction sociale :** L'atmosphère change autour de vous...`;
+        }
+
+        // Ajouter des informations sur l'état du personnage
+        if (character.currentEnergy < 20) {
+            enhanced += `\n\n⚠️ **Fatigue :** Vous ressentez la fatigue s'installer.`;
+        }
+
+        if (character.currentLife < character.maxLife * 0.5) {
+            enhanced += `\n\n🩸 **Blessures :** Vos blessures vous ralentissent.`;
+        }
+
+        return enhanced;
+    }
+
+    /**
+     * Récupère les actions récentes d'un joueur pour la continuité narrative
+     */
+    async getRecentPlayerActions(playerId) {
+        try {
+            // Utiliser la base de données pour récupérer les actions récentes
+            const recentActions = await this.dbManager.getTemporaryData(playerId, 'recent_actions') || [];
+            return recentActions.slice(-3); // Garder les 3 dernières actions
+        } catch (error) {
+            console.error('❌ Erreur récupération actions récentes:', error);
+            return [];
+        }
+    }
+
+    /**
+     * Sauvegarde une action pour la continuité narrative
+     */
+    async savePlayerAction(playerId, action, result) {
+        try {
+            const recentActions = await this.getRecentPlayerActions(playerId);
+            recentActions.push({
+                action: action,
+                result: result,
+                timestamp: Date.now()
+            });
+
+            // Garder seulement les 5 dernières actions
+            if (recentActions.length > 5) {
+                recentActions.shift();
+            }
+
+            await this.dbManager.setTemporaryData(playerId, 'recent_actions', recentActions);
+        } catch (error) {
+            console.error('❌ Erreur sauvegarde action:', error);
+        }
+    }
+
+    /**
+     * Obtient les facteurs environnementaux pour une localisation
+     */
+    getEnvironmentalFactors(location) {
+        const factors = {
+            'Grande Plaine d\'Honneur - Village de Valorhall': {
+                atmosphere: 'paisible et ordonnée',
+                dangers: 'faibles',
+                npcs: 'gardes loyaux et marchands honnêtes'
+            },
+            'Forêt des Murmures - Clairière de Lunelame': {
+                atmosphere: 'mystérieuse et sombre',
+                dangers: 'modérés',
+                npcs: 'créatures sylvestres et esprits anciens'
+            }
+        };
+
+        return factors[location] || {
+            atmosphere: 'inconnue',
+            dangers: 'imprévisibles',
+            npcs: 'inconnus'
+        };
+    }
+
+    /**
+     * Obtient l'heure du jour dans le jeu
+     */
+    async getGameTimeOfDay(playerId) {
+        try {
+            const gameTime = await this.dbManager.getTemporaryData(playerId, 'game_time') || 0;
+            const hour = gameTime % 24;
+
+            if (hour < 6) return 'aube';
+            if (hour < 12) return 'matin';
+            if (hour < 18) return 'après-midi';
+            return 'soir';
+        } catch (error) {
+            return 'jour';
+        }
     }
 }
 
