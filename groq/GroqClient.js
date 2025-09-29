@@ -109,9 +109,12 @@ Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 car
 
             let narration = response.choices[0]?.message?.content?.trim() || '';
             
-            // Forcer la limite de 700 caractères
+            // Forcer la limite STRICTE de 700 caractères
             if (narration.length > 700) {
-                narration = narration.substring(0, 697) + '...';
+                // Couper au dernier espace pour éviter de couper un mot
+                const truncated = narration.substring(0, 697);
+                const lastSpace = truncated.lastIndexOf(' ');
+                narration = (lastSpace > 600 ? truncated.substring(0, lastSpace) : truncated) + '...';
             }
 
             return narration;

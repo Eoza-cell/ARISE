@@ -365,7 +365,7 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
                     };
                 }
 
-                const dialogueKeywords = ['parle', 'dis', 'demande', 'salue', 'bonjour', 'bonsoir', 'hey', '"'];
+                const dialogueKeywords = ['parle', 'dis', 'demande', 'salue', 'bonjour', 'bonsoir', 'hey', '"', 'tape l\'épaule', 'interpelle'];
                 const isDialogue = dialogueKeywords.some(keyword =>
                     message.toLowerCase().includes(keyword)
                 ) || message.includes('"') || message.toLowerCase().startsWith('je dis');
@@ -1683,6 +1683,100 @@ Chaque muscle se tend, chaque sens s'aiguise. ${character.currentEnergy < 50 ? '
 Le destin semble retenir son souffle...`;
     }
 
+    /**
+     * Traite les actions de dialogue avec les PNJ
+     */
+    async processDialogueAction({ player, character, message, dbManager, imageGenerator }) {
+        try {
+            console.log(`💬 Action dialogue détectée: ${message}`);
+
+            // Détecter le type d'interaction avec PNJ
+            const npcInteraction = this.detectNPCInteraction(message);
+            
+            let narration = `💬 **INTERACTION AVEC PNJ** 💬\n\n`;
+            
+            if (npcInteraction) {
+                narration += `🎯 **${character.name}** tente de ${npcInteraction.type} avec ${npcInteraction.target}.\n\n`;
+                
+                // Générer une réponse PNJ basique
+                const npcResponse = this.generateBasicNPCResponse(npcInteraction, character);
+                narration += `🗣️ **Réponse du PNJ :**\n"${npcResponse}"\n\n`;
+                
+                narration += `📍 **Lieu :** ${character.currentLocation}\n`;
+                narration += `⚡ **Énergie utilisée :** 2 points`;
+                
+                // Consommer un peu d'énergie pour l'interaction
+                character.currentEnergy = Math.max(0, character.currentEnergy - 2);
+                await dbManager.updateCharacter(character.id, {
+                    currentEnergy: character.currentEnergy
+                });
+            } else {
+                narration += `${character.name} tente de communiquer mais n'identifie pas de cible précise.\n\n`;
+                narration += `💡 **Conseil :** Précisez avec qui vous voulez interagir (garde, marchand, villageois, etc.)`;
+            }
+
+            // Générer une image si possible
+            let actionImage = null;
+            try {
+                actionImage = await imageGenerator.generateCharacterActionImage(
+                    character,
+                    message,
+                    narration,
+                    { style: '3d', perspective: 'first_person' }
+                );
+            } catch (imageError) {
+                console.log('⚠️ Erreur génération image dialogue:', imageError.message);
+            }
+
+            return {
+                text: narration,
+                image: actionImage
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur processDialogueAction:', error);
+            return {
+                text: `💬 **TENTATIVE D'INTERACTION**
+
+${character.name} tente d'interagir avec les environs, mais l'échange reste silencieux.
+
+💡 Utilisez des termes plus précis comme "parle au garde" ou "salue le marchand".`
+            };
+        }
+    }
+
+    /**
+     * Génère une réponse basique de PNJ
+     */
+    generateBasicNPCResponse(npcInteraction, character) {
+        const responses = {
+            garde: [
+                "Que faites-vous dans ces parages ?",
+                "Tout va bien, citoyen ?",
+                "Restez vigilant, des bandits rôdent."
+            ],
+            marchand: [
+                "Bienvenue ! Que puis-je vous vendre ?",
+                "J'ai des objets rares aujourd'hui !",
+                "Mes prix sont les meilleurs de la région."
+            ],
+            villageois: [
+                "Bonjour, étranger !",
+                "Belle journée, n'est-ce pas ?",
+                "Attention aux routes la nuit."
+            ]
+        };
+
+        const npcType = npcInteraction.target.toLowerCase();
+        const possibleResponses = responses[npcType] || [
+            "Bonjour.",
+            "Que voulez-vous ?",
+            "Je n'ai pas le temps de parler."
+        ];
+
+        return possibleResponses[Math.floor(Math.random() * possibleResponses.length)];
+    }
+
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
             // Vérifier que le personnage a assez d'énergie pour agir
@@ -1800,9 +1894,16 @@ Narre cette scène comme si tu étais George R.R. Martin ou J.R.R. Tolkien, avec
                 console.log('⚠️ Erreur génération vidéo action:', videoError.message);
             }
 
-            // Combiner la narration avec les conséquences
+            // Combiner la narration avec les conséquences (limite stricte)
             let finalText = `🎮 **${character.name}** - ${character.kingdom} 🎮\n\n`;
-            finalText += narration + '\n\n';
+            
+            // S'assurer que la narration ne dépasse pas 700 caractères
+            let limitedNarration = narration;
+            if (limitedNarration.length > 500) { // Laisser de la place pour le reste
+                limitedNarration = limitedNarration.substring(0, 497) + '...';
+            }
+            
+            finalText += limitedNarration + '\n\n';
 
             if (actionAnalysis.consequences) {
                 finalText += `📊 **Conséquences :**\n${actionAnalysis.consequences}\n\n`;
