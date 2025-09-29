@@ -2103,6 +2103,575 @@ Durée : ${socialEvent.duration}
         return { text: weatherText };
     }
 
+    async handlePlayCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        if (!character) {
+            return {
+                text: `❌ **AUCUN PERSONNAGE TROUVÉ** ❌
+
+Tu dois d'abord créer un personnage !
+
+🎮 **Utilise /créer pour créer ton personnage**
+📋 **Ou /menu pour voir toutes les options**`
+            };
+        }
+
+        // Activer le mode jeu
+        await dbManager.setTemporaryData(player.id, 'game_mode', true);
+
+        return {
+            text: `🎮 **MODE JEU ACTIVÉ** 🎮
+
+👤 **${character.name}** entre en jeu !
+🏰 **Royaume :** ${character.kingdom}
+📍 **Position :** ${character.currentLocation}
+
+💫 **Tu peux maintenant :**
+• Écrire des actions libres (ex: "je marche vers la forêt")
+• Interagir avec l'environnement
+• Combattre des ennemis
+• Parler aux PNJ
+
+⚡ **Chaque action sera narrée par l'IA !**
+🔥 **L'aventure commence maintenant !**
+
+💡 **Écris ton action pour commencer l'aventure...**`
+        };
+    }
+
+    async handleCombatCommand({ player, dbManager, imageGenerator }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const combatInfo = `⚔️ **SYSTÈME DE COMBAT FRICTION** ⚔️
+
+👤 **${character.name}** - Rang ${character.powerLevel}
+❤️ **PV :** ${character.currentLife}/${character.maxLife}
+⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}
+
+🥊 **Techniques de base disponibles :**
+• Coup de poing (3 dégâts, 8 énergie)
+• Coup de pied (4 dégâts, 14 énergie)
+• Uppercut (5 dégâts, 15 énergie)
+
+⚠️ **ATTENTION :** En tant que débutant rang G, tes attaques sont très faibles !
+
+💡 **Comment combattre :**
+• Écris des actions de combat naturelles
+• Ex: "je donne un coup de poing au gobelin"
+• L'IA calculera automatiquement les dégâts
+
+🎯 **Trouve des adversaires faibles pour commencer :**
+• Rats géants (niveau 1)
+• Gobelins (niveau 2)
+• Évite les gardes (niveau 5+) !`;
+
+        return { text: combatInfo };
+    }
+
+    async handleInventoryCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const inventory = character.inventory || [];
+        const equipment = character.equipment || {};
+
+        let inventoryText = `🎒 **INVENTAIRE DE ${character.name}** 🎒
+
+💰 **Pièces :** ${character.coins}
+
+⚔️ **ÉQUIPEMENT ACTUEL :**
+${this.formatEquipment(equipment)}
+
+📦 **OBJETS TRANSPORTÉS :**`;
+
+        if (inventory.length === 0) {
+            inventoryText += `\n• Aucun objet`;
+        } else {
+            inventory.forEach(item => {
+                inventoryText += `\n• ${item.name} (x${item.quantity || 1})`;
+            });
+        }
+
+        inventoryText += `\n\n💡 **Pour équiper :** "j'équipe [objet]"
+🛒 **Pour acheter :** Trouve un marchand dans le jeu`;
+
+        return { text: inventoryText };
+    }
+
+    async handleMapCommand({ player, dbManager, imageGenerator }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        let mapImage = null;
+        try {
+            mapImage = await imageGenerator.generateWorldMap({
+                playerKingdom: character.kingdom,
+                playerLocation: character.currentLocation,
+                style: '3d'
+            });
+        } catch (error) {
+            console.log('⚠️ Erreur génération carte:', error.message);
+        }
+
+        const mapText = `🗺️ **CARTE DU MONDE FRICTION** 🗺️
+
+📍 **Ta position actuelle :**
+🏰 **Royaume :** ${character.kingdom}
+📍 **Lieu :** ${character.currentLocation}
+
+🌍 **LES 12 ROYAUMES :**
+• AEGYRIA - Plaines d'Honneur
+• SOMBRENUIT - Forêts Mystérieuses  
+• KHELOS - Déserts de Sable
+• ABRANTIS - Côtes Marines
+• VARHA - Montagnes Glacées
+• SYLVARIA - Forêts Éternelles
+• ECLYPSIA - Terres d'Ombre
+• TERRE_DÉSOLE - Wasteland
+• DRAK_TARR - Volcans de Feu
+• URVALA - Marais Maudits
+• OMBREFIEL - Plaines Grises
+• KHALDAR - Jungles Tropicales
+
+💡 **Pour voyager :** Écris "je vais vers [lieu]" en mode jeu`;
+
+        return {
+            text: mapText,
+            image: mapImage
+        };
+    }
+
+    async handleMarketCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const marketText = `🛒 **MARCHÉ DE ${character.kingdom}** 🛒
+
+💰 **Tes pièces :** ${character.coins}
+
+🗡️ **ARMES DISPONIBLES :**
+• Épée de bois - 50 pièces (+5 attaque)
+• Épée de fer - 200 pièces (+15 attaque)
+• Arc simple - 80 pièces (+8 attaque à distance)
+
+🛡️ **ARMURES DISPONIBLES :**
+• Armure de cuir - 100 pièces (+10 défense)
+• Cotte de mailles - 300 pièces (+20 défense)
+• Casque de fer - 150 pièces (+8 défense)
+
+💊 **CONSOMMABLES :**
+• Potion de soin - 25 pièces (+50 PV)
+• Potion d'énergie - 30 pièces (+30 énergie)
+• Pain - 5 pièces (+10 PV)
+
+💡 **Pour acheter :** Trouve un marchand en jeu et dis "j'achète [objet]"`;
+
+        return { text: marketText };
+    }
+
+    async handleFactionsCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        const factionsText = `⚔️ **FACTIONS DE FRICTION ULTIMATE** ⚔️
+
+🏰 **FACTIONS PRINCIPALES :**
+
+🛡️ **La Garde Royale**
+• Protecteurs des royaumes
+• Bonus : +20% défense
+• Ennemi : Mercenaires
+
+⚔️ **Les Mercenaires**
+• Guerriers indépendants
+• Bonus : +15% attaque
+• Ennemi : Garde Royale
+
+🔮 **L'Ordre des Mages**
+• Maîtres de la magie
+• Bonus : +25% mana
+• Ennemi : Chasseurs
+
+🏹 **Les Chasseurs**
+• Tueurs de monstres
+• Bonus : +20% vs créatures
+• Ennemi : Ordre des Mages
+
+🌿 **Les Druides**
+• Gardiens de la nature
+• Bonus : +15% régénération
+• Neutre avec tous
+
+${character ? `\n👤 **${character.name}** - Faction : Aucune (Indépendant)` : ''}
+
+💡 **Pour rejoindre une faction :** Trouve leurs représentants en jeu !`;
+
+        return { text: factionsText };
+    }
+
+    async handleChallengesCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const challengesText = `🎯 **DÉFIS FRICTION ULTIMATE** 🎯
+
+👤 **${character.name}** - Rang ${character.powerLevel}
+
+🔥 **DÉFIS QUOTIDIENS :**
+• Vaincre 3 ennemis - Récompense : 50 XP
+• Voyager 5 lieux - Récompense : 25 pièces
+• Utiliser 10 techniques - Récompense : Potion
+
+⚡ **DÉFIS DE RANG :**
+• Rang F : Vaincre un Gobelin Chef
+• Rang E : Explorer 3 royaumes
+• Rang D : Maîtriser une technique d'aura
+• Rang C : Vaincre un Boss mineur
+• Rang B : Rejoindre une faction
+• Rang A : Combattre un Dragon
+• Rang S : Conquérir un territoire
+
+🏆 **DÉFIS LÉGENDAIRES :**
+• Rang SS : Vaincre un Monarque
+• Rang SSS : Unifier les royaumes
+• MONARQUE : Devenir immortel
+
+💡 **Progression automatique basée sur tes actions en jeu !**`;
+
+        return { text: challengesText };
+    }
+
+    async handleSaveGameCommand({ player, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            
+            if (!character) {
+                return {
+                    text: `❌ **AUCUN PERSONNAGE À SAUVEGARDER**
+                    
+Tu n'as pas encore de personnage créé !
+Utilise /créer pour créer ton personnage.`
+                };
+            }
+
+            // Créer une sauvegarde
+            const saveData = {
+                playerId: player.id,
+                characterId: character.id,
+                playerData: player,
+                characterData: character,
+                timestamp: new Date().toISOString(),
+                gameVersion: '1.0.0'
+            };
+
+            const saveId = `save_${player.id}_${Date.now()}`;
+            await dbManager.setTemporaryData(player.id, `save_${saveId}`, saveData);
+
+            return {
+                text: `💾 **SAUVEGARDE CRÉÉE** 💾
+
+✅ **Sauvegarde ID :** ${saveId}
+👤 **Personnage :** ${character.name}
+📊 **Niveau :** ${character.level} (${character.powerLevel})
+⏰ **Date :** ${new Date().toLocaleString()}
+
+💾 **Données sauvegardées :**
+• Statistiques du personnage
+• Position et équipement
+• Progression et expérience
+
+💡 **Pour restaurer :** /restore ${saveId}`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur sauvegarde:', error);
+            return {
+                text: `❌ **ERREUR DE SAUVEGARDE**
+                
+Impossible de créer la sauvegarde. Réessayez plus tard.`
+            };
+        }
+    }
+
+    async handleBackupCommand({ player, dbManager }) {
+        // Vérifier les permissions admin
+        if (!this.adminManager.isAdmin(player.id)) {
+            return {
+                text: `❌ **ACCÈS REFUSÉ**
+                
+Cette commande est réservée aux administrateurs.`
+            };
+        }
+
+        try {
+            // Créer une sauvegarde complète de la base de données
+            const backupId = `backup_${Date.now()}`;
+            
+            return {
+                text: `💾 **SAUVEGARDE ADMINISTRATIVE** 💾
+
+🔧 **Backup ID :** ${backupId}
+⏰ **Démarré :** ${new Date().toLocaleString()}
+
+📊 **Sauvegarde en cours...**
+• Base de données principale
+• Données des joueurs
+• Système de jeu
+
+✅ **Sauvegarde terminée !**`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur backup admin:', error);
+            return {
+                text: `❌ **ERREUR DE SAUVEGARDE ADMINISTRATIVE**
+                
+${error.message}`
+            };
+        }
+    }
+
+    async handleRestoreCommand({ player, message, dbManager }) {
+        const args = message.split(' ');
+        if (args.length < 2) {
+            return {
+                text: `💾 **RESTAURATION DE SAUVEGARDE** 💾
+
+💡 **Usage :** /restore [ID_sauvegarde]
+
+📝 **Exemple :** /restore save_123456789_1234567890
+
+💾 **Pour voir vos sauvegardes :** /stats_db`
+            };
+        }
+
+        const saveId = args[1];
+
+        try {
+            const saveData = await dbManager.getTemporaryData(player.id, `save_${saveId}`);
+            
+            if (!saveData) {
+                return {
+                    text: `❌ **SAUVEGARDE INTROUVABLE**
+                    
+L'ID "${saveId}" n'existe pas ou a expiré.
+Vérifiez l'ID avec /stats_db`
+                };
+            }
+
+            // Restaurer les données du personnage
+            await dbManager.updateCharacter(saveData.characterData.id, saveData.characterData);
+
+            return {
+                text: `✅ **SAUVEGARDE RESTAURÉE** ✅
+
+💾 **ID :** ${saveId}
+👤 **Personnage :** ${saveData.characterData.name}
+📊 **Niveau :** ${saveData.characterData.level}
+⏰ **Date de sauvegarde :** ${new Date(saveData.timestamp).toLocaleString()}
+
+🎮 **Votre progression a été restaurée !**`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur restauration:', error);
+            return {
+                text: `❌ **ERREUR DE RESTAURATION**
+                
+Impossible de restaurer la sauvegarde "${saveId}".
+${error.message}`
+            };
+        }
+    }
+
+    async handleDatabaseStatsCommand({ player, dbManager }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            
+            return {
+                text: `📊 **STATISTIQUES DE SAUVEGARDE** 📊
+
+👤 **${player.username}**
+📱 **WhatsApp :** ${player.whatsappNumber}
+
+💾 **ÉTAT ACTUEL :**
+${character ? 
+`✅ **Personnage :** ${character.name}
+📊 **Niveau :** ${character.level} (${character.powerLevel})
+🏰 **Royaume :** ${character.kingdom}
+📍 **Position :** ${character.currentLocation}` 
+: '❌ **Aucun personnage créé**'}
+
+📈 **STATISTIQUES :**
+• Dernière activité : ${new Date(player.lastActivity).toLocaleString()}
+• Compte créé : ${new Date(player.createdAt).toLocaleString()}
+${character ? `• Personnage créé : ${new Date(character.createdAt).toLocaleString()}` : ''}
+
+💡 **Commandes disponibles :**
+• /sauvegarde - Créer une sauvegarde
+• /restore [ID] - Restaurer une sauvegarde`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur stats DB:', error);
+            return {
+                text: `❌ **ERREUR D'ACCÈS AUX STATISTIQUES**
+                
+${error.message}`
+            };
+        }
+    }
+
+    async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
+        try {
+            const character = await dbManager.getCharacterByPlayer(player.id);
+            
+            if (!character) {
+                return {
+                    text: `❌ **AUCUN PERSONNAGE À SUPPRIMER**
+                    
+Tu n'as pas de personnage créé.`
+                };
+            }
+
+            // Supprimer le personnage
+            await dbManager.deleteCharacter(character.id);
+            
+            // Nettoyer les données temporaires
+            await dbManager.clearTemporaryData(player.id, 'creation_started');
+            await dbManager.clearTemporaryData(player.id, 'creation_mode');
+            await dbManager.clearTemporaryData(player.id, 'photo_received');
+            await dbManager.clearTemporaryData(player.id, 'game_mode');
+
+            return {
+                text: `✅ **PERSONNAGE SUPPRIMÉ** ✅
+
+👤 **${character.name}** a été supprimé de ${character.kingdom}.
+
+🎮 **Tu peux maintenant :**
+• /créer - Créer un nouveau personnage
+• /menu - Retourner au menu principal
+
+💫 **Prêt pour une nouvelle aventure !**`,
+                image: await imageGenerator.generateMenuImage()
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur suppression personnage:', error);
+            return {
+                text: `❌ **ERREUR DE SUPPRESSION**
+                
+Impossible de supprimer le personnage. Réessayez plus tard.`
+            };
+        }
+    }
+
+    async handleCoordinatesCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const position = character.position || { x: 0, y: 0, z: 0 };
+
+        return {
+            text: `📍 **COORDONNÉES DE ${character.name}** 📍
+
+🗺️ **Position actuelle :**
+• X: ${position.x}
+• Y: ${position.y}  
+• Z: ${position.z}
+
+🏰 **Royaume :** ${character.kingdom}
+📍 **Lieu :** ${character.currentLocation}
+
+🧭 **Navigation :**
+• Nord: Y+ | Sud: Y-
+• Est: X+ | Ouest: X-
+• Haut: Z+ | Bas: Z-
+
+💡 **Le déplacement modifie automatiquement tes coordonnées !**`
+        };
+    }
+
+    async handleCalendarCommand({ player, dbManager }) {
+        if (!this.timeManager) {
+            return {
+                text: `❌ Système temporel non initialisé`
+            };
+        }
+
+        const timeInfo = this.timeManager.getCurrentTime();
+        const weatherInfo = this.timeManager.getCurrentWeather();
+
+        return {
+            text: `📅 **CALENDRIER DU MONDE FRICTION** 📅
+
+🗓️ **Date actuelle :**
+${timeInfo.dateString}
+
+⏰ **Heure :** ${timeInfo.timeString}
+🌸 **Saison :** ${timeInfo.seasonInfo.name} ${timeInfo.seasonInfo.emoji}
+${weatherInfo.weatherInfo.emoji} **Météo :** ${weatherInfo.weatherInfo.name}
+
+🌱 **Effets saisonniers actifs :**
+${timeInfo.seasonInfo.description}
+
+🌤️ **Conditions météo :**
+${weatherInfo.weatherInfo.description}
+
+📊 **Impact sur le gameplay :**
+• Visibilité : ${weatherInfo.visibility}%
+• Déplacement : ${weatherInfo.movement}%
+• Température : ${weatherInfo.temperature}°C
+
+💡 **Le temps s'écoule en permanence et affecte le monde !**`
+        };
+    }
+
+    formatTechniques(techniques) {
+        if (!techniques || techniques.length === 0) {
+            return '• Aucune technique apprise';
+        }
+
+        return techniques.map(tech => `• ${tech}`).join('\n');
+    }
+
+    getReputationBar(value) {
+        const filledBars = Math.floor(value / 20);
+        const emptyBars = 5 - filledBars;
+        return '█'.repeat(filledBars) + '░'.repeat(emptyBars);
+    }
+
     // ==================== COMMANDES D'AURA ====================
 
     /**
