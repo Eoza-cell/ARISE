@@ -364,6 +364,13 @@ ${timerInfo.targetName} n'a pas réagi à temps !
             };
         } else {
             character = await this.gameEngine.dbManager.getCharacterByPlayer(reactionData.defenderId);
+            
+            // Si c'est un joueur qui n'a pas réagi, l'immobiliser
+            if (character) {
+                const immobilizationTime = Date.now() + (8000 + Math.random() * 7000); // 8-15 secondes
+                await this.gameEngine.dbManager.setTemporaryData(reactionData.defenderId, 'immobilized_until', immobilizationTime);
+                console.log(`🔒 Joueur ${character.name} immobilisé jusqu'à ${new Date(immobilizationTime).toLocaleTimeString()}`);
+            }
         }
 
         if (!character) {
@@ -385,12 +392,12 @@ ${timerInfo.targetName} n'a pas réagi à temps !
             `⏰ **TEMPS ÉCOULÉ !** ⏰
 
 🗿 **${character.name}** n'a pas réagi à temps !
-💀 Il reste immobile face à l'attaque !
+💀 Vous êtes maintenant IMMOBILISÉ !
 
 ⚡ Rang ${character.powerLevel} = ${Math.floor(reactionData.reactionTime / 1000)} secondes max
-❌ Aucune défense ne sera appliquée !
+❌ Vous ne pourrez plus agir pendant quelques secondes !
 
-💥 L'attaque va maintenant être traitée...`;
+🎯 Les PNJ peuvent maintenant vous attaquer librement !`;
 
         await this.sock.sendMessage(reactionData.chatId, { text: timeoutMessage });
 
@@ -440,20 +447,26 @@ ${timerInfo.targetName} n'a pas réagi à temps !
         reactionData.status = 'npc_responded';
         this.activeReactions.delete(actionId);
 
-        // Générer une réaction intelligente du PNJ
-        const npcReaction = this.generateNPCReaction(npcData, playerAction);
+        // Générer une réaction intelligente et potentiellement mortelle du PNJ
+        const npcReaction = this.generateAggressiveNPCReaction(npcData, playerAction);
 
-        const reactionMessage = `🤖 **RÉACTION PNJ** 🤖
+        // Calculer les dégâts que le PNJ peut infliger
+        const npcDamage = this.calculateNPCDamage(npcData, npcReaction);
+        
+        const reactionMessage = this.limitMessage(`🤖 **PNJ ACTIF - ${npcData.powerLevel}** 🤖
 
-⚡ **${npcData.name}** (${npcData.powerLevel}) réagit rapidement !
+⚡ **${npcData.name}** riposte violemment !
 
-🎭 **Action du PNJ :** ${npcReaction.action}
-💭 **Pensée :** "${npcReaction.thought}"
+🎭 **Action :** ${npcReaction.action}
+💭 **"${npcReaction.thought}"**
 
-⚔️ **Type de réaction :** ${npcReaction.type}
-🎯 **Efficacité :** ${npcReaction.effectiveness}%
+⚔️ **${npcReaction.type}** 
+🎯 **Efficacité:** ${npcReaction.effectiveness}%
+💀 **Dégâts potentiels:** ${npcDamage} PV
 
-💥 **La situation évolue...**`;
+${npcReaction.canKill ? '☠️ ATTAQUE MORTELLE POSSIBLE !' : '⚠️ Attaque dangereuse !'}
+
+💥 Le PNJ ne se laisse pas faire !`);
 
         await this.sock.sendMessage(chatId, { text: reactionMessage });
 
@@ -462,7 +475,95 @@ ${timerInfo.targetName} n'a pas réagi à temps !
             this.gameEngine.processNPCReaction(actionId, npcData, npcReaction);
         }
 
-        console.log(`🤖 PNJ ${npcData.name} a réagi: ${npcReaction.action}`);
+        console.log(`🤖 PNJ ${npcData.name} a réagi agressivement: ${npcReaction.action}`);
+    }
+
+    /**
+     * Génère une réaction agressive et potentiellement mortelle pour un PNJ
+     */
+    generateAggressiveNPCReaction(npcData, playerAction) {
+        const aggressiveReactions = {
+            high_level: [ // PNJ puissants (C+)
+                { action: "contre-attaque mortelle", type: "ATTAQUE CRITIQUE", effectiveness: 95, canKill: true },
+                { action: "frappe dévastatrice", type: "DESTRUCTION", effectiveness: 90, canKill: true },
+                { action: "technique secrète", type: "ART MARTIAL", effectiveness: 85, canKill: false }
+            ],
+            medium_level: [ // PNJ moyens (F-D)
+                { action: "contre-attaque féroce", type: "Riposte", effectiveness: 75, canKill: false },
+                { action: "esquive et riposte", type: "Combo", effectiveness: 70, canKill: false },
+                { action: "charge brutale", type: "Charge", effectiveness: 65, canKill: false }
+            ],
+            low_level: [ // PNJ faibles (G)
+                { action: "défense désespérée", type: "Défense", effectiveness: 45, canKill: false },
+                { action: "recul prudent", type: "Esquive", effectiveness: 40, canKill: false },
+                { action: "cri d'alarme", type: "Alerte", effectiveness: 35, canKill: false }
+            ]
+        };
+
+        // Déterminer le niveau du PNJ
+        let reactionType = 'low_level';
+        if (['A', 'S', 'S+', 'SS', 'SSS'].includes(npcData.powerLevel)) {
+            reactionType = 'high_level';
+        } else if (['D', 'C', 'B'].includes(npcData.powerLevel)) {
+            reactionType = 'medium_level';
+        }
+
+        const availableReactions = aggressiveReactions[reactionType];
+        const selectedReaction = availableReactions[Math.floor(Math.random() * availableReactions.length)];
+
+        // Générer une pensée agressive contextuelle
+        const aggressiveThoughts = {
+            high_level: [
+                "Tu oses défier ma puissance !",
+                "Je vais te montrer la vraie force !",
+                "Cette impertinence mérite la mort !",
+                "Prépare-toi à rencontrer ton créateur !"
+            ],
+            medium_level: [
+                "Je ne me laisserai pas faire !",
+                "Cette attaque mérite une réponse !",
+                "Tu vas regretter ton audace !",
+                "Je dois me défendre !"
+            ],
+            low_level: [
+                "Je... je dois fuir !",
+                "À l'aide ! Je suis attaqué !",
+                "Pitié, épargnez-moi !",
+                "Je ne veux pas mourir !"
+            ]
+        };
+
+        const selectedThought = aggressiveThoughts[reactionType][Math.floor(Math.random() * aggressiveThoughts[reactionType].length)];
+
+        return {
+            ...selectedReaction,
+            thought: selectedThought
+        };
+    }
+
+    /**
+     * Calcule les dégâts qu'un PNJ peut infliger
+     */
+    calculateNPCDamage(npcData, npcReaction) {
+        const baseDamages = {
+            'G': 15, 'F': 25, 'E': 40, 'D': 60, 'C': 85, 
+            'B': 120, 'A': 160, 'S': 220, 'S+': 300, 
+            'SS': 400, 'SSS': 550
+        };
+        
+        const baseDamage = baseDamages[npcData.powerLevel] || 10;
+        const effectivenessMultiplier = npcReaction.effectiveness / 100;
+        const criticalMultiplier = npcReaction.canKill ? 1.5 : 1.0;
+        
+        return Math.floor(baseDamage * effectivenessMultiplier * criticalMultiplier);
+    }
+
+    /**
+     * Limite un message à 700 caractères
+     */
+    limitMessage(message) {
+        if (message.length <= 700) return message;
+        return message.substring(0, 697) + '...';
     }
 
     /**
