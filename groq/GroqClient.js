@@ -198,6 +198,12 @@ RÈGLES DE NARRATION COMBAT:
 ⚔️ Éviter d'inventer des détails non mentionnés par le joueur
 🔥 Se concentrer sur l'ACTION EXACTE demandée par le joueur
 
+RÈGLES DE DIALOGUE PNJ:
+💬 Si l'action contient "parle", "dit", "demande" = INCLURE la réponse du PNJ dans la narration
+🗣️ Créer des réponses PNJ cohérentes avec leur rôle (garde, marchand, noble, etc.)
+🎭 Varier les personnalités des PNJ selon leur fonction et le lieu
+📍 Adapter les dialogues au royaume et à la situation actuelle
+
 SYSTÈME IA RÉACTIVE GTA-STYLE:
 1. 🌍 MONDE VIVANT - Les PNJ continuent leur vie même sans le joueur
 2. 🎯 CONSÉQUENCES RÉALISTES - Chaque action a des répercussions à long terme
