@@ -966,6 +966,27 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
         return true;
     }
 
+    /**
+     * Traite une réaction PNJ automatique
+     */
+    processNPCReaction(actionId, npcData, npcReaction) {
+        console.log(`🤖 Traitement réaction PNJ: ${npcData.name} - ${npcReaction.action}`);
+        
+        // Logique future pour traiter les réactions PNJ
+        // - Calculer les effets de la réaction PNJ
+        // - Mettre à jour l'état du combat/interaction
+        // - Déclencher des événements en chaîne
+        // - Affecter la réputation du joueur
+        
+        // Pour l'instant, juste logger l'événement
+        return {
+            success: true,
+            npcAction: npcReaction.action,
+            effectiveness: npcReaction.effectiveness,
+            consequences: `Le PNJ ${npcData.name} a réagi avec ${npcReaction.effectiveness}% d'efficacité`
+        };
+    }
+
     getStartingLocation(kingdom) {
         const locations = {
             'AEGYRIA': 'Grande Plaine d\'Honneur - Village de Valorhall',
@@ -1698,6 +1719,23 @@ ${character.name} est complètement épuisé ! Vous devez vous reposer avant d'a
             const invalidPowerAttempt = this.checkInvalidPowerUsage(character, message);
             if (invalidPowerAttempt) {
                 return invalidPowerAttempt;
+            }
+
+            // Détecter et démarrer les temps de réaction des PNJ automatiquement
+            if (this.reactionTimeManager) {
+                try {
+                    const npcReactions = await this.reactionTimeManager.detectAndStartNPCReactions(
+                        message, 
+                        chatId || 'unknown', 
+                        player.id
+                    );
+                    
+                    if (npcReactions.length > 0) {
+                        console.log(`🎭 ${npcReactions.length} PNJ détecté(s) pour réaction automatique`);
+                    }
+                } catch (reactionError) {
+                    console.error('⚠️ Erreur détection réactions PNJ:', reactionError);
+                }
             }
 
             // Toutes les interactions sont gérées par l'IA de narration
