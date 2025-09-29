@@ -12,6 +12,13 @@ const RunwareClient = require('../runware/RunwareClient');
 const PollinationsClient = require('../pollinations/PollinationsClient');
 const CharacterDefaults = require('./CharacterDefaults');
 
+// Clients audio et vidéo
+const PlayHTClient = require('../playht/PlayHTClient');
+const CambAIClient = require('../camb/CambAIClient');
+const PuterClient = require('../puter/PuterClient');
+const PythonVideoClient = require('../python_video/PythonVideoClient');
+
+
 class ImageGenerator {
     constructor() {
         this.imageCache = new Map();
@@ -103,15 +110,33 @@ class ImageGenerator {
             this.huggingfaceClient = new HuggingFaceClient();
             this.hasHuggingFace = this.huggingfaceClient.hasValidClient();
             if (this.hasHuggingFace) {
-                console.log('🤗 HuggingFaceClient initialisé - Génération de vidéos IA activée');
+                console.log('🤗 HuggingFaceClient initialisé - Génération de vidéos IA avec ltxv-13b-098-distilled activée');
+                console.log('🎬 Vidéos image-to-video avec images de personnages disponibles');
             } else {
                 console.log('⚠️ HF_TOKEN non configurée - HuggingFace vidéos désactivées');
+                console.log('💡 Ajoutez HF_TOKEN dans les secrets pour activer les vidéos ltxv-13b-098-distilled');
             }
         } catch (error) {
             console.error('❌ Erreur initialisation HuggingFaceClient:', error.message);
             this.huggingfaceClient = null;
             this.hasHuggingFace = false;
         }
+
+        // Initialisation de PythonVideoClient pour diffusers
+        try {
+            this.pythonVideoClient = new PythonVideoClient();
+            this.hasPythonVideo = this.pythonVideoClient.hasValidClient();
+            if (this.hasPythonVideo) {
+                console.log('🐍 PythonVideoClient initialisé - Diffusers text-to-video activé');
+            } else {
+                console.log('⚠️ Python/diffusers non disponible - PythonVideoClient désactivé');
+            }
+        } catch (error) {
+            console.error('❌ Erreur initialisation PythonVideoClient:', error.message);
+            this.pythonVideoClient = null;
+            this.hasPythonVideo = false;
+        }
+
 
         // Configuration par défaut
         this.defaultStyle = '3d'; // 3d ou 2d
@@ -175,11 +200,11 @@ class ImageGenerator {
         try {
             console.log(`💾 Début sauvegarde image pour personnage: ${characterId}`);
             console.log(`📊 Type imageBuffer: ${typeof imageBuffer}, Taille: ${imageBuffer ? imageBuffer.length : 'undefined'}`);
-            
+
             // Debug approfondi du buffer
             if (imageBuffer && Buffer.isBuffer(imageBuffer)) {
                 const firstBytes = Array.from(imageBuffer.slice(0, 8)).map(b => '0x' + b.toString(16).padStart(2, '0')).join(' ');
-                console.log(`🔍 Premiers bytes de l'image: ${firstBytes}`);
+                console.log(`🔍 Premiers bytes de l\'image: ${firstBytes}`);
             }
 
             // Vérifier que l'imageBuffer est valide
@@ -202,13 +227,13 @@ class ImageGenerator {
 
             // S'assurer que les dossiers existent
             const customImagesDir = path.join(this.assetsPath, 'custom_images');
-            
+
             // Utiliser fsSync pour créer le dossier de manière synchrone
             if (!fsSync.existsSync(customImagesDir)) {
                 fsSync.mkdirSync(customImagesDir, { recursive: true });
                 console.log(`📁 Dossier créé: ${customImagesDir}`);
             }
-            
+
             if (!fsSync.existsSync(this.tempPath)) {
                 fsSync.mkdirSync(this.tempPath, { recursive: true });
                 console.log(`📁 Dossier temp créé: ${this.tempPath}`);
@@ -217,12 +242,12 @@ class ImageGenerator {
             // Nettoyer l'ID du personnage
             const cleanCharacterId = characterId.toString().replace(/[^a-zA-Z0-9_-]/g, '_');
             const imagePath = path.join(customImagesDir, `character_${cleanCharacterId}.png`);
-            
+
             console.log(`💾 Sauvegarde vers: ${imagePath}`);
 
             // Sauvegarder l'image
             await fs.writeFile(imagePath, imageBuffer);
-            
+
             // Vérifier que le fichier a été créé
             const stats = await fs.stat(imagePath);
             console.log(`✅ Image sauvegardée: ${stats.size} bytes`);
@@ -237,7 +262,7 @@ class ImageGenerator {
                     imagePath: imagePath,
                     characterId: cleanCharacterId
                 };
-                
+
                 await fs.writeFile(metadataPath, JSON.stringify(metadataContent, null, 2));
                 console.log(`✅ Métadonnées sauvegardées`);
             }
@@ -247,18 +272,18 @@ class ImageGenerator {
         } catch (error) {
             console.error('❌ Erreur sauvegarde image:', error.message);
             console.error('❌ Stack:', error.stack);
-            
+
             // Essayer de sauvegarder dans le dossier temp
             try {
                 const cleanCharacterId = characterId.toString().replace(/[^a-zA-Z0-9_-]/g, '_');
                 const tempImagePath = path.join(this.tempPath, `character_${cleanCharacterId}.png`);
-                
+
                 console.log(`🔄 Tentative sauvegarde dans temp: ${tempImagePath}`);
                 await fs.writeFile(tempImagePath, imageBuffer);
-                
+
                 console.log(`✅ Image sauvegardée en temp: ${tempImagePath}`);
                 return tempImagePath;
-                
+
             } catch (tempError) {
                 console.error('❌ Erreur sauvegarde temp:', tempError.message);
                 throw new Error(`Impossible de sauvegarder l'image: ${error.message}`);
@@ -269,7 +294,7 @@ class ImageGenerator {
     async getCustomCharacterImage(characterId) {
         try {
             const cleanCharacterId = characterId.toString().replace(/[^a-zA-Z0-9_-]/g, '_');
-            
+
             // Chercher d'abord dans custom_images
             const imagePath = path.join(this.assetsPath, 'custom_images', `character_${cleanCharacterId}.png`);
             if (fsSync.existsSync(imagePath)) {
@@ -277,7 +302,7 @@ class ImageGenerator {
                 console.log(`✅ Image personnalisée trouvée: ${imagePath}`);
                 return imageBuffer;
             }
-            
+
             // Chercher ensuite dans temp
             const tempImagePath = path.join(this.tempPath, `character_${cleanCharacterId}.png`);
             if (fsSync.existsSync(tempImagePath)) {
@@ -285,10 +310,10 @@ class ImageGenerator {
                 console.log(`✅ Image personnalisée trouvée en temp: ${tempImagePath}`);
                 return imageBuffer;
             }
-            
+
             console.log(`⚠️ Aucune image personnalisée trouvée pour: ${characterId}`);
             return null;
-            
+
         } catch (error) {
             console.error('❌ Erreur lecture image personnalisée:', error.message);
             return null;
@@ -546,9 +571,9 @@ class ImageGenerator {
                     }
                 } catch (pollinationsError) {
                     if (pollinationsError.message.includes('timeout')) {
-                        console.log('⚠️ Timeout Pollinations (>2min), fallback vers Freepik:', pollinationsError.message);
+                        console.log('⚠️ Timeout Pollinations (>2min), fallback vers Freepik:', pollinatorsError.message);
                     } else {
-                        console.log('⚠️ Erreur Pollinations personnage, fallback vers Freepik:', pollinationsError.message);
+                        console.log('⚠️ Erreur Pollinations personnage, fallback vers Freepik:', pollinatorsError.message);
                     }
                 }
             }
@@ -757,18 +782,35 @@ class ImageGenerator {
             try {
                 if (this.freepikClient) {
                     console.log('🎨 Fallback avec FreepikClient...');
-                    return await this.freepikClient.generateDetailedWorldMap(this.getImagePath('world_map_ai'), options);
+                    const fallbackResult = await this.freepikClient.generateDetailedWorldMap(this.getImagePath('world_map_ai'), options);
+                    if (fallbackResult && fallbackResult.buffer) {
+                        const fallbackPath = path.join(this.tempPath, `world_map_fallback_${Date.now()}.png`);
+                        await fs.writeFile(fallbackPath, fallbackResult.buffer);
+                        return fallbackPath;
+                    }
                 }
 
-                if (this.pollinationsClient) {
-                    console.log('🌸 Fallback avec PollinationsClient...');
-                    return await this.pollinationsClient.generateDetailedWorldMap(this.getImagePath('world_map_ai'), options);
+                // Fallback ultime avec PollinationsClient
+                try {
+                    console.log('🎨 Fallback ultime avec PollinationsClient...');
+                    const ultimateFallback = await this.pollinationsClient.generateImage(
+                        'Fantasy world map with kingdoms, medieval style, detailed topography, rivers, mountains, forests, ancient cartography style'
+                    );
+
+                    if (ultimateFallback && ultimateFallback.buffer) {
+                        const fallbackPath = path.join(this.tempPath, `world_map_ultimate_${Date.now()}.png`);
+                        await fs.writeFile(fallbackPath, ultimateFallback.buffer);
+                        return fallbackPath;
+                    }
+                } catch (ultimateError) {
+                    console.log('⚠️ Erreur fallback ultime:', ultimateError.message);
                 }
 
-                return await this.generateFallbackImage('World Map');
+                return null;
+
             } catch (fallbackError) {
-                console.error('❌ Erreur fallback carte monde:', fallbackError);
-                return await this.generateFallbackImage('World Map Error');
+                console.error('❌ Erreur fallback carte monde:', fallbackError.message);
+                return null;
             }
         }
     }
@@ -970,12 +1012,31 @@ class ImageGenerator {
                 }
             }
 
+            // Essayer PythonVideoClient (diffusers)
+            if (this.hasPythonVideo && this.pythonVideoClient) {
+                try {
+                    console.log(`🐍 Génération vidéo d'action avec PythonVideoClient (diffusers): ${action}`);
+                    const prompt = `${character.name} performing: ${action}. ${narration}. Medieval fantasy setting, cinematic movement, epic fantasy atmosphere`;
+                    const result = await this.pythonVideoClient.generateVideo(prompt, videoPath, {
+                        duration: 4,
+                        width: 512,
+                        height: 512
+                    });
+
+                    if (result && result.success) {
+                        console.log('✅ Vidéo d\'action générée par PythonVideoClient (diffusers)');
+                        return result.videoPath;
+                    }
+                } catch (pythonVideoError) {
+                    console.log('⚠️ Erreur PythonVideoClient vidéo action:', pythonVideoError.message);
+                }
+            }
+
             // Fallback vers RunwayML (si disponible et après correction de l'URL)
             if (this.hasRunway && this.runwayClient) {
                 try {
                     console.log('🎬 Génération vidéo d\'action avec RunwayML...');
                     const videoPrompt = `${character.name} performing: ${action}. Medieval fantasy setting, cinematic movement, epic fantasy atmosphere`;
-                    // RunwayClient's generateVideoFromText is assumed to exist and work similarly
                     const runwayResult = await this.runwayClient.generateVideoFromText(videoPrompt, videoPath, {
                         duration: 5
                     });
@@ -1027,6 +1088,26 @@ class ImageGenerator {
                 }
             }
 
+            // Essayer PythonVideoClient (diffusers)
+            if (this.hasPythonVideo && this.pythonVideoClient) {
+                try {
+                    console.log(`🐍 Génération vidéo de combat avec PythonVideoClient (diffusers)`);
+                    const prompt = `${combatContext.attacker.name} fighting ${combatContext.defender.name} in epic medieval combat, dynamic battle scene, weapons and armor, dramatic action`;
+                    const result = await this.pythonVideoClient.generateVideo(prompt, videoPath, {
+                        duration: 4,
+                        width: 1024,
+                        height: 768
+                    });
+
+                    if (result && result.success) {
+                        console.log('✅ Vidéo de combat générée par PythonVideoClient (diffusers)');
+                        return result.videoPath;
+                    }
+                } catch (pythonVideoError) {
+                    console.log('⚠️ Erreur PythonVideoClient vidéo combat:', pythonVideoError.message);
+                }
+            }
+
             // Fallback vers RunwayML
             if (this.hasRunway && this.runwayClient) {
                 console.log(`🎬 Génération vidéo de combat avec RunwayML: ${combatContext.attacker.name} vs ${combatContext.defender.name}`);
@@ -1072,6 +1153,26 @@ class ImageGenerator {
                 }
             }
 
+            // Essayer PythonVideoClient (diffusers)
+            if (this.hasPythonVideo && this.pythonVideoClient) {
+                try {
+                    console.log(`🐍 Génération vidéo de lieu avec PythonVideoClient (diffusers)`);
+                    const prompt = `${character.name} exploring ${location}, fantasy landscape, atmospheric environment, cinematic camera movement, medieval fantasy world`;
+                    const result = await this.pythonVideoClient.generateVideo(prompt, videoPath, {
+                        duration: 6,
+                        width: 1024,
+                        height: 768
+                    });
+
+                    if (result && result.success) {
+                        console.log('✅ Vidéo de lieu générée par PythonVideoClient (diffusers)');
+                        return result.videoPath;
+                    }
+                } catch (pythonVideoError) {
+                    console.log('⚠️ Erreur PythonVideoClient vidéo lieu:', pythonVideoError.message);
+                }
+            }
+
             // Fallback vers RunwayML
             if (this.hasRunway && this.runwayClient) {
                 console.log(`🎬 Génération vidéo de lieu avec RunwayML: ${location}`);
@@ -1100,6 +1201,21 @@ class ImageGenerator {
                     }
                 } catch (hfError) {
                     console.log('⚠️ Erreur HuggingFace vidéo personnalisée, fallback vers RunwayML:', hfError.message);
+                }
+            }
+
+            // Essayer PythonVideoClient (diffusers)
+            if (this.hasPythonVideo && this.pythonVideoClient) {
+                try {
+                    console.log(`🐍 Génération vidéo personnalisée avec PythonVideoClient (diffusers): ${prompt.substring(0, 100)}...`);
+                    const result = await this.pythonVideoClient.generateVideo(prompt, outputPath, options);
+
+                    if (result && result.success) {
+                        console.log('✅ Vidéo personnalisée générée par PythonVideoClient (diffusers)');
+                        return result;
+                    }
+                } catch (pythonVideoError) {
+                    console.log('⚠️ Erreur PythonVideoClient vidéo personnalisée:', pythonVideoError.message);
                 }
             }
 
@@ -1132,6 +1248,22 @@ class ImageGenerator {
                     }
                 } catch (hfError) {
                     console.log('⚠️ Erreur HuggingFace sort, fallback vers RunwayML:', hfError.message);
+                }
+            }
+
+            // Essayer PythonVideoClient (diffusers)
+            if (this.hasPythonVideo && this.pythonVideoClient) {
+                try {
+                    console.log(`🐍 Génération vidéo de sort avec PythonVideoClient (diffusers)`);
+                    const prompt = `${character.name} casting ${spellName} magic spell, mystical energy effects, glowing magical aura, fantasy spellcasting, dynamic magical particles, epic scene`;
+                    const result = await this.pythonVideoClient.generateVideo(prompt, videoPath, { duration: 4 });
+
+                    if (result && result.success) {
+                        console.log('✅ Vidéo de sort générée par PythonVideoClient (diffusers)');
+                        return result.videoPath;
+                    }
+                } catch (pythonVideoError) {
+                    console.log('⚠️ Erreur PythonVideoClient vidéo sort:', pythonVideoError.message);
                 }
             }
 

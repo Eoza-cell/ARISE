@@ -105,7 +105,12 @@ class HuggingFaceClient {
 
                 console.log(`✅ Vidéo HuggingFace générée: ${outputPath} (${videoBuffer.length} bytes)`);
 
-                return outputPath;
+                return {
+                    success: true,
+                    videoPath: outputPath,
+                    method: 'huggingface',
+                    size: videoBuffer.length
+                };
 
             } catch (apiError) {
                 console.log(`⚠️ Erreur API principale: ${apiError.message}`);
@@ -198,10 +203,12 @@ class HuggingFaceClient {
     async generateCombatVideo(action, character, outputPath) {
         const prompt = `${character.name} in medieval fantasy combat, ${action}, epic battle scene, dynamic movement, armor and weapons, dramatic lighting, action sequence`;
 
-        return await this.generateVideoFromText(prompt, outputPath, {
+        const result = await this.generateVideoFromText(prompt, outputPath, {
             duration: 4,
             characterImagePath: character.imagePath || null
         });
+        
+        return result || outputPath;
     }
 
     async generateCharacterActionVideo(action, character, location, outputPath) {
