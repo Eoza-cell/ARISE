@@ -144,6 +144,8 @@ class GameEngine {
         this.playerDifficultySettings = new Map(); // Difficulté toujours au maximum
         this.worldHostility = new Map(); // Hostilité croissante du monde (0-500%)
         this.playerMisfortune = new Map(); // Malchance permanente du joueur
+        this.playerCunning = new Map(); // Niveau de ruse du joueur (0-100)
+        this.strategicActions = new Map(); // Actions stratégiques du joueur
 
         this.commandHandlers = {
             // Core commands that definitely exist
@@ -1409,32 +1411,123 @@ ${type === 'aura' ? '🔮' : '✨'} Votre ${type} est maintenant à son maximum 
     }
 
     /**
-     * Génère le message de régénération avec barre
+     * Génère le message de régénération avec barre et compte à rebours
      */
     generateRegenMessage(regenData) {
         const { type, currentValue, maxValue, startTime } = regenData;
         const percentage = (currentValue / maxValue) * 100;
-
-        // Générer la barre de progression
-        const totalBars = 10;
-        const filledBars = Math.floor((currentValue / maxValue) * totalBars);
-        const emptyBars = totalBars - filledBars;
-
-        const progressBar = '▰'.repeat(filledBars) + '▱'.repeat(emptyBars);
         const timeElapsed = Math.floor((Date.now() - startTime) / 1000);
         const timeRemaining = Math.max(0, 60 - timeElapsed);
 
-        const emoji = type === 'aura' ? '🔮' : '✨';
-        const typeDisplay = type.charAt(0).toUpperCase() + type.slice(1);
+        // Utiliser le ProgressBarRenderer pour un affichage cohérent
+        const progressDisplay = this.progressBarRenderer.renderProgressBar(percentage, {
+            text: `RÉGÉNÉRATION ${type.toUpperCase()}`,
+            timeRemaining: timeRemaining,
+            includeEmojis: true
+        });
 
-        return `${emoji} **RÉGÉNÉRATION ${typeDisplay.toUpperCase()}** ${emoji}
+        return `🔮 **COMPTE À REBOURS ACTIF** 🔮
 
-${progressBar} ${Math.floor(percentage)}%
+${progressDisplay}
 
-⏱️ Temps écoulé: ${timeElapsed}s / 60s
-⏳ Temps restant: ${timeRemaining}s
+💡 **ASTUCE DE RUSE :** Utilisez ce temps pour planifier votre prochaine action !
+⚡ Dans FRICTION, la réflexion vaut mieux que la force brute.
 
 💫 Récupération en cours...`;
+    }
+
+    /**
+     * Système de comptes à rebours avec affichage en temps réel
+     */
+    async startCountdownTimer(playerId, actionType, duration, sock, chatId, actionDescription) {
+        const startTime = Date.now();
+        const endTime = startTime + duration;
+        let messageId = null;
+
+        // Envoyer le message initial
+        const initialProgress = this.progressBarRenderer.renderProgressBar(0, {
+            text: `⏰ ${actionDescription}`,
+            timeRemaining: Math.floor(duration / 1000),
+            includeEmojis: true
+        });
+
+        const initialMessage = `🎯 **COMPTE À REBOURS DÉMARRÉ** 🎯
+
+${initialProgress}
+
+🧠 **CONSEIL DE RUSE :** Pendant ce temps, réfléchissez à votre stratégie !
+⚔️ Les plus intelligents survivent dans FRICTION Ultimate.`;
+
+        try {
+            const response = await sock.sendMessage(chatId, { text: initialMessage });
+            messageId = response.key.id;
+        } catch (error) {
+            console.log('⚠️ Erreur envoi message initial:', error.message);
+        }
+
+        // Mettre à jour toutes les 5 secondes
+        const updateInterval = setInterval(async () => {
+            const now = Date.now();
+            const elapsed = now - startTime;
+            const remaining = Math.max(0, endTime - now);
+            const percentage = Math.min(100, (elapsed / duration) * 100);
+
+            if (remaining <= 0) {
+                clearInterval(updateInterval);
+                
+                const finalMessage = `✅ **COMPTE À REBOURS TERMINÉ** ✅
+
+${this.progressBarRenderer.renderProgressBar(100, {
+    text: `${actionDescription} - TERMINÉ`,
+    timeRemaining: 0,
+    includeEmojis: true
+})}
+
+🎉 Action complétée ! Maintenant, montrez votre ruse !`;
+
+                try {
+                    await sock.sendMessage(chatId, { text: finalMessage });
+                } catch (error) {
+                    console.log('⚠️ Erreur message final:', error.message);
+                }
+                return;
+            }
+
+            const updateProgress = this.progressBarRenderer.renderProgressBar(percentage, {
+                text: `⏰ ${actionDescription}`,
+                timeRemaining: Math.floor(remaining / 1000),
+                includeEmojis: true
+            });
+
+            const updateMessage = `🎯 **COMPTE À REBOURS EN COURS** 🎯
+
+${updateProgress}
+
+🧠 **TEMPS POUR LA RUSE :** Préparez votre stratégie maintenant !`;
+
+            try {
+                if (messageId) {
+                    await sock.sendMessage(chatId, {
+                        text: updateMessage,
+                        edit: messageId
+                    });
+                } else {
+                    // Si l'édition échoue, envoyer un nouveau message
+                    const newResponse = await sock.sendMessage(chatId, { text: updateMessage });
+                    messageId = newResponse.key.id;
+                }
+            } catch (error) {
+                // En cas d'erreur d'édition, envoyer un nouveau message
+                try {
+                    const newResponse = await sock.sendMessage(chatId, { text: updateMessage });
+                    messageId = newResponse.key.id;
+                } catch (sendError) {
+                    console.log('⚠️ Erreur envoi message:', sendError.message);
+                }
+            }
+        }, 5000); // Mise à jour toutes les 5 secondes
+
+        return { startTime, endTime, updateInterval };
     }
 
     /**
@@ -1703,6 +1796,9 @@ Le destin semble retenir son souffle...`;
         try {
             console.log(`🎭 Action RPG: ${message} pour ${character.name}`);
 
+            // Analyser la ruse de l'action AVANT tout
+            const cunningAnalysis = this.analyzeCunning(message, character);
+            
             // Vérifier si le personnage a assez d'énergie pour l'action
             if (character.currentEnergy < 5) {
                 return {
@@ -1713,8 +1809,9 @@ ${character.name} est complètement épuisé !
 ❤️ **Vie :** ${character.currentLife}/${character.maxLife}
 ⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}
 
-🛌 Vous devez vous reposer avant de pouvoir agir.
-💡 Tapez "je me repose" pour récupérer de l'énergie.`
+🧠 **CONSEIL DE RUSE :** Un stratège intelligent se repose pour mieux frapper !
+🛌 Tapez "je me repose stratégiquement" pour récupérer de l'énergie avec bonus.
+💡 Ou "j'observe l'environnement" pour préparer votre prochaine action rusée.`
                 };
             }
 
@@ -2790,6 +2887,114 @@ Réessayez avec /royaumes`
 
             ORDERS_DATA.forEach((order, index) => {
                 ordersText += `**${index + 1}. ${order.name}**\n`;
+
+
+    /**
+     * Analyse le niveau de ruse d'une action
+     */
+    analyzeCunning(message, character) {
+        const cunningKeywords = {
+            high: ['stratégie', 'ruse', 'piège', 'feinte', 'diversion', 'manipulation', 'astuce', 'tromperie', 'déguise', 'infiltre', 'espion', 'observe', 'analyse', 'planifie', 'étudie', 'prépare'],
+            medium: ['discret', 'prudent', 'silencieux', 'furtif', 'caché', 'évite', 'contourne', 'esquive'],
+            low: ['attaque', 'frappe', 'charge', 'fonce', 'combat direct', 'bourre', 'cogne']
+        };
+
+        const lowerMessage = message.toLowerCase();
+        let cunningLevel = 0;
+        let detectedStrategies = [];
+
+        // Analyser les mots-clés de haute ruse
+        cunningKeywords.high.forEach(keyword => {
+            if (lowerMessage.includes(keyword)) {
+                cunningLevel += 20;
+                detectedStrategies.push(keyword);
+            }
+        });
+
+        // Analyser les mots-clés de ruse moyenne
+        cunningKeywords.medium.forEach(keyword => {
+            if (lowerMessage.includes(keyword)) {
+                cunningLevel += 10;
+                detectedStrategies.push(keyword);
+            }
+        });
+
+        // Pénalité pour les actions brutales
+        cunningKeywords.low.forEach(keyword => {
+            if (lowerMessage.includes(keyword)) {
+                cunningLevel -= 15;
+            }
+        });
+
+        // Bonus pour les phrases complexes (plus de mots = plus de réflexion)
+        const wordCount = message.split(' ').length;
+        if (wordCount > 10) cunningLevel += 10;
+        if (wordCount > 15) cunningLevel += 10;
+
+        // Bonus pour l'utilisation de ponctuation (virgules, points-virgules = réflexion)
+        const punctuationCount = (message.match(/[,;:]/g) || []).length;
+        cunningLevel += punctuationCount * 5;
+
+        return {
+            level: Math.max(0, Math.min(100, cunningLevel)),
+            strategies: detectedStrategies,
+            isStrategic: cunningLevel > 15,
+            isBrutal: cunningLevel < -10
+        };
+    }
+
+    /**
+     * Applique les bonus/malus de ruse
+     */
+    applyCunningEffects(cunningAnalysis, character, baseNarration) {
+        let modifiedNarration = baseNarration;
+        let bonusText = '';
+        let experienceBonus = 0;
+        let energyCostReduction = 0;
+
+        if (cunningAnalysis.isStrategic) {
+            bonusText = `
+
+🧠 **RUSE DÉTECTÉE !** 🧠
+📊 **Niveau de stratégie :** ${cunningAnalysis.level}/100
+✨ **Stratégies utilisées :** ${cunningAnalysis.strategies.join(', ')}
+
+🎯 **BONUS DE RUSE :**
+• +${Math.floor(cunningAnalysis.level / 10)} XP bonus
+• -${Math.floor(cunningAnalysis.level / 20)} énergie requise
+• Chance critique augmentée
+• Réactions ennemies réduites
+
+💡 **FRICTION récompense l'intelligence !** Continuez à être rusé !`;
+
+            experienceBonus = Math.floor(cunningAnalysis.level / 10);
+            energyCostReduction = Math.floor(cunningAnalysis.level / 20);
+
+        } else if (cunningAnalysis.isBrutal) {
+            bonusText = `
+
+💀 **ACTION BRUTALE DÉTECTÉE** 💀
+
+⚠️ **MALUS DE BRUTALITÉ :**
+• Énergie doublée
+• Ennemis alertés
+• Chance d'échec critique
+• Réputation dégradée
+
+🧠 **CONSEIL :** Dans FRICTION, la ruse vaut mieux que la force !
+💡 Essayez des actions comme "j'observe discrètement" ou "je planifie une stratégie"`;
+
+            energyCostReduction = -10; // Malus
+        }
+
+        return {
+            narration: modifiedNarration + bonusText,
+            experienceBonus,
+            energyCostReduction
+        };
+    }
+
+
                 ordersText += `📜 ${order.description}\n`;
                 ordersText += `🎯 *Spécialités:* ${order.specialties.join(', ')}\n`;
                 if (order.location) {

@@ -63,13 +63,14 @@ class ProgressBarRenderer {
      */
     renderProgressBar(percentage, options = {}) {
         const {
-            width = 20,
-            style = 'elegant',
+            width = 10,
+            style = 'elegant', 
             showPercentage = true,
             showAnimation = true,
             text = '',
             includeEmojis = true,
-            theme = 'rpg'
+            theme = 'rpg',
+            timeRemaining = null
         } = options;
 
         // Valider le pourcentage
@@ -79,27 +80,17 @@ class ProgressBarRenderer {
         const filledSegments = Math.floor((percentage / 100) * width);
         const emptySegments = width - filledSegments;
         
-        // Sélectionner le style de caractères
-        const chars = this.styles[style] || this.styles.elegant;
+        // Utiliser directement les caractères ▰ et ▱ pour une meilleure compatibilité
+        const filledChar = '▰';
+        const emptyChar = '▱';
         
-        // Construire la barre de base
-        const filledPart = chars.filled.repeat(filledSegments);
-        const emptyPart = chars.empty.repeat(emptySegments);
-        const progressBar = `${chars.left}${filledPart}${emptyPart}${chars.right}`;
+        // Construire la barre
+        const progressBar = filledChar.repeat(filledSegments) + emptyChar.repeat(emptySegments);
         
-        // Animation si activée
-        let animationChar = '';
-        if (showAnimation && percentage < 100) {
-            const animKey = theme === 'rpg' ? 'magic' : 'pulse';
-            const anim = this.animations[animKey];
-            animationChar = anim[this.currentAnimationFrame % anim.length] + ' ';
-            this.currentAnimationFrame++;
-        }
-        
-        // Construire le texte final
+        // Construire le résultat
         let result = '';
         
-        // Emojis de thème
+        // Emoji selon le pourcentage
         if (includeEmojis) {
             if (percentage === 0) {
                 result += '⚡ ';
@@ -116,21 +107,20 @@ class ProgressBarRenderer {
             }
         }
         
-        // Animation
-        result += animationChar;
-        
         // Texte personnalisé
         if (text) {
-            result += `${text} `;
+            result += `${text}\n`;
         }
         
-        // Barre de progression
-        result += progressBar;
+        // Barre de progression avec pourcentage
+        result += `${progressBar} ${Math.floor(percentage)}%`;
         
-        // Pourcentage
-        if (showPercentage) {
-            const percentText = `${percentage.toFixed(0)}%`;
-            result += ` ${percentText}`;
+        // Temps restant si fourni
+        if (timeRemaining !== null) {
+            const minutes = Math.floor(timeRemaining / 60);
+            const seconds = timeRemaining % 60;
+            const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+            result += `\n⏰ Temps restant: ${timeDisplay}`;
         }
         
         return result;
