@@ -14,6 +14,7 @@ const TimeManager = require('../utils/TimeManager');
 const ReactionTimeManager = require('../utils/ReactionTimeManager');
 const HealthBarManager = require('../utils/HealthBarManager');
 const RPEncounterManager = require('../utils/RPEncounterManager');
+const ProgressBarRenderer = require('../utils/ProgressBarRenderer');
 const path = require('path');
 
 class GameEngine {
@@ -119,11 +120,23 @@ class GameEngine {
         this.adminManager = new AdminManager();
         this.narrationImageManager = new NarrationImageManager();
         this.healthBarManager = new HealthBarManager(); // Nouveau système de barres de vie
+        this.progressBarRenderer = new ProgressBarRenderer();
         this.questManager = null; // Initialisé avec dbManager
         this.auraManager = null; // Initialisé avec dbManager
         this.timeManager = null; // Initialisé avec dbManager
         this.reactionTimeManager = null; // Initialisé avec sock
         this.rpEncounterManager = null; // Initialisé avec sock pour rencontres RP
+
+        // Initialiser le gestionnaire d'aura
+        this.auraManager = new AuraManager();
+        console.log('✨ Gestionnaire d\'aura initialisé');
+
+        // Initialiser les gestionnaires de barres de progression
+        this.healthBarManager = new HealthBarManager();
+        this.progressBarRenderer = new ProgressBarRenderer();
+        this.loadingBarManager = new LoadingBarManager();
+        console.log('📊 Gestionnaires de barres de progression initialisés');
+
 
         // Systèmes de difficulté
         this.playerFatigue = new Map(); // Fatigue par joueur (0-100)
@@ -1011,24 +1024,18 @@ Utilise la commande /créer pour en créer un.`
             };
         }
 
-        const lifeBar = this.generateBar(character.currentLife, character.maxLife, '🟥');
-        const energyBar = this.generateBar(character.currentEnergy, character.maxEnergy, '🟩');
+        // Utiliser le HealthBarManager pour afficher les barres
+        const healthDisplay = this.healthBarManager.generateHealthDisplay(character);
 
-        const sheetText = `👤 **FICHE DE PERSONNAGE**
+        const statsDisplay = `📊 **STATISTIQUES DE ${character.name.toUpperCase()}**
 
-**Nom :** ${character.name}
-**Sexe :** ${character.gender === 'male' ? 'Homme' : 'Femme'}
-**Royaume :** ${character.kingdom}
-**Ordre :** ${character.order || 'Aucun'}
+${healthDisplay}
 
-📊 **Statistiques :**
-• Niveau : ${character.level}
-• Expérience : ${character.experience}
-• Niveau de puissance : ${character.powerLevel}
-• Niveau de friction : ${character.frictionLevel}
-
-❤️ **Barres de vie :** ${lifeBar}
-⚡ **Énergie :** ${energyBar}
+⭐ **NIVEAU:** ${character.level}
+💫 **XP:** ${character.experience}/${character.experienceToNextLevel}
+🏆 **PUISSANCE:** ${character.powerLevel}
+👑 **ROYAUME:** ${character.kingdom}
+🛡️ **ORDRE:** ${character.order || 'Aucun'}
 
 📍 **Position :** ${character.currentLocation}
 💰 **Pièces :** ${character.coins}
@@ -1051,7 +1058,7 @@ ${this.formatTechniques(character.learnedTechniques)}`;
         }
 
         return {
-            text: sheetText,
+            text: statsDisplay,
             image: characterImage
         };
     }
@@ -2547,7 +2554,7 @@ Crée une narration qui donne envie de connaître la suite !`;
     async handleHelpCommand({ player, dbManager, imageGenerator }) {
         try {
             const character = await this.dbManager.getCharacterByPlayer(player.id);
-            
+
             let helpText = `📚 **GUIDE COMPLET - FRICTION ULTIMATE** 📚
 
 🎮 **COMMANDES PRINCIPALES :**
@@ -2624,7 +2631,7 @@ Réessayez dans quelques instants.`
     async handlePlayCommand({ player, dbManager }) {
         try {
             const character = await this.dbManager.getCharacterByPlayer(player.id);
-            
+
             if (!character) {
                 return {
                     text: `❌ **Aucun personnage trouvé !**
@@ -2715,11 +2722,11 @@ Si le problème persiste, contacte un administrateur.`
     async handleKingdomsCommand({ player, dbManager, imageGenerator }) {
         try {
             const { KINGDOMS_DATA } = require('../data/GameData');
-            
+
             let kingdomsText = `🏰 **LES 12 ROYAUMES DE FRICTION ULTIMATE** 🏰\n\n`;
-            
+
             kingdomsText += `🌍 **Chaque royaume possède sa propre culture, ses spécialités et ses défis uniques !**\n\n`;
-            
+
             KINGDOMS_DATA.forEach((kingdom, index) => {
                 kingdomsText += `**${index + 1}. ${kingdom.name} (${kingdom.id})**\n`;
                 kingdomsText += `📍 ${kingdom.description}\n`;
@@ -2727,7 +2734,7 @@ Si le problème persiste, contacte un administrateur.`
                 kingdomsText += `⚔️ *Spécialités:* ${kingdom.specialties.join(', ')}\n`;
                 kingdomsText += `✨ *Particularité:* ${kingdom.particularities}\n\n`;
             });
-            
+
             kingdomsText += `💡 **Conseils pour choisir ton royaume :**
 • Chaque royaume offre des techniques et équipements uniques
 • Ta réputation varie selon le royaume où tu te trouves
@@ -2774,11 +2781,11 @@ Réessayez avec /royaumes`
     async handleOrdersCommand({ player, dbManager, imageGenerator }) {
         try {
             const { ORDERS_DATA } = require('../data/GameData');
-            
+
             let ordersText = `⚔️ **LES 7 ORDRES MYSTIQUES** ⚔️\n\n`;
-            
+
             ordersText += `🔮 **Rejoindre un ordre te donne accès à des techniques et pouvoirs exclusifs !**\n\n`;
-            
+
             ORDERS_DATA.forEach((order, index) => {
                 ordersText += `**${index + 1}. ${order.name}**\n`;
                 ordersText += `📜 ${order.description}\n`;
@@ -2791,7 +2798,7 @@ Réessayez avec /royaumes`
                 }
                 ordersText += `\n`;
             });
-            
+
             ordersText += `💡 **Comment rejoindre un ordre :**
 • Atteins un certain niveau de maîtrise
 • Complète des quêtes spécifiques à l'ordre
@@ -2866,8 +2873,8 @@ Réessayez avec /ordres`
 ${this.formatEquipment(character.equipment)}
 
 📦 **Inventaire:**
-${Array.isArray(character.inventory) && character.inventory.length > 0 ? 
-    character.inventory.map(item => `• ${item.quantity}x ${item.itemId}`).join('\n') : 
+${Array.isArray(character.inventory) && character.inventory.length > 0 ?
+    character.inventory.map(item => `• ${item.quantity}x ${item.itemId}`).join('\n') :
     '• Inventaire vide'
 }
 
@@ -2977,7 +2984,7 @@ ${Array.isArray(character.inventory) && character.inventory.length > 0 ?
 
 🏪 **Marchands disponibles:**
 • 🗡️ Marchand d'armes (bientôt)
-• 🛡️ Marchand d'armures (bientôt) 
+• 🛡️ Marchand d'armures (bientôt)
 • 🧪 Alchimiste (bientôt)
 • 📜 Marchand de sorts (bientôt)
 
@@ -3013,7 +3020,7 @@ ${Array.isArray(character.inventory) && character.inventory.length > 0 ?
 
     async handleChallengesCommand({ player, dbManager, imageGenerator }) {
         const character = await this.dbManager.getCharacterByPlayer(player.id);
-        
+
         return {
             text: `🎯 **DÉFIS DISPONIBLES** 🎯
 
@@ -3044,7 +3051,7 @@ ${character ? `👤 **${character.name}** (Niveau ${character.level})` : '❌ Cr
 
 📊 **Données sauvegardées:**
 • Personnage et statistiques
-• Position et équipement  
+• Position et équipement
 • Inventaire et progression
 • Techniques apprises
 
@@ -3116,7 +3123,7 @@ ${character ? `👤 **${character.name}** (Niveau ${character.level})` : '❌ Cr
 
 🎨 **7 Types d'aura disponibles:**
 • 🔥 Feu - Techniques de combat et chaleur
-• 💧 Eau - Guérison et fluidité  
+• 💧 Eau - Guérison et fluidité
 • 🌍 Terre - Défense et solidité
 • 💨 Vent - Vitesse et agilité
 • ⚡ Foudre - Puissance et paralysie
@@ -3155,7 +3162,7 @@ ${character ? `👤 **${character.name}** (Niveau ${character.level})` : '❌ Cr
 
 🔮 **Programme d'entraînement:**
 • Méditation profonde (30 min)
-• Canalisation d'énergie (45 min)  
+• Canalisation d'énergie (45 min)
 • Techniques pratiques (60 min)
 
 🚧 **Système en développement**
@@ -3274,7 +3281,7 @@ ${character ? `👤 **${character.name}** (Niveau ${character.level})` : '❌ Cr
 
 🎨 **Affinités élémentaires:**
 • 🔥 Feu: 0%
-• 💧 Eau: 0%  
+• 💧 Eau: 0%
 • 🌍 Terre: 0%
 • 💨 Vent: 0%
 • ⚡ Foudre: 0%
@@ -3326,7 +3333,7 @@ Utilisez /jouer pour explorer le monde et découvrir naturellement les maîtres 
 
 🗓️ **Système temporel:**
 • 12 mois par année
-• 30 jours par mois  
+• 30 jours par mois
 • 24 heures par jour
 • Saisons cycliques
 

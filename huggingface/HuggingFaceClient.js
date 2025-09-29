@@ -67,35 +67,31 @@ class HuggingFaceClient {
                 let videoBlob;
 
                 if (imageData) {
-                    // Mode image-to-video avec Wan2.2-Animate-14B
-                    console.log(`🎬 Mode image-to-video avec Wan-AI/Wan2.2-Animate-14B...`);
+                    // Mode image-to-video avec modèle stable
+                    console.log(`🎬 Mode image-to-video avec stabilityai/stable-video-diffusion-img2vid-xt...`);
 
                     videoBlob = await this.client.imageToVideo({
-                        model: "Wan-AI/Wan2.2-Animate-14B",
+                        model: "stabilityai/stable-video-diffusion-img2vid-xt",
                         inputs: imageData,
                         parameters: { 
-                            prompt: optimizedPrompt,
+                            height: 576,
+                            width: 1024,
                             num_frames: Math.min(options.num_frames || 25, 25),
-                            fps: Math.min(options.fps || 8, 8),
-                            width: options.width || 512,
-                            height: options.height || 512,
-                            seed: options.seed || Math.floor(Math.random() * 1000000),
-                            motion_bucket_id: options.motion_bucket_id || 127
+                            motion_bucket_id: options.motion_bucket_id || 127,
+                            fps: Math.min(options.fps || 6, 6)
                         }
                     });
                 } else {
-                    // Mode text-to-video avec Wan2.2-Animate-14B
-                    console.log(`🎬 Mode text-to-video avec Wan-AI/Wan2.2-Animate-14B...`);
+                    // Fallback text-to-video avec modèle alternatif
+                    console.log(`🎬 Mode text-to-video avec damo-vilab/text-to-video-ms-1.7b...`);
 
                     videoBlob = await this.client.textToVideo({
-                        model: "Wan-AI/Wan2.2-Animate-14B",
+                        model: "damo-vilab/text-to-video-ms-1.7b",
                         inputs: optimizedPrompt,
                         parameters: {
-                            num_frames: Math.min(options.num_frames || 25, 25),
-                            fps: options.fps || 8,
-                            width: options.width || 512,
-                            height: options.height || 512,
-                            seed: options.seed || Math.floor(Math.random() * 1000000)
+                            num_frames: Math.min(options.num_frames || 16, 16),
+                            width: options.width || 256,
+                            height: options.height || 256
                         }
                     });
                 }
@@ -357,18 +353,16 @@ class HuggingFaceClient {
             // Optimiser le prompt pour Wan2.2-Animate-14B
             const optimizedPrompt = this.optimizePromptForWanAnimate(prompt, options);
 
-            // Utiliser le modèle Wan2.2-Animate-14B
+            // Utiliser le modèle Stable Video Diffusion
             const video = await this.client.imageToVideo({
-                model: "Wan-AI/Wan2.2-Animate-14B",
+                model: "stabilityai/stable-video-diffusion-img2vid-xt",
                 inputs: imageBuffer,
                 parameters: { 
-                    prompt: optimizedPrompt,
-                    num_frames: Math.min(options.num_frames || 49, 49),
-                    height: options.height || 768,
-                    width: options.width || 768,
-                    fps: Math.min(options.fps || 8, 8),
-                    seed: options.seed || Math.floor(Math.random() * 1000000),
-                    motion_bucket_id: options.motion_bucket_id || 127
+                    height: 576,
+                    width: 1024,
+                    num_frames: Math.min(options.num_frames || 25, 25),
+                    motion_bucket_id: options.motion_bucket_id || 127,
+                    fps: Math.min(options.fps || 6, 6)
                 }
             });
 
