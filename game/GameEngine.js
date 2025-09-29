@@ -1745,14 +1745,23 @@ Narration (200 mots maximum):`;
             // Générer une vidéo pour l'action si HuggingFace est disponible
             let actionVideo = null;
             try {
-                if (imageGenerator.hasHuggingFace && imageGenerator.huggingfaceClient) {
-                    console.log('🎬 Génération vidéo pour l\'action...');
+                // Vérifier si imageGenerator a HuggingFace disponible
+                if (imageGenerator && imageGenerator.huggingfaceClient && imageGenerator.huggingfaceClient.hasValidClient()) {
+                    console.log('🎬 Génération vidéo HuggingFace pour l\'action...');
 
-                    // Obtenir l'image du personnage
-                    const characterImagePath = await imageGenerator.getCustomCharacterImage(character.id);
-
+                    // Créer le chemin de sortie pour la vidéo
                     const videoPath = `temp/action_video_${character.id}_${Date.now()}.mp4`;
 
+                    // Essayer d'obtenir l'image personnalisée du personnage
+                    let characterImagePath = null;
+                    try {
+                        characterImagePath = await imageGenerator.getCustomCharacterImage(character.id);
+                        console.log(`📸 Image personnage trouvée: ${characterImagePath}`);
+                    } catch (imageError) {
+                        console.log('⚠️ Pas d\'image personnage, génération vidéo text-to-video');
+                    }
+
+                    // Générer la vidéo avec ou sans image
                     const videoResult = await imageGenerator.huggingfaceClient.generateCharacterActionVideo(
                         message, 
                         character, 
@@ -1760,13 +1769,17 @@ Narration (200 mots maximum):`;
                         videoPath
                     );
 
-                    if (videoResult && typeof videoResult === 'string') {
+                    if (videoResult) {
                         actionVideo = videoResult;
-                        console.log('✅ Vidéo d\'action générée avec succès');
+                        console.log('✅ Vidéo d\'action HuggingFace générée avec succès');
+                    } else {
+                        console.log('⚠️ Génération vidéo HuggingFace échouée');
                     }
+                } else {
+                    console.log('⚠️ HuggingFace non disponible pour la génération de vidéos');
                 }
             } catch (videoError) {
-                console.error('⚠️ Erreur génération vidéo action:', videoError);
+                console.error('❌ Erreur génération vidéo action:', videoError.message);
             }
 
             // Traiter l'action et mettre à jour le personnage

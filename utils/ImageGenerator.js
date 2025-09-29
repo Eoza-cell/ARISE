@@ -418,89 +418,55 @@ class ImageGenerator {
         }
     }
 
-    async generateCharacterActionImage(character, action, narration, options = {}) {
+    async generateCharacterActionImage(character, action, narration = '', options = {}) {
         try {
-            // FORCER la vue première personne pour toutes les images d'action
-            const imageOptions = {
-                style: options.style || this.defaultStyle,
-                perspective: 'first_person', // FORCÉ - vue première personne uniquement pour les actions
-                nudity: options.nudity !== undefined ? options.nudity : this.allowNudity
+            // Construire le prompt avec la narration si disponible
+            const actionDesc = narration ? `${action}. ${narration}` : action;
+            const prompt = this.buildCharacterActionPrompt(character, actionDesc, options);
+
+            console.log(`🎨 Génération image d'action avec ${this.primaryService} (vue première personne forcée)...`);
+
+            // Forcer la vue première personne pour les actions
+            const actionOptions = {
+                ...options,
+                perspective: 'first_person',
+                style: options.style || '3d',
+                nudity: false
             };
 
-            const imagePath = path.join(this.tempPath, `character_action_${character.id}_${Date.now()}.png`);
+            const result = await this.generateImageWithFallback(prompt, actionOptions);
 
-            // Essayer Pollinations d'abord (GRATUIT)
-            if (this.hasPollinations && this.pollinationsClient) {
+            if (result) {
+                console.log(`✅ Image action générée par ${this.primaryService} (vue première personne)`);
+            }
+
+            // Tenter aussi de générer une vidéo si HuggingFace est disponible
+            if (this.hasHuggingFace && this.huggingfaceClient) {
+                console.log('🎬 Tentative de génération vidéo d\'action avec HuggingFace...');
                 try {
-                    console.log(`🎨 Génération image d'action avec Pollinations GRATUIT (vue première personne forcée)...`);
-                    await this.pollinationsClient.generateActionImage(character, action, narration, imagePath, imageOptions);
-                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                    if (imageBuffer) {
-                        console.log('✅ Image action générée par Pollinations GRATUIT (vue première personne)');
-                        return imageBuffer;
+                    const videoPath = `temp/action_video_${character.id}_${Date.now()}.mp4`;
+                    const videoResult = await this.huggingfaceClient.generateCharacterActionVideo(
+                        action, 
+                        character, 
+                        character.currentLocation, 
+                        videoPath
+                    );
+                    if (videoResult) {
+                        console.log('✅ Vidéo d\'action générée en arrière-plan');
                     }
-                } catch (pollinationsError) {
-                    if (pollinationsError.message.includes('timeout')) {
-                        console.log('⚠️ Timeout Pollinations (>2min), fallback vers Freepik:', pollinatorsError.message);
-                    } else {
-                        console.log('⚠️ Erreur Pollinations action, fallback vers Freepik:', pollinatorsError.message);
-                    }
+                } catch (videoError) {
+                    console.log('⚠️ Erreur génération vidéo arrière-plan:', videoError.message);
                 }
             }
 
-            // Fallback vers Runware (payant)
-            if (this.hasRunware && this.runwareClient) {
-                try {
-                    console.log(`🎨 Génération image d'action avec Runware (vue première personne forcée)...`);
-                    await this.runwareClient.generateActionImage(character, action, narration, imagePath, imageOptions);
-                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                    if (imageBuffer) {
-                        console.log('✅ Image action générée par Runware (vue première personne)');
-                        return imageBuffer;
-                    }
-                } catch (runwareError) {
-                    console.log('⚠️ Erreur Runware action, fallback vers KieAI:', runwareError.message);
-                }
-            }
+            return result;
 
-            // Fallback vers KieAI
-            if (this.hasKieAI && this.kieaiClient) {
-                try {
-                    console.log(`🎨 Génération image d'action avec KieAI (fallback, vue première personne forcée)...`);
-                    const sanitizedCharacter = CharacterDefaults.sanitizeCharacter(character);
-                    const prompt = CharacterDefaults.generateImagePrompt(sanitizedCharacter, action, narration + ', first person view, POV');
-                    await this.kieaiClient.generateCombatScene(prompt, imagePath, imageOptions);
-                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                    if (imageBuffer) {
-                        console.log('✅ Image action générée par KieAI (vue première personne)');
-                        return imageBuffer;
-                    }
-                } catch (kieaiError) {
-                    console.log('⚠️ Erreur KieAI action, fallback vers Freepik:', kieaiError.message);
-                }
-            }
-
-            // Fallback vers Freepik
-            if (this.hasFreepik && this.freepikClient) {
-                try {
-                    console.log(`🎨 Génération image d'action avec Freepik (fallback, vue première personne forcée)...`);
-                    await this.freepikClient.generateActionImage(character, action, narration, imagePath, imageOptions);
-                    const imageBuffer = await fs.readFile(imagePath).catch(() => null);
-                    if (imageBuffer) {
-                        console.log('✅ Image action générée par Freepik (vue première personne)');
-                        return imageBuffer;
-                    }
-                } catch (freepikError) {
-                    console.log('⚠️ Erreur Freepik action:', freepikError.message);
-                }
-            }
-
-            throw new Error('Impossible de générer l\'image d\'action - aucun générateur disponible');
         } catch (error) {
-            console.error('❌ Erreur génération image action:', error);
-            throw error;
+            console.error('❌ Erreur génération image action:', error.message);
+            return null;
         }
     }
+
 
     async generateCharacterImage(character, options = {}) {
         try {

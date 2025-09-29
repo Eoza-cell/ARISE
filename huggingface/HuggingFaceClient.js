@@ -260,13 +260,20 @@ class HuggingFaceClient {
     buildCharacterDescription(character) {
         let desc = '';
 
+        // Vérifier que character existe et a les propriétés nécessaires
+        if (!character) {
+            return 'mysterious character';
+        }
+
         // Priorité absolue à la description personnalisée
         if (character.appearance && character.appearance.trim().length > 0) {
             desc = character.appearance;
         } else {
             // Description par défaut basée sur le royaume et le genre
-            const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
-            desc = `${genderDesc} named ${character.name} from ${character.kingdom} kingdom`;
+            const genderDesc = (character.gender === 'male' || character.gender === 'male') ? 'male warrior' : 'female warrior';
+            const name = character.name || 'Unknown';
+            const kingdom = character.kingdom || 'Unknown Kingdom';
+            desc = `${genderDesc} named ${name} from ${kingdom} kingdom`;
         }
 
         return desc;
