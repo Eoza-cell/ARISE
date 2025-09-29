@@ -1699,185 +1699,109 @@ Chaque muscle se tend, chaque sens s'aiguise. ${character.currentEnergy < 50 ? '
 Le destin semble retenir son souffle...`;
     }
 
-
-
-
-
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
-            // Vérifier que le personnage a assez d'énergie pour agir
-            if (character.currentEnergy <= 0) {
+            console.log(`🎭 Traitement action IA pour ${character.name}: ${message}`);
+
+            // Validation de l'action
+            const actionValidation = this.validateAction(character, message);
+            if (actionValidation.length > 0) {
                 return {
-                    text: `⚡ **ÉPUISEMENT TOTAL** ⚡
-
-${character.name} est complètement épuisé ! Vous devez vous reposer avant d'agir.
-
-❤️ PV: ${character.currentLife}/${character.maxLife}
-⚡ Énergie: ${character.currentEnergy}/${character.maxEnergy}
-
-💡 **Utilisez /regenerer_aura ou attendez la régénération naturelle.**`
+                    text: `❌ **Actions impossibles détectées :**\n\n${actionValidation.join('\n')}\n\n💡 Vérifiez votre équipement et vos capacités.`
                 };
             }
 
-            // Vérifier si le joueur tente d'utiliser des pouvoirs qu'il ne possède pas
-            const invalidPowerAttempt = this.checkInvalidPowerUsage(character, message);
-            if (invalidPowerAttempt) {
-                return invalidPowerAttempt;
-            }
+            // Générer la narration avec l'IA AMÉLIORÉE
+            let narration = "Vous effectuez une action dans le monde de Friction Ultimate.";
 
-            // Détecter et démarrer les temps de réaction des PNJ automatiquement
-            if (this.reactionTimeManager) {
+            if (this.groqClient && this.groqClient.hasValidClient()) {
                 try {
-                    const npcReactions = await this.reactionTimeManager.detectAndStartNPCReactions(
-                        message, 
-                        chatId || 'unknown', 
-                        player.id
-                    );
+                    // Détecter les réactions PNJ avec contexte enrichi
+                    const npcInteraction = this.detectNPCInteraction(message);
 
-                    if (npcReactions.length > 0) {
-                        console.log(`🎭 ${npcReactions.length} PNJ détecté(s) pour réaction automatique`);
+                    if (npcInteraction) {
+                        console.log(`🤖 Interaction PNJ détectée: ${npcInteraction.type} avec ${npcInteraction.target}`);
+
+                        // Générer une réaction PNJ si appropriée
+                        const npcReaction = await this.generateNPCReaction(character, npcInteraction, player.whatsappNumber);
+                        if (npcReaction) {
+                            console.log(`🎭 Réaction PNJ générée: ${npcReaction.response}`);
+                        }
                     }
-                } catch (reactionError) {
-                    console.error('⚠️ Erreur détection réactions PNJ:', reactionError);
+
+                    const enhancedPrompt = this.buildEnhancedNarrationPrompt(character, message);
+                    narration = await this.groqClient.generateNarration(enhancedPrompt, 600);
+
+                    console.log(`✅ Narration IA enrichie générée: ${narration.substring(0, 100)}...`);
+                } catch (error) {
+                    console.error('❌ Erreur narration IA:', error);
+                    narration = this.generateFallbackNarration(character, message);
                 }
             }
 
-            // Toutes les interactions sont gérées par l'IA de narration
+            // Ajouter des éléments dynamiques à la narration
+            narration = this.enrichNarrationWithDynamicElements(narration, character, message);
 
-            // Générer une narration immersive avec l'IA
-            let narrationResponse;
-            try {
-                // Créer un contexte ultra-détaillé pour la narration
-                const detailedContext = `
-PERSONNAGE : ${character.name}
-- Sexe : ${character.gender === 'male' ? 'Homme' : 'Femme'}
-- Royaume : ${character.kingdom}
-- Niveau : ${character.level} (Rang ${character.powerLevel})
-- Localisation : ${character.currentLocation || 'Zone Inconnue'}
-- État physique : ${character.currentLife}/${character.maxLife} PV, ${character.currentEnergy}/${character.maxEnergy} énergie
-- Équipement : ${Object.keys(character.equipment || {}).length > 0 ? Object.values(character.equipment).join(', ') : 'Aucun équipement spécial'}
+            // Mettre à jour les statistiques du personnage
+            await this.updateCharacterAfterAction(character, message, dbManager);
 
-ACTION DEMANDÉE : "${message}"
-
-CONTEXTE NARRATIF :
-${character.currentLocation ? `Le héros se trouve actuellement dans ${character.currentLocation}, un lieu emblématique du royaume de ${character.kingdom}.` : ''}
-${character.powerLevel === 'G' ? 'Ce personnage est encore un débutant, ses mouvements sont maladroits et hésitants.' : ''}
-${character.currentEnergy < 30 ? 'Le personnage semble fatigué, ses gestes sont plus lents.' : ''}
-
-Narre cette scène comme si tu étais George R.R. Martin ou J.R.R. Tolkien, avec des détails sensoriels, des descriptions d'ambiance, et une immersion totale.`;
-
-                narrationResponse = await this.groqClient.generateNarration(detailedContext);
-            } catch (narrationError) {
-                console.error('❌ Erreur narration Groq:', narrationError);
-                // Fallback avec une narration basique mais détaillée
-                narrationResponse = this.createDetailedFallbackNarration(character, message);
-            }
-
-            const narration = narrationResponse.narration || narrationResponse;
-
-            // Analyser l'action pour déterminer les conséquences
-            const actionAnalysis = await this.analyzePlayerAction({
-                character,
-                action: message,
-                narration,
-                dbManager
-            });
-
-            // Appliquer les conséquences sur le personnage
-            if (actionAnalysis.energyCost) {
-                character.currentEnergy = Math.max(0, character.currentEnergy - actionAnalysis.energyCost);
-                await dbManager.updateCharacter(character.id, {
-                    currentEnergy: character.currentEnergy
-                });
-            }
-
-            // Générer l'image d'action
+            // Générer l'image d'action si possible
             let actionImage = null;
-            try {
-                actionImage = await imageGenerator.generateCharacterActionImage(
-                    character,
-                    message,
-                    narration,
-                    { style: '3d', perspective: 'first_person' }
-                );
-            } catch (imageError) {
-                console.log('⚠️ Erreur génération image action:', imageError.message);
-            }
-
-            // Essayer de générer une vidéo si disponible
-            let actionVideo = null;
-            try {
-                if (this.imageGenerator.hasHuggingFace && actionImage) {
-                    const videoPath = path.join(__dirname, '../temp', `action_video_${character.id}_${Date.now()}.mp4`);
-                    const videoPrompt = `${character.name} performing: ${message}, fantasy RPG action scene, cinematic movement`;
-
-                    actionVideo = await this.imageGenerator.huggingfaceClient.generateVideoFromImage(
-                        actionImage,
-                        videoPrompt,
-                        videoPath
-                    );
+            if (imageGenerator) {
+                try {
+                    actionImage = await imageGenerator.generateCharacterActionImage(character, message, narration);
+                    console.log('✅ Image d\'action générée');
+                } catch (imageError) {
+                    console.log('⚠️ Impossible de générer l\'image d\'action:', imageError.message);
                 }
-            } catch (videoError) {
-                console.log('⚠️ Erreur génération vidéo action:', videoError.message);
             }
-
-            // Combiner la narration avec les conséquences (limite stricte)
-            let finalText = `🎮 **${character.name}** - ${character.kingdom} 🎮\n\n`;
-
-            // S'assurer que la narration ne dépasse pas 700 caractères
-            let limitedNarration = narration;
-            if (limitedNarration.length > 500) { // Laisser de la place pour le reste
-                limitedNarration = limitedNarration.substring(0, 497) + '...';
-            }
-
-            finalText += limitedNarration + '\n\n';
-
-            if (actionAnalysis.consequences) {
-                finalText += `📊 **Conséquences :**\n${actionAnalysis.consequences}\n\n`;
-            }
-
-            // Barres de statut visuelles
-            const healthBar = this.loadingBarManager.createHealthBar(
-                character.currentLife,
-                character.maxLife,
-                'life'
-            );
-            const energyBar = this.loadingBarManager.createHealthBar(
-                character.currentEnergy,
-                character.maxEnergy,
-                'energy'
-            );
-
-            finalText += `📊 **ÉTAT DU PERSONNAGE**\n`;
-            finalText += healthBar + '\n';
-            finalText += energyBar + '\n\n';
-
-            finalText += `⚔️ **Niveau :** ${character.level} (${character.powerLevel})`;
 
             return {
-                text: finalText,
-                image: actionImage,
-                video: actionVideo
+                text: narration,
+                image: actionImage
             };
 
         } catch (error) {
             console.error('❌ Erreur traitement action IA:', error);
             return {
-                text: `❌ Erreur lors du traitement de votre action.
-
-**Action :** ${message}
-
-Le monde de Friction Ultimate semble instable en ce moment. Réessayez dans quelques instants ou utilisez /aide pour voir les commandes disponibles.`
+                text: `⚡ Une erreur s'est produite lors du traitement de votre action. Réessayez.`
             };
         }
     }
 
-    generateBar(current, max, icon) {
-        const percentage = Math.round((current / max) * 100);
-        const filledBars = Math.round(percentage / 20);
-        const emptyBars = 5 - filledBars;
+    generateBar(current, max, emoji) {
+        const percentage = Math.floor((current / max) * 100);
+        const barLength = 10;
+        const filledLength = Math.floor((percentage / 100) * barLength);
+        const emptyLength = barLength - filledLength;
 
-        return icon.repeat(filledBars) + '⬜'.repeat(emptyBars) + ` (${percentage}%)`;
+        return emoji.repeat(filledLength) + '⚫'.repeat(emptyLength) + ` ${percentage}%`;
+    }
+
+    generateHealthBar(current, max) {
+        const percentage = (current / max) * 100;
+        const barLength = 10;
+        const filledLength = Math.floor((percentage / 100) * barLength);
+
+        let emoji = '🟢';
+        if (percentage < 25) emoji = '🔴';
+        else if (percentage < 50) emoji = '🟠';
+        else if (percentage < 75) emoji = '🟡';
+
+        return emoji.repeat(filledLength) + '⚫'.repeat(barLength - filledLength);
+    }
+
+    generateEnergyBar(current, max) {
+        const percentage = (current / max) * 100;
+        const barLength = 10;
+        const filledLength = Math.floor((percentage / 100) * barLength);
+
+        let emoji = '🔵';
+        if (percentage < 25) emoji = '🟤';
+        else if (percentage < 50) emoji = '🟠';
+        else if (percentage < 75) emoji = '🟡';
+
+        return emoji.repeat(filledLength) + '⚫'.repeat(barLength - filledLength);
     }
 
     formatEquipment(equipment) {
@@ -2104,8 +2028,8 @@ Durée : ${socialEvent.duration}
     }
 
     async handlePlayCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+
         if (!character) {
             return {
                 text: `❌ **AUCUN PERSONNAGE TROUVÉ** ❌
@@ -2141,8 +2065,8 @@ Tu dois d'abord créer un personnage !
     }
 
     async handleCombatCommand({ player, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2176,8 +2100,8 @@ Tu dois d'abord créer un personnage !
     }
 
     async handleInventoryCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2211,8 +2135,8 @@ ${this.formatEquipment(equipment)}
     }
 
     async handleMapCommand({ player, dbManager, imageGenerator }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2259,8 +2183,8 @@ ${this.formatEquipment(equipment)}
     }
 
     async handleMarketCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2292,8 +2216,8 @@ ${this.formatEquipment(equipment)}
     }
 
     async handleFactionsCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+
         const factionsText = `⚔️ **FACTIONS DE FRICTION ULTIMATE** ⚔️
 
 🏰 **FACTIONS PRINCIPALES :**
@@ -2331,8 +2255,8 @@ ${character ? `\n👤 **${character.name}** - Faction : Aucune (Indépendant)` :
     }
 
     async handleChallengesCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -2369,12 +2293,12 @@ ${character ? `\n👤 **${character.name}** - Faction : Aucune (Indépendant)` :
 
     async handleSaveGameCommand({ player, dbManager }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
+
             if (!character) {
                 return {
                     text: `❌ **AUCUN PERSONNAGE À SAUVEGARDER**
-                    
+
 Tu n'as pas encore de personnage créé !
 Utilise /créer pour créer ton personnage.`
                 };
@@ -2413,7 +2337,7 @@ Utilise /créer pour créer ton personnage.`
             console.error('❌ Erreur sauvegarde:', error);
             return {
                 text: `❌ **ERREUR DE SAUVEGARDE**
-                
+
 Impossible de créer la sauvegarde. Réessayez plus tard.`
             };
         }
@@ -2424,7 +2348,7 @@ Impossible de créer la sauvegarde. Réessayez plus tard.`
         if (!this.adminManager.isAdmin(player.id)) {
             return {
                 text: `❌ **ACCÈS REFUSÉ**
-                
+
 Cette commande est réservée aux administrateurs.`
             };
         }
@@ -2432,7 +2356,7 @@ Cette commande est réservée aux administrateurs.`
         try {
             // Créer une sauvegarde complète de la base de données
             const backupId = `backup_${Date.now()}`;
-            
+
             return {
                 text: `💾 **SAUVEGARDE ADMINISTRATIVE** 💾
 
@@ -2451,7 +2375,7 @@ Cette commande est réservée aux administrateurs.`
             console.error('❌ Erreur backup admin:', error);
             return {
                 text: `❌ **ERREUR DE SAUVEGARDE ADMINISTRATIVE**
-                
+
 ${error.message}`
             };
         }
@@ -2475,11 +2399,11 @@ ${error.message}`
 
         try {
             const saveData = await dbManager.getTemporaryData(player.id, `save_${saveId}`);
-            
+
             if (!saveData) {
                 return {
                     text: `❌ **SAUVEGARDE INTROUVABLE**
-                    
+
 L'ID "${saveId}" n'existe pas ou a expiré.
 Vérifiez l'ID avec /stats_db`
                 };
@@ -2503,7 +2427,7 @@ Vérifiez l'ID avec /stats_db`
             console.error('❌ Erreur restauration:', error);
             return {
                 text: `❌ **ERREUR DE RESTAURATION**
-                
+
 Impossible de restaurer la sauvegarde "${saveId}".
 ${error.message}`
             };
@@ -2512,8 +2436,8 @@ ${error.message}`
 
     async handleDatabaseStatsCommand({ player, dbManager }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
+
             return {
                 text: `📊 **STATISTIQUES DE SAUVEGARDE** 📊
 
@@ -2521,11 +2445,11 @@ ${error.message}`
 📱 **WhatsApp :** ${player.whatsappNumber}
 
 💾 **ÉTAT ACTUEL :**
-${character ? 
+${character ?
 `✅ **Personnage :** ${character.name}
 📊 **Niveau :** ${character.level} (${character.powerLevel})
 🏰 **Royaume :** ${character.kingdom}
-📍 **Position :** ${character.currentLocation}` 
+📍 **Position :** ${character.currentLocation}`
 : '❌ **Aucun personnage créé**'}
 
 📈 **STATISTIQUES :**
@@ -2542,7 +2466,7 @@ ${character ? `• Personnage créé : ${new Date(character.createdAt).toLocaleS
             console.error('❌ Erreur stats DB:', error);
             return {
                 text: `❌ **ERREUR D'ACCÈS AUX STATISTIQUES**
-                
+
 ${error.message}`
             };
         }
@@ -2550,19 +2474,19 @@ ${error.message}`
 
     async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
         try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
+
             if (!character) {
                 return {
                     text: `❌ **AUCUN PERSONNAGE À SUPPRIMER**
-                    
+
 Tu n'as pas de personnage créé.`
                 };
             }
 
             // Supprimer le personnage
             await dbManager.deleteCharacter(character.id);
-            
+
             // Nettoyer les données temporaires
             await dbManager.clearTemporaryData(player.id, 'creation_started');
             await dbManager.clearTemporaryData(player.id, 'creation_mode');
@@ -2586,15 +2510,15 @@ Tu n'as pas de personnage créé.`
             console.error('❌ Erreur suppression personnage:', error);
             return {
                 text: `❌ **ERREUR DE SUPPRESSION**
-                
+
 Impossible de supprimer le personnage. Réessayez plus tard.`
             };
         }
     }
 
     async handleCoordinatesCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
-        
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+
         if (!character) {
             return {
                 text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
@@ -3379,6 +3303,142 @@ ${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**
             'coast': '🏖️ Côte Maritime'
         };
         return names[terrain] || '❓ Terrain Inconnu';
+    }
+
+    // Méthodes pour la narration enrichie
+    buildEnhancedNarrationPrompt(character, action) {
+        const timeOfDay = this.getTimeOfDay();
+        const weather = this.getCurrentWeather();
+        const dangerLevel = this.calculateDangerLevel(character, action);
+        const emotionalState = this.getCharacterEmotionalState(character);
+
+        return `Tu es un narrateur expert de RPG médiéval-fantasy. Crée une narration CAPTIVANTE et IMMERSIVE pour cette action :
+
+CONTEXTE DRAMATIQUE:
+- Personnage: ${character.name} (${character.gender === 'male' ? 'Guerrier' : 'Guerrière'} de ${character.kingdom})
+- Niveau de puissance: ${character.powerLevel} (${character.level}) - ${this.getPowerDescription(character.powerLevel)}
+- Lieu mystique: ${character.currentLocation}
+- Moment: ${timeOfDay}, ${weather}
+- État émotionnel: ${emotionalState}
+- Niveau de danger: ${dangerLevel}
+
+ACTION À NARRER: ${action}
+
+STYLE DE NARRATION REQUIS:
+- Utilise des détails sensoriels (sons, odeurs, textures)
+- Ajoute de la tension dramatique et du suspense
+- Inclus des éléments fantastiques spécifiques au royaume ${character.kingdom}
+- Montre les conséquences immédiates de l'action
+- Rends le personnage vivant avec ses émotions et réactions physiques
+- Maximum 4 phrases, style cinématographique épique
+
+Crée une narration qui donne envie de connaître la suite !`;
+    }
+
+    buildNarrationPrompt(character, action) {
+        return this.buildEnhancedNarrationPrompt(character, action);
+    }
+
+    getTimeOfDay() {
+        const hour = new Date().getHours();
+        if (hour < 6) return "Profonde nuit étoilée";
+        if (hour < 12) return "Aube naissante";
+        if (hour < 18) return "Jour éclatant";
+        return "Crépuscule mystérieux";
+    }
+
+    getCurrentWeather() {
+        const weathers = [
+            "brume mystique flottant",
+            "vent chargé de magie",
+            "air cristallin",
+            "atmosphère électrique",
+            "chaleur suffocante",
+            "froid mordant"
+        ];
+        return weathers[Math.floor(Math.random() * weathers.length)];
+    }
+
+    calculateDangerLevel(character, action) {
+        const lowerAction = action.toLowerCase();
+        if (lowerAction.includes('attaque') || lowerAction.includes('combat')) return "EXTRÊME";
+        if (lowerAction.includes('explore') || lowerAction.includes('cherche')) return "ÉLEVÉ";
+        if (lowerAction.includes('parle') || lowerAction.includes('discute')) return "MODÉRÉ";
+        return "FAIBLE";
+    }
+
+    getCharacterEmotionalState(character) {
+        const healthPercent = (character.currentLife / character.maxLife) * 100;
+        const energyPercent = (character.currentEnergy / character.maxEnergy) * 100;
+
+        if (healthPercent < 30) return "désespéré mais déterminé";
+        if (healthPercent < 60) return "inquiet mais résolu";
+        if (energyPercent < 30) return "épuisé mais persévérant";
+        if (energyPercent < 60) return "fatigué mais alerte";
+        return "confiant et vigoureux";
+    }
+
+    getPowerDescription(powerLevel) {
+        const descriptions = {
+            'G': "Novice tremblant aux premiers pas",
+            'F': "Apprenti maladroit en apprentissage",
+            'E': "Combattant débutant en progression",
+            'D': "Guerrier prometteur",
+            'C': "Vétéran expérimenté",
+            'B': "Champion redoutable",
+            'A': "Maître légendaire",
+            'S': "Héros épique",
+            'S+': "Demi-dieu destructeur",
+            'SS': "Force cosmique",
+            'SSS': "Transcendance absolue",
+            'MONARQUE': "Souverain des réalités"
+        };
+        return descriptions[powerLevel] || "Mystérieux inconnu";
+    }
+
+    generateFallbackNarration(character, action) {
+        const scenarios = [
+            `${character.name} s'avance avec détermination. ${action} - mais le destin en décidera autrement...`,
+            `L'air se charge de tension autour de ${character.name}. ${action} - les conséquences sont imprévisibles.`,
+            `${character.name} sent son cœur battre la chamade. ${action} - le monde semble retenir son souffle.`,
+            `Les yeux de ${character.name} brillent d'une lueur farouche. ${action} - l'aventure prend un tournant inattendu.`
+        ];
+        return scenarios[Math.floor(Math.random() * scenarios.length)];
+    }
+
+    enrichNarrationWithDynamicElements(narration, character, action) {
+        // Ajouter des éléments liés au royaume
+        const kingdomElements = this.getKingdomSpecificElements(character.kingdom);
+
+        // Ajouter des détails sur l'état du personnage
+        let enrichedNarration = narration;
+
+        // Ajouter des informations de statut à la fin
+        const statusInfo = `\n\n📊 **État de ${character.name}:**`;
+        const healthBar = this.generateHealthBar(character.currentLife, character.maxLife);
+        const energyBar = this.generateEnergyBar(character.currentEnergy, character.maxEnergy);
+
+        enrichedNarration += `${statusInfo}\n❤️ ${healthBar} (${character.currentLife}/${character.maxLife})\n⚡ ${energyBar} (${character.currentEnergy}/${character.maxEnergy})`;
+
+        return enrichedNarration;
+    }
+
+    getKingdomSpecificElements(kingdom) {
+        const elements = {
+            'AEGYRIA': ["lumière dorée", "bannières flottantes", "armures étincelantes"],
+            'SOMBRENUIT': ["ombres dansantes", "murmures mystiques", "éclat lunaire"],
+            'KHELOS': ["sables brûlants", "mirages scintillants", "vents du désert"],
+            'ABRANTIS': ["embruns salés", "cris de mouettes", "navires au loin"],
+            'VARHA': ["neige crissante", "souffle glacé", "échos montagnards"],
+            'SYLVARIA': ["feuilles bruissantes", "chants d'oiseaux", "parfums floraux"],
+            'ECLYPSIA': ["ténèbres oppressantes", "éclipse permanente", "énergies sombres"],
+            'TERRE_DESOLE': ["métal rouillé", "radiations sourdes", "désolation nucléaire"],
+            'DRAK_TARR': ["lave bouillonnante", "vapeurs sulfureuses", "roches incandescentes"],
+            'URVALA': ["brouillards toxiques", "bubulements sinistres", "odeurs putrides"],
+            'OMBREFIEL': ["silence oppressant", "neutralité glaciale", "grisaille éternelle"],
+            'KHALDAR': ["circuits lumineux", "bourdonnements électriques", "technologies mystiques"]
+        };
+        return elements[kingdom] || ["éléments mystérieux"];
     }
 }
 
