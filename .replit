@@ -126,6 +126,23 @@ args = "sleep 3"
 task = "shell.exec"
 args = "node index.js"
 
+[[workflows.workflow]]
+name = "Restart Bot Fixed"
+author = 48109623
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pkill -f \"node index.js\" || true"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "sleep 3"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
+
 [[ports]]
 localPort = 5000
 externalPort = 80

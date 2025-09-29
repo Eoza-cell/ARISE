@@ -1776,14 +1776,14 @@ Narration (200 mots maximum):`;
                 newLocation: character.currentLocation // Peut être modifié selon l'action
             };
 
-            await this.updateCharacterAfterAction(character, message, actionResult);
+            await this.updateCharacterAfterAction(character, message, actionResult, dbManager);
 
             const response = {
                 text: `🎭 **${character.name}** - ${character.currentLocation}
 
 ${narration}
 
-⚡ **Énergie:** ${character.currentEnergy - actionResult.energyCost}/${character.maxEnergy} (-${actionResult.energyCost})
+⚡ **Énergie:** ${Math.max(0, character.currentEnergy - actionResult.energyCost)}/${character.maxEnergy} (-${actionResult.energyCost})
 ✨ **Expérience:** +${actionResult.experience} XP`,
                 image: actionImage
             };
@@ -1800,6 +1800,47 @@ ${narration}
             return {
                 text: `❌ Une erreur s'est produite lors du traitement de votre action. Veuillez réessayer.`
             };
+        }
+    }
+
+    /**
+     * Met à jour le personnage après une action
+     */
+    async updateCharacterAfterAction(character, action, actionResult, dbManager) {
+        try {
+            // Calculer la nouvelle énergie
+            const newEnergy = Math.max(0, character.currentEnergy - actionResult.energyCost);
+            
+            // Calculer la nouvelle expérience et niveau
+            const newExperience = character.experience + actionResult.experience;
+            let newLevel = character.level;
+            
+            // Calcul simple pour montée de niveau (tous les 100 XP)
+            const experienceForNextLevel = newLevel * 100;
+            if (newExperience >= experienceForNextLevel) {
+                newLevel++;
+                console.log(`🎉 ${character.name} monte au niveau ${newLevel} !`);
+            }
+
+            // Mettre à jour le personnage dans la base de données
+            await dbManager.updateCharacter(character.id, {
+                currentEnergy: newEnergy,
+                experience: newExperience,
+                level: newLevel,
+                currentLocation: actionResult.newLocation || character.currentLocation
+            });
+
+            // Mettre à jour l'objet character en mémoire
+            character.currentEnergy = newEnergy;
+            character.experience = newExperience;
+            character.level = newLevel;
+            character.currentLocation = actionResult.newLocation || character.currentLocation;
+
+            console.log(`✅ Personnage ${character.name} mis à jour: Énergie=${newEnergy}, XP=${newExperience}, Niveau=${newLevel}`);
+
+        } catch (error) {
+            console.error('❌ Erreur mise à jour personnage:', error);
+            throw error;
         }
     }
 
