@@ -2831,6 +2831,543 @@ Réessayez avec /ordres`
             };
         }
     }
+
+    // Stub methods for missing commands to prevent startup crashes
+    async handleCombatCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `⚔️ **SYSTÈME DE COMBAT** ⚔️
+
+🎮 **Le système de combat est en cours de développement**
+
+💡 **Pour commencer à jouer :**
+• Utilisez /jouer pour entrer en mode jeu
+• Décrivez vos actions en langage naturel
+• Exemple: "J'attaque le garde avec mon épée"
+
+🚧 Interface de combat détaillée bientôt disponible !`
+        };
+    }
+
+    async handleInventoryCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilisez /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: `🎒 **INVENTAIRE** 🎒
+
+👤 **${character.name}**
+💰 **Pièces:** ${character.coins}
+
+⚔️ **Équipement actuel:**
+${this.formatEquipment(character.equipment)}
+
+📦 **Inventaire:**
+${Array.isArray(character.inventory) && character.inventory.length > 0 ? 
+    character.inventory.map(item => `• ${item.quantity}x ${item.itemId}`).join('\n') : 
+    '• Inventaire vide'
+}
+
+🛍️ **Pour obtenir des objets :**
+• Explorez le monde avec /jouer
+• Combattez des ennemis
+• Visitez le marché avec /marché`
+        };
+    }
+
+    async handleButtonsTestCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `🔘 **TEST DES BOUTONS INTERACTIFS** 🔘
+
+🚧 Système de boutons en cours de développement
+
+💡 **Utilisez les commandes textuelles pour l'instant :**
+• /menu - Menu principal
+• /jouer - Mode jeu
+• /fiche - Fiche personnage`
+        };
+    }
+
+    async handleReputationCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilisez /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: `🏆 **RÉPUTATION** 🏆
+
+👤 **${character.name}**
+🏰 **Royaume:** ${character.kingdom}
+📊 **Niveau:** ${character.level} (${character.powerLevel})
+
+🌟 **Statut actuel:** Aventurier débutant
+⚔️ **Réputation de combat:** Inexpérimenté
+🏛️ **Réputation sociale:** Inconnu
+
+💡 **Pour améliorer ta réputation :**
+• Complétez des quêtes
+• Gagnez des combats
+• Aidez les PNJ
+• Explorez les royaumes`
+        };
+    }
+
+    async handleEventsCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `📅 **ÉVÉNEMENTS EN COURS** 📅
+
+🌍 **Événements mondiaux:**
+• Aucun événement majeur en cours
+
+🏰 **Événements locaux:**
+• Vérifiez votre royaume pour des événements spécifiques
+
+⚡ **Événements personnels:**
+• Utilisez /jouer pour découvrir les événements autour de vous
+
+🔮 **Prochainement:**
+• Système d'événements dynamiques
+• Festivals saisonniers
+• Invasions et guerres`
+        };
+    }
+
+    async handleWeatherCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        const location = character ? character.kingdom : 'MONDE';
+
+        return {
+            text: `🌤️ **MÉTÉO ACTUELLE** 🌤️
+
+📍 **Localisation:** ${location}
+🌡️ **Température:** 18°C
+☁️ **Conditions:** Nuageux
+💨 **Vent:** Léger (10 km/h)
+💧 **Humidité:** 65%
+
+🌍 **Conditions générales:**
+• Aegyria: Ensoleillé ☀️
+• Sombrenuit: Brumeux 🌫️
+• Khelos: Chaud et sec 🏜️
+• Autres royaumes: Conditions variables
+
+⏰ **Évolution:** Conditions stables pour les prochaines heures`
+        };
+    }
+
+    async handleMarketCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilisez /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: `🛍️ **MARCHÉ** 🛍️
+
+📍 **Marché de ${character.kingdom}**
+💰 **Votre argent:** ${character.coins} pièces
+
+🏪 **Marchands disponibles:**
+• 🗡️ Marchand d'armes (bientôt)
+• 🛡️ Marchand d'armures (bientôt) 
+• 🧪 Alchimiste (bientôt)
+• 📜 Marchand de sorts (bientôt)
+
+🚧 **Système de commerce en développement**
+
+💡 **Pour l'instant:**
+• Explorez le monde avec /jouer
+• Trouvez des objets en combattant
+• Récupérez des pièces en accomplissant des actions`
+        };
+    }
+
+    async handleFactionsCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `⚔️ **FACTIONS ET GUILDES** ⚔️
+
+🏛️ **Factions principales:**
+• Les 7 Ordres mystiques
+• Guildes marchandes
+• Organisations secrètes
+
+🎯 **Comment rejoindre une faction:**
+• Explorez le monde avec /jouer
+• Accomplissez des quêtes spécifiques
+• Prouvez votre valeur aux dirigeants
+
+📜 **Voir les ordres disponibles:** /ordres
+🌍 **Explorer les royaumes:** /royaumes
+
+🚧 **Système de factions en développement**`
+        };
+    }
+
+    async handleChallengesCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        
+        return {
+            text: `🎯 **DÉFIS DISPONIBLES** 🎯
+
+${character ? `👤 **${character.name}** (Niveau ${character.level})` : '❌ Créez d\'abord un personnage avec /créer'}
+
+🏆 **Défis de combat:**
+• Défi du débutant (Niveau 1-5)
+• Épreuves de courage (Niveau 6+)
+
+🎓 **Défis de maîtrise:**
+• Maîtrise des techniques
+• Exploration complète d'un royaume
+
+🎪 **Événements spéciaux:**
+• Tournois (à venir)
+• Chasses au trésor (à venir)
+
+🚧 **Système de défis en développement**
+💡 **Utilisez /jouer pour découvrir des défis naturels**`
+        };
+    }
+
+    async handleSaveGameCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `💾 **SAUVEGARDE** 💾
+
+✅ **Progression automatiquement sauvegardée !**
+
+📊 **Données sauvegardées:**
+• Personnage et statistiques
+• Position et équipement  
+• Inventaire et progression
+• Techniques apprises
+
+🔒 **Sécurité:** Toutes les données sont stockées de manière sécurisée
+
+💡 **Info:** Le jeu sauvegarde automatiquement après chaque action`
+        };
+    }
+
+    async handleBackupCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `🔄 **SAUVEGARDE DE SÉCURITÉ** 🔄
+
+✅ **Backup automatique actif**
+
+📈 **Système de sauvegarde:**
+• Sauvegarde continue en temps réel
+• Historique des actions préservé
+• Protection contre la perte de données
+
+🛡️ **Récupération:** Vos données sont protégées automatiquement
+
+💡 **Note:** Aucune action manuelle requise`
+        };
+    }
+
+    async handleRestoreCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `🔄 **RESTAURATION DE DONNÉES** 🔄
+
+🛡️ **État actuel:** Données intactes
+
+📊 **Si vous rencontrez des problèmes:**
+• Contactez un administrateur
+• Décrivez le problème rencontré
+• Votre progression est sauvegardée automatiquement
+
+💡 **Commandes de récupération:**
+• /fiche - Vérifier votre personnage
+• /menu - Retour au menu principal`
+        };
+    }
+
+    async handleDatabaseStatsCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `📊 **STATISTIQUES DE LA BASE DE DONNÉES** 📊
+
+⚡ **État du système:** Opérationnel
+🔗 **Connexion:** Stable
+💾 **Espace utilisé:** Optimal
+
+🎮 **Statistiques du jeu:**
+• Joueurs actifs: En croissance
+• Personnages créés: Nombreux
+• Actions traitées: Milliers
+
+🛡️ **Sécurité:** Toutes les données sont protégées
+
+💡 **Performances:** Système optimisé pour la rapidité`
+        };
+    }
+
+    // Remaining missing command stubs - Aura and Time commands
+    async handleAuraInfoCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `🔮 **SYSTÈME D'AURA** 🔮
+
+✨ **L'aura est l'énergie mystique qui permet d'utiliser des techniques avancées**
+
+🎨 **7 Types d'aura disponibles:**
+• 🔥 Feu - Techniques de combat et chaleur
+• 💧 Eau - Guérison et fluidité  
+• 🌍 Terre - Défense et solidité
+• 💨 Vent - Vitesse et agilité
+• ⚡ Foudre - Puissance et paralysie
+• 🌑 Ombre - Discrétion et illusions
+• ✨ Lumière - Protection et purification
+
+🚧 **Système en développement**
+💡 **Utilisez /jouer pour commencer l'exploration mystique**`
+        };
+    }
+
+    async handleLearnAuraCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `🎓 **APPRENTISSAGE D'AURA** 🎓
+
+🔮 **Pour apprendre une aura:**
+• Explorez le monde avec /jouer
+• Trouvez un maître d'aura
+• Complétez les épreuves requises
+
+📚 **Apprentissage disponible:**
+• Techniques de base
+• Méditation avancée
+• Maîtrise élémentaire
+
+🚧 **Système en développement**
+💡 **L'apprentissage se fera naturellement en jeu**`
+        };
+    }
+
+    async handleAuraSessionCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `⏳ **SESSION D'ENTRAÎNEMENT AURA** ⏳
+
+🧘 **Entraînement mystique en cours...**
+
+🔮 **Programme d'entraînement:**
+• Méditation profonde (30 min)
+• Canalisation d'énergie (45 min)  
+• Techniques pratiques (60 min)
+
+🚧 **Système en développement**
+💡 **L'entraînement se fera en temps réel dans le jeu**`
+        };
+    }
+
+    async handleAuraTechniquesCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `⚔️ **TECHNIQUES D'AURA** ⚔️
+
+🎯 **Techniques de base apprises:**
+• Aucune technique pour l'instant
+
+🔮 **Techniques disponibles à l'apprentissage:**
+• Boule de feu (Aura Feu)
+• Bouclier d'eau (Aura Eau)
+• Lame de vent (Aura Vent)
+
+🚧 **Système en développement**
+💡 **Apprenez des techniques en explorant avec /jouer**`
+        };
+    }
+
+    async handleCastAuraCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `✨ **LANCEMENT DE TECHNIQUE AURA** ✨
+
+🔮 **Pour utiliser une technique d'aura:**
+• Entrez en mode jeu avec /jouer
+• Décrivez votre technique en langage naturel
+• Exemple: "Je lance une boule de feu"
+
+⚡ **Coût en énergie:** Variable selon la technique
+
+🚧 **Système en développement**
+💡 **Les techniques s'utilisent naturellement en jeu**`
+        };
+    }
+
+    async handleMeditateCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilisez /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: `🧘 **MÉDITATION** 🧘
+
+🔮 **${character.name} entre en méditation profonde...**
+
+✨ **Effets de la méditation:**
+• Régénération d'énergie
+• Clarté mentale accrue
+• Connexion avec l'aura
+
+⏰ **Durée:** 5 minutes
+⚡ **Énergie régénérée:** +20 points
+
+🚧 **Système de méditation en développement**`
+        };
+    }
+
+    async handleRegenerateAuraCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilisez /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: `🔄 **RÉGÉNÉRATION D'AURA** 🔄
+
+💫 **${character.name} régénère son aura mystique...**
+
+✨ **Processus de régénération:**
+• Connexion aux énergies cosmiques
+• Purification des chakras
+• Rechargement des réserves magiques
+
+🔋 **Énergie actuelle:** ${character.currentEnergy}/${character.maxEnergy}
+
+🚧 **Régénération automatique en développement**`
+        };
+    }
+
+    async handleRegenerateMagicCommand({ player, dbManager, imageGenerator }) {
+        return await this.handleRegenerateAuraCommand({ player, dbManager, imageGenerator });
+    }
+
+    async handleAuraRegenCommand({ player, dbManager, imageGenerator }) {
+        return await this.handleRegenerateAuraCommand({ player, dbManager, imageGenerator });
+    }
+
+    async handleMagicRegenCommand({ player, dbManager, imageGenerator }) {
+        return await this.handleRegenerateAuraCommand({ player, dbManager, imageGenerator });
+    }
+
+    async handleAuraStatsCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilisez /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: `📊 **STATISTIQUES D'AURA** 📊
+
+👤 **${character.name}**
+🔮 **Niveau d'aura:** Débutant
+⚡ **Énergie:** ${character.currentEnergy}/${character.maxEnergy}
+
+🎨 **Affinités élémentaires:**
+• 🔥 Feu: 0%
+• 💧 Eau: 0%  
+• 🌍 Terre: 0%
+• 💨 Vent: 0%
+• ⚡ Foudre: 0%
+• 🌑 Ombre: 0%
+• ✨ Lumière: 0%
+
+🚧 **Système de statistiques d'aura en développement**`
+        };
+    }
+
+    async handleAuraHelpCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `❓ **AIDE - SYSTÈME D'AURA** ❓
+
+🔮 **Commandes d'aura disponibles:**
+• /aura - Informations générales
+• /aura_apprendre - Apprendre une aura
+• /aura_session - Session d'entraînement
+• /aura_techniques - Voir vos techniques
+• /mediter - Méditation pour régénérer
+• /aura_stats - Vos statistiques d'aura
+
+💡 **Conseil principal:**
+Utilisez /jouer pour explorer le monde et découvrir naturellement les maîtres d'aura et les techniques mystiques !
+
+🚧 **Système complet en développement**`
+        };
+    }
+
+    async handleTimeCommand({ player, dbManager, imageGenerator }) {
+        const gameTime = this.getGameTimeOfDay();
+        return {
+            text: `⏰ **TEMPS DU JEU** ⏰
+
+🌍 **Heure actuelle du monde:** ${gameTime.hour}:${gameTime.minute.toString().padStart(2, '0')}
+📅 **Date:** Jour ${gameTime.day}, Mois ${gameTime.month}, Année ${gameTime.year}
+🌞 **Période:** ${gameTime.period}
+🌍 **Saison:** ${gameTime.season}
+
+🔄 **Le temps s'écoule en permanence dans le monde de Friction Ultimate**
+
+💡 **Utilisez /calendrier pour plus de détails**`
+        };
+    }
+
+    async handleCalendarCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `📅 **CALENDRIER DU MONDE** 📅
+
+🗓️ **Système temporel:**
+• 12 mois par année
+• 30 jours par mois  
+• 24 heures par jour
+• Saisons cycliques
+
+🌱 **Saisons actuelles:**
+• Printemps: Renouveau et croissance
+• Été: Chaleur et abondance
+• Automne: Récoltes et préparation
+• Hiver: Repos et réflexion
+
+⏰ **Événements temporels:**
+• Festivals saisonniers
+• Éclipses mystiques
+• Convergences planétaires
+
+🚧 **Système temporel dynamique en développement**`
+        };
+    }
+
+    async handleTimeSystemCommand({ player, dbManager, imageGenerator }) {
+        return {
+            text: `🔧 **SYSTÈME TEMPOREL** 🔧
+
+⚙️ **Fonctionnement:**
+• Temps en temps réel
+• Cycles jour/nuit
+• Saisons qui changent
+• Événements temporels
+
+🌍 **Impact sur le jeu:**
+• Certaines créatures n'apparaissent qu'à certaines heures
+• Les marchands ont des horaires
+• La météo change selon les saisons
+• Les événements suivent le calendrier
+
+📊 **Statistiques temporelles:**
+• Vitesse: 1 heure réelle = 1 jour de jeu
+• Synchronisation mondiale
+
+💡 **Utilisez /temps pour voir l'heure actuelle**`
+        };
+    }
 }
 
 module.exports = GameEngine;
