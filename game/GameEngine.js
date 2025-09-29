@@ -125,6 +125,11 @@ class GameEngine {
         this.reactionTimeManager = null; // Initialisé avec sock
         this.rpEncounterManager = null; // Initialisé avec sock pour rencontres RP
 
+        // Systèmes de difficulté
+        this.playerFatigue = new Map(); // Fatigue par joueur (0-100)
+        this.combatConditions = new Map(); // Conditions de combat par joueur (ex: 'étourdi', 'saignement')
+        this.playerDifficultySettings = new Map(); // Paramètres de difficulté par joueur
+
         this.commandHandlers = {
             // Core commands that definitely exist
             '/menu': this.handleMenuCommand.bind(this),
@@ -519,20 +524,6 @@ L'image n'a pas pu être traitée. Réessaie d'envoyer ta photo.`
             console.log(`✅ Utilisation image déjà téléchargée: ${imageBuffer.length} bytes`);
 
             if (imageBuffer && imageBuffer.length > 0) {
-                // Valider le type d'image
-                const validImageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-
-                if (!validImageTypes.includes(mimetype.toLowerCase())) {
-                    return {
-                        text: `❌ **Type d'image non supporté**
-
-Types supportés: JPEG, PNG, WebP
-Type reçu: ${mimetype}
-
-📸 Réessaie avec une image dans un format supporté.`
-                    };
-                }
-
                 // Validation renforcée de l'image
                 if (imageBuffer.length < 500) { // Au moins 500 bytes
                     console.log(`⚠️ Image très petite détectée: ${imageBuffer.length} bytes`);
@@ -1763,9 +1754,9 @@ Narration (200 mots maximum):`;
 
                     // Générer la vidéo avec ou sans image
                     const videoResult = await imageGenerator.huggingfaceClient.generateCharacterActionVideo(
-                        message, 
-                        character, 
-                        character.currentLocation, 
+                        message,
+                        character,
+                        character.currentLocation,
                         videoPath
                     );
 
@@ -1817,27 +1808,58 @@ ${narration}
     }
 
     /**
-     * Met à jour le personnage après une action
+     * Met à jour le personnage après une action avec système de difficulté
      */
     async updateCharacterAfterAction(character, action, actionResult, dbManager) {
         try {
-            // Calculer la nouvelle énergie
-            const newEnergy = Math.max(0, character.currentEnergy - actionResult.energyCost);
-            
-            // Calculer la nouvelle expérience et niveau
-            const newExperience = character.experience + actionResult.experience;
+            // Appliquer la fatigue
+            this.applyFatigueAfterAction(character.playerId, action, actionResult.energyCost);
+
+            // Générer événements de combat
+            const combatEvents = this.generateCombatEvents(character, action);
+
+            let totalDamage = 0;
+            let appliedConditions = [];
+
+            for (const event of combatEvents) {
+                if (event.effect.damage) {
+                    totalDamage += event.effect.damage;
+                }
+                if (event.effect.condition) {
+                    this.applyCombatCondition(character.playerId, event.effect.condition);
+                    appliedConditions.push(event.effect.condition);
+                }
+            }
+
+            // Calculer la nouvelle énergie (coût plus élevé selon la fatigue)
+            const fatigueMultiplier = 1 + (this.getPlayerFatigue(character.playerId) * 0.01);
+            const adjustedEnergyCost = Math.floor(actionResult.energyCost * fatigueMultiplier);
+            const newEnergy = Math.max(0, character.currentEnergy - adjustedEnergyCost);
+
+            // Calculer la nouvelle vie (dégâts des événements)
+            const newLife = Math.max(0, character.currentLife - totalDamage);
+
+            // Calculer la nouvelle expérience et niveau (BEAUCOUP plus difficile)
+            const baseXP = Math.floor(actionResult.experience * 0.6); // XP réduite de 40%
+            const difficultyXP = this.calculateDifficultyXP(character, action);
+            const newExperience = character.experience + baseXP + difficultyXP;
             let newLevel = character.level;
-            
-            // Calcul simple pour montée de niveau (tous les 100 XP)
-            const experienceForNextLevel = newLevel * 100;
+
+            // Calcul de montée de niveau BEAUCOUP plus difficile
+            const experienceForNextLevel = Math.pow(newLevel, 2.5) * 150; // Progression exponentielle
             if (newExperience >= experienceForNextLevel) {
                 newLevel++;
-                console.log(`🎉 ${character.name} monte au niveau ${newLevel} !`);
+                console.log(`🎉 ${character.name} monte au niveau ${newLevel} après un entraînement acharné !`);
+
+                // Réduire légèrement la fatigue au niveau up
+                const currentFatigue = this.getPlayerFatigue(character.playerId);
+                this.playerFatigue.set(character.playerId, Math.max(0, currentFatigue - 10));
             }
 
             // Mettre à jour le personnage dans la base de données
             await dbManager.updateCharacter(character.id, {
                 currentEnergy: newEnergy,
+                currentLife: newLife,
                 experience: newExperience,
                 level: newLevel,
                 currentLocation: actionResult.newLocation || character.currentLocation
@@ -1845,11 +1867,18 @@ ${narration}
 
             // Mettre à jour l'objet character en mémoire
             character.currentEnergy = newEnergy;
+            character.currentLife = newLife;
             character.experience = newExperience;
             character.level = newLevel;
             character.currentLocation = actionResult.newLocation || character.currentLocation;
 
-            console.log(`✅ Personnage ${character.name} mis à jour: Énergie=${newEnergy}, XP=${newExperience}, Niveau=${newLevel}`);
+            // Ajouter infos sur les événements et conditions dans actionResult
+            actionResult.combatEvents = combatEvents;
+            actionResult.appliedConditions = appliedConditions;
+            actionResult.totalDamage = totalDamage;
+            actionResult.fatigueIncrease = this.getPlayerFatigue(character.playerId);
+
+            console.log(`✅ Personnage ${character.name} mis à jour avec système de difficulté: Énergie=${newEnergy}, Vie=${newLife}, XP=${newExperience}, Niveau=${newLevel}, Fatigue=${this.getPlayerFatigue(character.playerId)}%`);
 
         } catch (error) {
             console.error('❌ Erreur mise à jour personnage:', error);
@@ -1857,1406 +1886,111 @@ ${narration}
         }
     }
 
-    generateBar(current, max, emoji) {
-        const percentage = Math.floor((current / max) * 100);
-        const barLength = 10;
-        const filledLength = Math.floor((percentage / 100) * barLength);
-        const emptyLength = barLength - filledLength;
-
-        return emoji.repeat(filledLength) + '⚫'.repeat(emptyLength) + ` ${percentage}%`;
-    }
-
-    generateHealthBar(current, max) {
-        const percentage = (current / max) * 100;
-        const barLength = 10;
-        const filledLength = Math.floor((percentage / 100) * barLength);
-
-        let emoji = '🟢';
-        if (percentage < 25) emoji = '🔴';
-        else if (percentage < 50) emoji = '🟠';
-        else if (percentage < 75) emoji = '🟡';
-
-        return emoji.repeat(filledLength) + '⚫'.repeat(barLength - filledLength);
-    }
-
-    generateEnergyBar(current, max) {
-        const percentage = (current / max) * 100;
-        const barLength = 10;
-        const filledLength = Math.floor((percentage / 100) * barLength);
-
-        let emoji = '🔵';
-        if (percentage < 25) emoji = '🟤';
-        else if (percentage < 50) emoji = '🟠';
-        else if (percentage < 75) emoji = '🟡';
-
-        return emoji.repeat(filledLength) + '⚫'.repeat(barLength - filledLength);
-    }
-
-    formatEquipment(equipment) {
-        if (!equipment || Object.keys(equipment).length === 0) {
-            return '• Aucun équipement';
-        }
-
-        let formatted = '';
-        if (equipment.weapon) formatted += `• Arme : ${equipment.weapon}\n`;
-        if (equipment.armor) formatted += `• Armure : ${equipment.armor}\n`;
-        if (equipment.accessories && equipment.accessories.length > 0) {
-            formatted += `• Accessoires : ${equipment.accessories.join(', ')}\n`;
-        }
-
-        return formatted || '• Aucun équipement';
-    }
-
-    async handleHelpCommand({ imageGenerator }) {
-        return {
-            text: `📱 **AIDE - FRICTION ULTIMATE**
-
-🎮 **Commandes de base :**
-• /menu - Menu principal
-• /créer - Créer un personnage
-• /modifier - Modifier l'apparence de ton personnage
-• /fiche - Fiche de personnage
-
-🌍 **Exploration :**
-• /royaumes - Les 12 royaumes
-• /ordres - Les 7 ordres
-• /carte - Carte du monde
-
-⚔️ **Combat :**
-• /combat - Système de combat
-• /inventaire - Gestion équipement
-• /time_system - Informations sur le temps de jeu
-
-💾 **Sauvegarde :**
-• /sauvegarde - Sauvegarder votre partie
-• /restore [ID] - Restaurer une sauvegarde
-• /stats_db - Statistiques de sauvegarde
-• /backup - Sauvegarde complète (admin)
-
-💀 **Le monde de Friction est impitoyable !**
-Chaque action doit être précise et réfléchie.`,
-            image: await imageGenerator.generateHelpImage()
-        };
-    }
-
-    async handleKingdomsCommand({ dbManager, imageGenerator }) {
-        const kingdoms = await dbManager.getAllKingdoms();
-
-        let kingdomsText = `🏰 **LES 12 ROYAUMES DE FRICTION ULTIMATE**\n\n`;
-
-        kingdoms.forEach((kingdom, index) => {
-            kingdomsText += `**${index + 1}. ${kingdom.name} (${kingdom.id})**
-${kingdom.description}
-🌍 **Géographie :** ${kingdom.geography}
-🎭 **Culture :** ${kingdom.culture}
-⚔️ **Spécialités :** ${kingdom.specialties.join(', ')}
-✨ **Particularités :** ${kingdom.particularities}
-
-`;
-        });
-
-        let kingdomImage = null;
-        try {
-            kingdomImage = await imageGenerator.generateWorldMap({
-                style: '3d',
-                description: 'Fantasy kingdoms overview with multiple magical realms and territories'
-            });
-        } catch (error) {
-            console.log('⚠️ Impossible de générer l\'image des royaumes, continuons sans image');
-        }
-
-        return {
-            text: kingdomsText,
-            image: kingdomImage
-        };
-    }
-
-    async handleOrdersCommand({ dbManager, imageGenerator }) {
-        const orders = await dbManager.getAllOrders();
-
-        let ordersText = `⚔️ **LES 7 ORDRES DE FRICTION ULTIMATE**\n\n`;
-
-        orders.forEach((order, index) => {
-            ordersText += `**${index + 1}. ${order.name}**
-${order.description}
-🏰 **Localisation :** ${order.location}
-⚔️ **Spécialités :** ${order.specialties.join(', ')}
-
-`;
-        });
-
-        return {
-            text: ordersText,
-            image: await imageGenerator.generateOrdersOverview()
-        };
-    }
-
-    async handleButtonsTestCommand({ player, chatId, dbManager, sock }) {
-        try {
-            if (!sock || !sock.buttonManager) {
-                return {
-                    text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**
-
-⚠️ Système de boutons non initialisé.
-
-Les boutons simulés avec des sondages WhatsApp permettent de créer des interfaces interactives sans API officielle !
-
-🎮 Chaque sondage = un bouton
-📊 Cliquer sur le sondage = activer l'action
-
-Cette fonctionnalité sera bientôt disponible !`
-                };
-            }
-
-            const character = await dbManager.getCharacterByPlayer(player.id);
-
-            const buttonManager = sock.buttonManager;
-
-            await sock.sendMessage(chatId, {
-                text: `🔘 **DÉMONSTRATION BOUTONS INTERACTIFS**
-
-🎮 Voici comment fonctionne le système de boutons simulés avec des sondages WhatsApp !
-
-✨ Chaque "bouton" est en fait un sondage avec une seule option
-📊 Cliquer dessus équivaut à appuyer sur un bouton
-
-**Menu de test :**`
-            });
-
-            setTimeout(async () => {
-                await buttonManager.sendMainGameMenu(chatId, character);
-
-                setTimeout(async () => {
-                    await buttonManager.sendActionMenu(chatId);
-
-                    setTimeout(async () => {
-                        await buttonManager.sendConfirmationMenu(chatId, "Voulez-vous continuer le test ?");
-                    }, 2000);
-                }, 2000);
-            }, 1000);
-
-            return {
-                text: '',
-                skipResponse: true
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur démonstration boutons:', error);
-            return {
-                text: `❌ **Erreur lors de la démonstration des boutons**
-
-Le système rencontre un problème technique.
-
-Veuillez réessayer plus tard ou contactez l'administrateur.`
-            };
-        }
-    }
-
-    async handleReputationCommand({ player, dbManager }) {
-        const reputation = await dbManager.getTemporaryData(player.id, 'reputation') || {
-            honor: 50, fear: 0, respect: 50, notoriety: 0
-        };
-
-        const reputationText = `🏆 **RÉPUTATION DE ${player.username.toUpperCase()}**
-
-⚔️ **Honneur :** ${reputation.honor}/100 ${this.getReputationBar(reputation.honor)}
-😨 **Peur :** ${reputation.fear}/100 ${this.getReputationBar(reputation.fear)}
-🤝 **Respect :** ${reputation.respect}/100 ${this.getReputationBar(reputation.respect)}
-🔥 **Notoriété :** ${reputation.notoriety}/100 ${this.getReputationBar(reputation.notoriety)}
-
-📊 **Effets actifs :**
-${this.advancedMechanics.getReputationEffects(reputation).join('\n')}`;
-
-        return { text: reputationText };
-    }
-
-    async handleEventsCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return { text: "❌ Aucun personnage trouvé !" };
-        }
-
-        const randomEvent = await this.advancedMechanics.triggerRandomEvent(character, character.currentLocation);
-        const socialEvent = this.advancedMechanics.generateSocialEvent(character, character.currentLocation);
-
-        const eventsText = `🎲 **ÉVÉNEMENTS EN COURS**
-
-🌟 **Événement aléatoire :**
-${randomEvent.description}
-Choix : ${randomEvent.choices.join(' | ')}
-
-🏛️ **Événement social :**
-${socialEvent.description}
-Effets : ${socialEvent.effects.join(', ')}
-Durée : ${socialEvent.duration}
-
-💡 **Tapez votre choix pour participer !**`;
-
-        return { text: eventsText };
-    }
-
-    async handleWeatherCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return { text: "❌ Aucun personnage trouvé !" };
-        }
-
-        const weather = this.advancedMechanics.weatherSystem.updateWeather(character.currentLocation);
-
-        const weatherText = `🌤️ **MÉTÉO À ${character.currentLocation.toUpperCase()}**
-
-☁️ **Conditions :** ${this.advancedMechanics.weatherSystem.currentWeather}
-👁️ **Visibilité :** ${weather.visibility}%
-🏃 **Mobilité :** ${weather.movement}%
-😊 **Ambiance :** ${weather.mood}
-
-⚠️ **Impact sur le gameplay en cours...**`;
-
-        return { text: weatherText };
-    }
-
-    async handlePlayCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ **AUCUN PERSONNAGE TROUVÉ** ❌
-
-Tu dois d'abord créer un personnage !
-
-🎮 **Utilise /créer pour créer ton personnage**
-📋 **Ou /menu pour voir toutes les options**`
-            };
-        }
-
-        // Activer le mode jeu
-        await dbManager.setTemporaryData(player.id, 'game_mode', true);
-
-        return {
-            text: `🎮 **MODE JEU ACTIVÉ** 🎮
-
-👤 **${character.name}** entre en jeu !
-🏰 **Royaume :** ${character.kingdom}
-📍 **Position :** ${character.currentLocation}
-
-💫 **Tu peux maintenant :**
-• Écrire des actions libres (ex: "je marche vers la forêt")
-• Interagir avec l'environnement
-• Combattre des ennemis
-• Parler aux PNJ
-
-⚡ **Chaque action sera narrée par l'IA !**
-🔥 **L'aventure commence maintenant !**
-
-💡 **Écris ton action pour commencer l'aventure...**`
-        };
-    }
-
-    async handleCombatCommand({ player, dbManager, imageGenerator }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const combatInfo = `⚔️ **SYSTÈME DE COMBAT FRICTION** ⚔️
-
-👤 **${character.name}** - Rang ${character.powerLevel}
-❤️ **PV :** ${character.currentLife}/${character.maxLife}
-⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}
-
-🥊 **Techniques de base disponibles :**
-• Coup de poing (3 dégâts, 8 énergie)
-• Coup de pied (4 dégâts, 14 énergie)
-• Uppercut (5 dégâts, 15 énergie)
-
-⚠️ **ATTENTION :** En tant que débutant rang G, tes attaques sont très faibles !
-
-💡 **Comment combattre :**
-• Écris des actions de combat naturelles
-• Ex: "je donne un coup de poing au gobelin"
-• L'IA calculera automatiquement les dégâts
-
-🎯 **Trouve des adversaires faibles pour commencer :**
-• Rats géants (niveau 1)
-• Gobelins (niveau 2)
-• Évite les gardes (niveau 5+) !`;
-
-        return { text: combatInfo };
-    }
-
-    async handleInventoryCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const inventory = character.inventory || [];
-        const equipment = character.equipment || {};
-
-        let inventoryText = `🎒 **INVENTAIRE DE ${character.name}** 🎒
-
-💰 **Pièces :** ${character.coins}
-
-⚔️ **ÉQUIPEMENT ACTUEL :**
-${this.formatEquipment(equipment)}
-
-📦 **OBJETS TRANSPORTÉS :**`;
-
-        if (inventory.length === 0) {
-            inventoryText += `\n• Aucun objet`;
+    // Fonctions utilitaires pour la difficulté (à implémenter)
+    applyFatigueAfterAction(playerId, action, energyCost) {
+        const currentFatigue = this.getPlayerFatigue(playerId);
+        let fatigueIncrease = 0;
+
+        if (action.toLowerCase().includes('combat') || action.toLowerCase().includes('attaque')) {
+            fatigueIncrease = (energyCost * 0.5) + (Math.random() * 5); // Fatigue accrue en combat
+        } else if (action.toLowerCase().includes('court') || action.toLowerCase().includes('saute') || action.toLowerCase().includes('grimpe')) {
+            fatigueIncrease = (energyCost * 0.3) + (Math.random() * 3); // Fatigue modérée pour les mouvements
         } else {
-            inventory.forEach(item => {
-                inventoryText += `\n• ${item.name} (x${item.quantity || 1})`;
+            fatigueIncrease = (energyCost * 0.1) + (Math.random() * 1); // Fatigue légère pour actions simples
+        }
+
+        const newFatigue = Math.min(100, currentFatigue + fatigueIncrease);
+        this.playerFatigue.set(playerId, newFatigue);
+    }
+
+    getPlayerFatigue(playerId) {
+        return this.playerFatigue.get(playerId) || 0;
+    }
+
+    generateCombatEvents(character, action) {
+        const events = [];
+        const difficultyFactor = this.getDifficultyFactor(character.playerId); // Facteur basé sur la fatigue, le niveau, etc.
+
+        // Exemple: 60% de chance d'un événement de combat mineur
+        if (Math.random() < 0.6 * difficultyFactor) {
+            events.push({
+                type: 'minor_damage',
+                effect: { damage: Math.floor(Math.random() * 5 * difficultyFactor) + 1 }, // Dégâts mineurs
+                description: 'Un coup malchanceux vous effleure.'
             });
         }
 
-        inventoryText += `\n\n💡 **Pour équiper :** "j'équipe [objet]"
-🛒 **Pour acheter :** Trouve un marchand dans le jeu`;
-
-        return { text: inventoryText };
-    }
-
-    async handleMapCommand({ player, dbManager, imageGenerator }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        let mapImage = null;
-        try {
-            mapImage = await imageGenerator.generateWorldMap({
-                playerKingdom: character.kingdom,
-                playerLocation: character.currentLocation,
-                style: '3d'
+        // Exemple: 20% de chance d'un événement de combat moyen
+        if (Math.random() < 0.2 * difficultyFactor) {
+            const condition = Math.random() < 0.3 ? 'saignement' : null; // 30% de chance de saignement
+            events.push({
+                type: 'medium_damage',
+                effect: { damage: Math.floor(Math.random() * 15 * difficultyFactor) + 5, condition: condition },
+                description: 'Vous recevez un coup plus sérieux !' + (condition ? ' Vous commencez à saigner.' : '')
             });
-        } catch (error) {
-            console.log('⚠️ Erreur génération carte:', error.message);
         }
 
-        const mapText = `🗺️ **CARTE DU MONDE FRICTION** 🗺️
-
-📍 **Ta position actuelle :**
-🏰 **Royaume :** ${character.kingdom}
-📍 **Lieu :** ${character.currentLocation}
-
-🌍 **LES 12 ROYAUMES :**
-• AEGYRIA - Plaines d'Honneur
-• SOMBRENUIT - Forêts Mystérieuses  
-• KHELOS - Déserts de Sable
-• ABRANTIS - Côtes Marines
-• VARHA - Montagnes Glacées
-• SYLVARIA - Forêts Éternelles
-• ECLYPSIA - Terres d'Ombre
-• TERRE_DÉSOLE - Wasteland
-• DRAK_TARR - Volcans de Feu
-• URVALA - Marais Maudits
-• OMBREFIEL - Plaines Grises
-• KHALDAR - Jungles Tropicales
-
-💡 **Pour voyager :** Écris "je vais vers [lieu]" en mode jeu`;
-
-        return {
-            text: mapText,
-            image: mapImage
-        };
-    }
-
-    async handleMarketCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
+        // Exemple: 5% de chance d'un événement de combat critique (stun, poison, etc.)
+        if (Math.random() < 0.05 * difficultyFactor) {
+            const condition = Math.random() < 0.5 ? 'étourdi' : 'empoisonné'; // 50/50 stun ou poison
+            events.push({
+                type: 'critical_event',
+                effect: { damage: Math.floor(Math.random() * 25 * difficultyFactor) + 10, condition: condition },
+                description: `Une attaque dévastatrice vous frappe de plein fouet! ${condition === 'étourdi' ? 'Votre vision se brouille, vous êtes étourdi !' : 'Une douleur intense vous envahit, vous êtes empoisonné !'}`
+            });
         }
 
-        const marketText = `🛒 **MARCHÉ DE ${character.kingdom}** 🛒
-
-💰 **Tes pièces :** ${character.coins}
-
-🗡️ **ARMES DISPONIBLES :**
-• Épée de bois - 50 pièces (+5 attaque)
-• Épée de fer - 200 pièces (+15 attaque)
-• Arc simple - 80 pièces (+8 attaque à distance)
-
-🛡️ **ARMURES DISPONIBLES :**
-• Armure de cuir - 100 pièces (+10 défense)
-• Cotte de mailles - 300 pièces (+20 défense)
-• Casque de fer - 150 pièces (+8 défense)
-
-💊 **CONSOMMABLES :**
-• Potion de soin - 25 pièces (+50 PV)
-• Potion d'énergie - 30 pièces (+30 énergie)
-• Pain - 5 pièces (+10 PV)
-
-💡 **Pour acheter :** Trouve un marchand en jeu et dis "j'achète [objet]"`;
-
-        return { text: marketText };
-    }
-
-    async handleFactionsCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        const factionsText = `⚔️ **FACTIONS DE FRICTION ULTIMATE** ⚔️
-
-🏰 **FACTIONS PRINCIPALES :**
-
-🛡️ **La Garde Royale**
-• Protecteurs des royaumes
-• Bonus : +20% défense
-• Ennemi : Mercenaires
-
-⚔️ **Les Mercenaires**
-• Guerriers indépendants
-• Bonus : +15% attaque
-• Ennemi : Garde Royale
-
-🔮 **L'Ordre des Mages**
-• Maîtres de la magie
-• Bonus : +25% mana
-• Ennemi : Chasseurs
-
-🏹 **Les Chasseurs**
-• Tueurs de monstres
-• Bonus : +20% vs créatures
-• Ennemi : Ordre des Mages
-
-🌿 **Les Druides**
-• Gardiens de la nature
-• Bonus : +15% régénération
-• Neutre avec tous
-
-${character ? `\n👤 **${character.name}** - Faction : Aucune (Indépendant)` : ''}
-
-💡 **Pour rejoindre une faction :** Trouve leurs représentants en jeu !`;
-
-        return { text: factionsText };
-    }
-
-    async handleChallengesCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const challengesText = `🎯 **DÉFIS FRICTION ULTIMATE** 🎯
-
-👤 **${character.name}** - Rang ${character.powerLevel}
-
-🔥 **DÉFIS QUOTIDIENS :**
-• Vaincre 3 ennemis - Récompense : 50 XP
-• Voyager 5 lieux - Récompense : 25 pièces
-• Utiliser 10 techniques - Récompense : Potion
-
-⚡ **DÉFIS DE RANG :**
-• Rang F : Vaincre un Gobelin Chef
-• Rang E : Explorer 3 royaumes
-• Rang D : Maîtriser une technique d'aura
-• Rang C : Vaincre un Boss mineur
-• Rang B : Rejoindre une faction
-• Rang A : Combattre un Dragon
-• Rang S : Conquérir un territoire
-
-🏆 **DÉFIS LÉGENDAIRES :**
-• Rang SS : Vaincre un Monarque
-• Rang SSS : Unifier les royaumes
-• MONARQUE : Devenir immortel
-
-💡 **Progression automatique basée sur tes actions en jeu !**`;
-
-        return { text: challengesText };
-    }
-
-    async handleSaveGameCommand({ player, dbManager }) {
-        try {
-            const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-            if (!character) {
-                return {
-                    text: `❌ **AUCUN PERSONNAGE À SAUVEGARDER**
-
-Tu n'as pas encore de personnage créé !
-Utilise /créer pour créer ton personnage.`
-                };
-            }
-
-            // Créer une sauvegarde
-            const saveData = {
-                playerId: player.id,
-                characterId: character.id,
-                playerData: player,
-                characterData: character,
-                timestamp: new Date().toISOString(),
-                gameVersion: '1.0.0'
-            };
-
-            const saveId = `save_${player.id}_${Date.now()}`;
-            await dbManager.setTemporaryData(player.id, `save_${saveId}`, saveData);
-
-            return {
-                text: `💾 **SAUVEGARDE CRÉÉE** 💾
-
-✅ **Sauvegarde ID :** ${saveId}
-👤 **Personnage :** ${character.name}
-📊 **Niveau :** ${character.level} (${character.powerLevel})
-⏰ **Date :** ${new Date().toLocaleString()}
-
-💾 **Données sauvegardées :**
-• Statistiques du personnage
-• Position et équipement
-• Progression et expérience
-
-💡 **Pour restaurer :** /restore ${saveId}`
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur sauvegarde:', error);
-            return {
-                text: `❌ **ERREUR DE SAUVEGARDE**
-
-Impossible de créer la sauvegarde. Réessayez plus tard.`
-            };
-        }
-    }
-
-    async handleBackupCommand({ player, dbManager }) {
-        // Vérifier les permissions admin
-        if (!this.adminManager.isAdmin(player.id)) {
-            return {
-                text: `❌ **ACCÈS REFUSÉ**
-
-Cette commande est réservée aux administrateurs.`
-            };
-        }
-
-        try {
-            // Créer une sauvegarde complète de la base de données
-            const backupId = `backup_${Date.now()}`;
-
-            return {
-                text: `💾 **SAUVEGARDE ADMINISTRATIVE** 💾
-
-🔧 **Backup ID :** ${backupId}
-⏰ **Démarré :** ${new Date().toLocaleString()}
-
-📊 **Sauvegarde en cours...**
-• Base de données principale
-• Données des joueurs
-• Système de jeu
-
-✅ **Sauvegarde terminée !**`
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur backup admin:', error);
-            return {
-                text: `❌ **ERREUR DE SAUVEGARDE ADMINISTRATIVE**
-
-${error.message}`
-            };
-        }
-    }
-
-    async handleRestoreCommand({ player, message, dbManager }) {
-        const args = message.split(' ');
-        if (args.length < 2) {
-            return {
-                text: `💾 **RESTAURATION DE SAUVEGARDE** 💾
-
-💡 **Usage :** /restore [ID_sauvegarde]
-
-📝 **Exemple :** /restore save_123456789_1234567890
-
-💾 **Pour voir vos sauvegardes :** /stats_db`
-            };
-        }
-
-        const saveId = args[1];
-
-        try {
-            const saveData = await dbManager.getTemporaryData(player.id, `save_${saveId}`);
-
-            if (!saveData) {
-                return {
-                    text: `❌ **SAUVEGARDE INTROUVABLE**
-
-L'ID "${saveId}" n'existe pas ou a expiré.
-Vérifiez l'ID avec /stats_db`
-                };
-            }
-
-            // Restaurer les données du personnage
-            await dbManager.updateCharacter(saveData.characterData.id, saveData.characterData);
-
-            return {
-                text: `✅ **SAUVEGARDE RESTAURÉE** ✅
-
-💾 **ID :** ${saveId}
-👤 **Personnage :** ${saveData.characterData.name}
-📊 **Niveau :** ${saveData.characterData.level}
-⏰ **Date de sauvegarde :** ${new Date(saveData.timestamp).toLocaleString()}
-
-🎮 **Votre progression a été restaurée !**`
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur restauration:', error);
-            return {
-                text: `❌ **ERREUR DE RESTAURATION**
-
-Impossible de restaurer la sauvegarde "${saveId}".
-${error.message}`
-            };
-        }
-    }
-
-    async handleDatabaseStatsCommand({ player, dbManager }) {
-        try {
-            const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-            return {
-                text: `📊 **STATISTIQUES DE SAUVEGARDE** 📊
-
-👤 **${player.username}**
-📱 **WhatsApp :** ${player.whatsappNumber}
-
-💾 **ÉTAT ACTUEL :**
-${character ?
-`✅ **Personnage :** ${character.name}
-📊 **Niveau :** ${character.level} (${character.powerLevel})
-🏰 **Royaume :** ${character.kingdom}
-📍 **Position :** ${character.currentLocation}`
-: '❌ **Aucun personnage créé**'}
-
-📈 **STATISTIQUES :**
-• Dernière activité : ${new Date(player.lastActivity).toLocaleString()}
-• Compte créé : ${new Date(player.createdAt).toLocaleString()}
-${character ? `• Personnage créé : ${new Date(character.createdAt).toLocaleString()}` : ''}
-
-💡 **Commandes disponibles :**
-• /sauvegarde - Créer une sauvegarde
-• /restore [ID] - Restaurer une sauvegarde`
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur stats DB:', error);
-            return {
-                text: `❌ **ERREUR D'ACCÈS AUX STATISTIQUES**
-
-${error.message}`
-            };
-        }
-    }
-
-    async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
-        try {
-            const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-            if (!character) {
-                return {
-                    text: `❌ **AUCUN PERSONNAGE À SUPPRIMER**
-
-Tu n'as pas de personnage créé.`
-                };
-            }
-
-            // Supprimer le personnage
-            await this.dbManager.deleteCharacter(character.id);
-
-            // Nettoyer les données temporaires
-            await this.dbManager.clearTemporaryData(player.id, 'creation_started');
-            await this.dbManager.clearTemporaryData(player.id, 'creation_mode');
-            await this.dbManager.clearTemporaryData(player.id, 'photo_received');
-            await this.dbManager.clearTemporaryData(player.id, 'game_mode');
-
-            return {
-                text: `✅ **PERSONNAGE SUPPRIMÉ** ✅
-
-👤 **${character.name}** a été supprimé de ${character.kingdom}.
-
-🎮 **Tu peux maintenant :**
-• /créer - Créer un nouveau personnage
-• /menu - Retourner au menu principal
-
-💫 **Prêt pour une nouvelle aventure !**`,
-                image: await imageGenerator.generateMenuImage()
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur suppression personnage:', error);
-            return {
-                text: `❌ **ERREUR DE SUPPRESSION**
-
-Impossible de supprimer le personnage. Réessayez plus tard.`
-            };
-        }
-    }
-
-    async handleCoordinatesCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const position = character.position || { x: 0, y: 0, z: 0 };
-
-        return {
-            text: `📍 **COORDONNÉES DE ${character.name}** 📍
-
-🗺️ **Position actuelle :**
-• X: ${position.x}
-• Y: ${position.y}  
-• Z: ${position.z}
-
-🏰 **Royaume :** ${character.kingdom}
-📍 **Lieu :** ${character.currentLocation}
-
-🧭 **Navigation :**
-• Nord: Y+ | Sud: Y-
-• Est: X+ | Ouest: X-
-• Haut: Z+ | Bas: Z-
-
-💡 **Le déplacement modifie automatiquement tes coordonnées !**`
-        };
-    }
-
-    async handleCalendarCommand({ player, dbManager }) {
-        if (!this.timeManager) {
-            return {
-                text: `❌ Système temporel non initialisé`
-            };
-        }
-
-        const timeInfo = this.timeManager.getCurrentTime();
-        const weatherInfo = this.timeManager.getCurrentWeather();
-
-        return {
-            text: `📅 **CALENDRIER DU MONDE FRICTION** 📅
-
-🗓️ **Date actuelle :**
-${timeInfo.dateString}
-
-⏰ **Heure :** ${timeInfo.timeString}
-🌸 **Saison :** ${timeInfo.seasonInfo.name} ${timeInfo.seasonInfo.emoji}
-${weatherInfo.weatherInfo.emoji} **Météo :** ${weatherInfo.weatherInfo.name}
-
-🌱 **Effets saisonniers actifs :**
-${timeInfo.seasonInfo.description}
-
-🌤️ **Conditions météo :**
-${weatherInfo.weatherInfo.description}
-
-📊 **Impact sur le gameplay :**
-• Visibilité : ${weatherInfo.visibility}%
-• Déplacement : ${weatherInfo.movement}%
-• Température : ${weatherInfo.temperature}°C
-
-💡 **Le temps s'écoule en permanence et affecte le monde !**`
-        };
-    }
-
-    formatTechniques(techniques) {
-        if (!techniques || techniques.length === 0) {
-            return '• Aucune technique apprise';
-        }
-
-        return techniques.map(tech => `• ${tech}`).join('\n');
-    }
-
-    getReputationBar(value) {
-        const filledBars = Math.floor(value / 20);
-        const emptyBars = 5 - filledBars;
-        return '█'.repeat(filledBars) + '░'.repeat(emptyBars);
-    }
-
-    // ==================== COMMANDES D'AURA ====================
-
-    /**
-     * Affiche les informations d'aura du joueur
-     */
-    async handleAuraInfoCommand({ player, dbManager }) {
-        try {
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return {
-                    text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-                };
-            }
-
-            if (!this.auraManager) {
-                return {
-                    text: `❌ Système d'aura non disponible pour le moment.`
-                };
-            }
-
-            const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
-
-            return {
-                text: auraInfo
-            };
-        } catch (error) {
-            console.error('❌ Erreur commande aura info:', error);
-            return {
-                text: `❌ Erreur lors de l'affichage des informations d'aura.`
-            };
-        }
-    }
-
-    async handleLearnAuraCommand({ player, message, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const args = message.split(' ');
-        if (args.length < 2) {
-            return {
-                text: `✨ **APPRENTISSAGE D'AURA** ✨
-
-💡 **Usage :** /aura_apprendre [type]
-
-🌟 **Types d'aura disponibles :**
-🔥 fire - Aura de Flamme
-🌊 water - Aura Aquatique  
-🌍 earth - Aura Tellurique
-💨 wind - Aura Éolienne
-⚡ lightning - Aura Foudroyante
-🌑 shadow - Aura Ténébreuse
-✨ light - Aura Lumineuse
-
-⚠️ **ATTENTION :** L'entraînement dure 365 jours avec seulement 2% de chance de succès par session !
-
-📝 **Exemple :** /aura_apprendre fire`
-            };
-        }
-
-        const auraType = args[1].toLowerCase();
-        const aura = this.auraManager.auraTypes[auraType];
-
-        if (!aura) {
-            return {
-                text: `❌ **TYPE D'AURA INVALIDE**
-
-Types disponibles : fire, water, earth, wind, lightning, shadow, light`
-            };
-        }
-
-        if (!this.auraManager.canStartTraining(player.id)) {
-            return {
-                text: `❌ **ENTRAÎNEMENT DÉJÀ EN COURS**
-
-Vous avez déjà un entraînement d'aura actif. Terminez-le avant d'en commencer un nouveau.`
-            };
-        }
-
-        // Chance de maîtrise instantanée (20%)
-        if (Math.random() < 0.2) {
-            // Maîtrise instantanée !
-            if (!this.auraManager.auraLevels.has(player.id)) {
-                this.auraManager.auraLevels.set(player.id, {});
-            }
-
-            const playerAuras = this.auraManager.auraLevels.get(player.id);
-            playerAuras[auraType] = {
-                level: aura.maxLevel,
-                techniques: [...aura.techniques],
-                masteryPoints: 10000
-            };
-
-            return {
-                text: this.auraManager.formatInstantMasteryMessage(aura)
-            };
-        }
-
-        // Entraînement normal
-        const trainingResult = await this.auraManager.startAuraTraining(player.id, auraType, aura.techniques[0]);
-
-        return {
-            text: trainingResult.message
-        };
-    }
-
-    async handleAuraSessionCommand({ player, dbManager, sock, chatId }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const activeTraining = this.auraManager.getPlayerTraining(player.id);
-        if (!activeTraining) {
-            return {
-                text: `❌ **AUCUN ENTRAÎNEMENT ACTIF**
-
-Utilisez d'abord /aura_apprendre [type] pour commencer un entraînement d'aura.`
-            };
-        }
-
-        const aura = this.auraManager.auraTypes[activeTraining.auraType];
-
-        // Démarrer l'animation d'entraînement
-        setTimeout(async () => {
-            await this.auraManager.createAuraAnimation(
-                player.id,
-                activeTraining.auraType,
-                activeTraining.techniqueName,
-                sock,
-                chatId
-            );
-
-            // Après l'animation, tentative de progression
-            setTimeout(async () => {
-                const growthResult = await this.auraManager.attemptAuraGrowth(player.id, activeTraining.auraType);
-
-                await sock.sendMessage(chatId, {
-                    text: growthResult.message
+        // Si l'action est un combat, augmenter légèrement les chances d'événements
+        if (action.toLowerCase().includes('combat') || action.toLowerCase().includes('attaque')) {
+            if (Math.random() < 0.1 * difficultyFactor) { // 10% chance d'un coup supplémentaire
+                events.push({
+                    type: 'extra_hit',
+                    effect: { damage: Math.floor(Math.random() * 10 * difficultyFactor) + 2 },
+                    description: 'Un coup inattendu vous surprend.'
                 });
-            }, 2000);
-
-        }, 1000);
-
-        return {
-            text: `🧘 **SESSION D'ENTRAÎNEMENT COMMENCÉE**
-
-${aura.emoji} Préparation de l'entraînement ${aura.name}...
-⏱️ Durée : 30 secondes d'entraînement intense
-
-🔮 L'animation va commencer dans un instant...`
-        };
-    }
-
-    async handleAuraTechniquesCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-
-        if (Object.keys(playerAuras).length === 0) {
-            return {
-                text: `✨ **AUCUNE TECHNIQUE D'AURA**
-
-Vous n'avez pas encore appris de techniques d'aura.
-Utilisez /aura_apprendre [type] pour commencer votre formation.`
-            };
-        }
-
-        let techniquesText = `⚡ **TECHNIQUES D'AURA DISPONIBLES** ⚡\n\n`;
-
-        for (const [auraType, auraData] of Object.entries(playerAuras)) {
-            const aura = this.auraManager.auraTypes[auraType];
-            techniquesText += `${aura.emoji} **${aura.name}** (Niveau ${auraData.level})\n`;
-
-            if (auraData.techniques.length > 0) {
-                auraData.techniques.forEach(technique => {
-                    techniquesText += `   ⚡ ${technique}\n`;
-                });
-            } else {
-                techniquesText += `   🚫 Aucune technique maîtrisée\n`;
-            }
-            techniquesText += `\n`;
-        }
-
-        techniquesText += `💡 **Utilisez /aura_cast [technique] pour lancer une technique**`;
-
-        return { text: techniquesText };
-    }
-
-    async handleCastAuraCommand({ player, message, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const args = message.split(' ');
-        if (args.length < 2) {
-            return {
-                text: `⚡ **LANCER TECHNIQUE D'AURA** ⚡
-
-💡 **Usage :** /aura_cast [technique]
-
-📝 **Exemple :** /aura_cast Souffle Ardent
-
-💫 Utilisez /aura_techniques pour voir vos techniques disponibles.`
-            };
-        }
-
-        const techniqueName = args.slice(1).join(' ');
-        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-
-        // Chercher la technique dans les auras du joueur
-        for (const [auraType, auraData] of Object.entries(playerAuras)) {
-            if (auraData.techniques.includes(techniqueName)) {
-                const result = await this.auraManager.castAuraTechnique(player.id, auraType, techniqueName);
-                return { text: result.message };
             }
         }
 
-        return {
-            text: `❌ **TECHNIQUE INCONNUE** ❌
-
-Vous ne maîtrisez pas la technique "${techniqueName}".
-
-📚 Utilisez /aura_techniques pour voir vos techniques disponibles.`
-        };
+        return events;
     }
 
-    /**
-     * Méditation pour récupérer l'énergie spirituelle
-     */
-    async handleMeditateCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
+    applyCombatCondition(playerId, condition) {
+        if (!this.combatConditions.has(playerId)) {
+            this.combatConditions.set(playerId, {});
         }
-
-        // Vérifier si le joueur a des auras
-        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-        if (Object.keys(playerAuras).length === 0) {
-            return {
-                text: `🧘 **MÉDITATION IMPOSSIBLE**
-
-Vous devez d'abord apprendre une aura avant de pouvoir méditer.
-
-Utilisez /aura_apprendre [type] pour commencer.`
-            };
-        }
-
-        try {
-            const result = await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
-            return { text: result.message };
-        } catch (error) {
-            console.error('❌ Erreur méditation:', error);
-            return {
-                text: `❌ Erreur lors de la méditation. Réessayez.`
-            };
-        }
+        const conditions = this.combatConditions.get(playerId);
+        conditions[condition] = { duration: 3, intensity: 1 }; // Durée et intensité simples
+        console.log(`Applying condition '${condition}' to player ${playerId}`);
     }
 
-    async handleRegenerateAuraCommand({ player, dbManager, sock, chatId }) {
-        return await this.handleMeditateCommand({ player, chatId, dbManager, sock });
-    }
+    calculateDifficultyXP(character, action) {
+        let xp = 0;
+        const fatigue = this.getPlayerFatigue(character.playerId);
+        const difficultyFactor = this.getDifficultyFactor(character.playerId);
 
-    async handleRegenerateMagicCommand({ player, chatId, dbManager, sock }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage !
-
-Utilise /créer pour créer ton personnage.`
-            };
+        // XP bonus pour actions dangereuses ou difficiles
+        if (action.toLowerCase().includes('combat') || action.toLowerCase().includes('attaque')) {
+            xp += 50 * difficultyFactor;
+        }
+        if (action.toLowerCase().includes('explore') && fatigue > 50) {
+            xp += 30 * difficultyFactor;
+        }
+        if (fatigue > 75) {
+            xp += 20 * difficultyFactor; // Bonus XP si très fatigué
         }
 
-        try {
-            await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
-            return { text: '', skipResponse: true }; // La régénération gère l'affichage
-        } catch (error) {
-            console.error('❌ Erreur régénération magie:', error);
-            return {
-                text: `❌ Erreur lors de la régénération magique. Réessayez.`
-            };
-        }
+        // XP bonus basé sur le niveau de l'adversaire (si applicable)
+        // Cette partie nécessiterait une analyse plus poussée de 'action' pour identifier l'adversaire
+
+        return Math.floor(xp);
     }
 
-
-    // ==================== COMMANDES D'AURA (NOUVELLES) ====================
-
-    /**
-     * Régénération d'aura
-     */
-    async handleAuraRegenCommand({ player, dbManager, sock, chatId }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
-
-        return {
-            text: `🔮 **RÉGÉNÉRATION D'AURA COMMENCÉE** 🔮
-
-⚡ Votre aura spirituelle se reconstitue...
-⏱️ Durée : 60 secondes
-
-✨ Concentrez-vous pendant la régénération !`,
-            skipResponse: true
-        };
+    getDifficultyFactor(playerId) {
+        const fatigue = this.getPlayerFatigue(playerId);
+        // La fatigue augmente la difficulté
+        return 1 + (fatigue / 100) * 0.8; // Max 80% de difficulté en plus à 100% fatigue
     }
 
-    /**
-     * Régénération de magie
-     */
-    async handleMagicRegenCommand({ player, dbManager, sock, chatId }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
-
-        return {
-            text: `✨ **RÉGÉNÉRATION MAGIQUE COMMENCÉE** ✨
-
-🔥 Votre énergie magique se reconstitue...
-⏱️ Durée : 60 secondes
-
-🌟 Laissez le mana circuler en vous !`,
-            skipResponse: true
-        };
-    }
-
-    /**
-     * Statistiques du système d'aura
-     */
-    async handleAuraStatsCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        const stats = this.auraManager.getAuraStats();
-
-        return {
-            text: `📊 **STATISTIQUES DU SYSTÈME D'AURA** 📊
-
-🔮 **Types d'aura disponibles :** ${stats.totalAuraTypes}
-🏃‍♂️ **Entraînements actifs :** ${stats.activeTrainings}
-⚡ **Animations en cours :** ${stats.activeAnimations}
-👥 **Joueurs avec auras :** ${stats.playersWithAuras}
-
-✨ Le système d'aura est opérationnel !`
-        };
-    }
-
-    /**
-     * Aide pour les commandes d'aura
-     */
-    async handleAuraHelpCommand({ player, dbManager }) {
-        return {
-            text: `🔮 **GUIDE COMPLET DU SYSTÈME D'AURA** 🔮
-
-📚 **COMMANDES DISPONIBLES :**
-
-🌟 **Informations :**
-• \`/aura_info\` - Vos auras et niveaux
-• \`/aura_techniques\` - Techniques disponibles  
-• \`/aura_stats\` - Statistiques système
-
-🎯 **Entraînement :**
-• \`/aura_apprendre [type]\` - Commencer formation
-• \`/aura_session\` - Session d'entraînement
-• \`/aura_cast [technique]\` - Lancer technique
-
-⚡ **Régénération :**
-• \`/aura_regen\` - Recharger aura (60s)
-• \`/magic_regen\` - Recharger magie (60s)
-
-🔥 **Types d'aura disponibles :**
-• fire, water, earth, wind
-• lightning, shadow, light
-
-⚠️ **IMPORTANT :** L'aura demande 365 jours d'entraînement avec seulement 2% de chance de réussite par session !
-
-💡 **Conseil :** Seuls les plus déterminés maîtrisent l'aura après des années d'efforts acharnés.`
-        };
-    }
-
-
-    // ===========================================
-    // MÉTHODES POUR LE TEMPS, LA MÉTÉO ET LES ÉVÉNEMENTS
-    // ===========================================
-
-    /**
-     * Affiche l'heure et la date actuelles du monde
-     */
-    async handleTimeCommand({ player, dbManager }) {
-        if (!this.timeManager) {
-            return { text: "❌ Système temporel non initialisé" };
-        }
-
-        return {
-            text: this.timeManager.formatTimeDisplay()
-        };
-    }
-
-    /**
-     * Affiche les informations système du temps de jeu
-     */
-    async handleTimeSystemCommand({ imageGenerator }) {
-        if (!this.timeManager) {
-            return {
-                text: `⚠️ **SYSTÈME TEMPOREL NON INITIALISÉ**
-
-Le gestionnaire de temps n'est pas encore configuré.`
-            };
-        }
-
-        return {
-            text: this.timeManager.getTimeSystemInfo()
-        };
-    }
-
-    /**
-     * Affiche les informations météo actuelles
-     */
-    async handleWeatherCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const weather = this.timeManager.getCurrentWeather();
-            const effects = this.timeManager.getCombinedEffects();
-
-            let weatherDisplay = `🌤️ **MÉTÉO ACTUELLE** 🌤️
-
-${weather.weatherInfo.emoji} **${weather.weatherInfo.name}**
-📖 ${weather.weatherInfo.description}
-
-🌡️ **Température:** ${weather.temperature}°C
-💧 **Humidité:** ${weather.humidity}%
-💨 **Vent:** ${weather.windSpeed} km/h
-📊 **Pression:** ${weather.pressure} hPa
-
-${weather.seasonInfo.emoji} **Saison:** ${weather.seasonInfo.name}
-📝 ${weather.seasonInfo.description}
-
-⚡ **EFFETS SUR LE GAMEPLAY** ⚡`;
-            for (const [effect, value] of Object.entries(effects)) {
-                if (Math.abs(value - 100) > 5) { // Seulement les effets significatifs
-                    const modifier = value > 100 ? '+' : '';
-                    const icon = value > 100 ? '⬆️' : '⬇️';
-                    weatherDisplay += `\n${icon} ${effect}: ${modifier}${Math.round(value - 100)}%`;
-                }
-            }
-
-            return { text: weatherDisplay };
-        } catch (error) {
-            console.error('❌ Erreur météo:', error);
-            return { text: '❌ Erreur lors du chargement de la météo.' };
-        }
-    }
-
-    /**
-     * Affiche les événements actifs
-     */
-    async handleEventsCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const activeEvents = this.timeManager.getActiveEvents();
-
-            if (activeEvents.length === 0) {
-                return {
-                    text: `🎆 **AUCUN ÉVÉNEMENT ACTIF** 🎆
-
-Aucun événement spécial n'est en cours actuellement.
-
-⏰ **Événements à venir:**
-• Les événements se déclenchent aléatoirement
-• Éclipses, pluies de météores, aurores boréales
-• Festivals saisonniers
-
-🔮 Restez connecté pour ne rien manquer !`
-                };
-            }
-
-            let eventsDisplay = `🎆 **ÉVÉNEMENTS ACTIFS** 🎆\n\n`;
-
-            activeEvents.forEach(event => {
-                const timeLeft = Math.max(0, Math.floor((event.endTime - Date.now()) / 60000));
-                eventsDisplay += `${event.emoji} **${event.name}**
-📖 ${event.description}
-⏳ Temps restant: ${timeLeft} minutes
-🌟 Rareté: ${event.rarity}
-
-`;
-
-                if (event.effects && Object.keys(event.effects).length > 0) {
-                    eventsDisplay += `⚡ **Effets actifs:**
-`;
-                    for (const [effect, value] of Object.entries(event.effects)) {
-                        const modifier = value > 100 ? '+' : '';
-                        eventsDisplay += `• ${effect}: ${modifier}${Math.round(value - 100)}%
-`;
-                    }
-                    eventsDisplay += `\n`;
-                }
-            });
-
-            eventsDisplay += `💡 Profitez des événements pour booster vos capacités !`;
-
-            return { text: eventsDisplay };
-        } catch (error) {
-            console.error('❌ Erreur événements:', error);
-            return { text: '❌ Erreur lors du chargement des événements.' };
-        }
-    }
-
-    /**
-     * Affiche un calendrier avec les phases temporelles
-     */
-    async handleCalendarCommand({ playerNumber, chatId, message, sock, dbManager, imageGenerator }) {
-        try {
-            const currentTime = this.timeManager.getCurrentTime();
-            const weather = this.timeManager.getCurrentWeather();
-
-            let calendarDisplay = `📅 **CALENDRIER MONDIAL** 📅\n\n`;
-            calendarDisplay += `📆 **${currentTime.dateString}**
-🕐 **${currentTime.timeString}**
-${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**
-
-🌤️ **Météo:** ${weather.weatherInfo.emoji} ${weather.weatherInfo.name}
-
-📊 **Cycle temporel:**
-• Année ${currentTime.year} de l'ère moderne
-• Mois ${currentTime.month}/12
-• Jour ${currentTime.day}/30
-• Heure ${currentTime.hour}:${currentTime.minute.toString().padStart(2, '0')}
-
-🔄 **Phases saisonnières:**
-`;
-            const seasons = ['Printemps', 'Été', 'Automne', 'Hiver'];
-            const currentSeason = currentTime.seasonInfo.name;
-            seasons.forEach(season => {
-                const icon = season === currentSeason ? '🔸' : '🔹';
-                calendarDisplay += `${icon} ${season}\n`;
-            });
-
-            calendarDisplay += `\n⏰ **1 minute réelle = 1 heure de jeu**
-📈 **Le temps affecte vos capacités et les événements !**`;
-
-            return { text: calendarDisplay };
-        } catch (error) {
-            console.error('❌ Erreur calendrier:', error);
-            return { text: '❌ Erreur lors du chargement du calendrier.' };
-        }
-    }
 
     // ===========================================
     // MÉTHODES POUR LES COORDONNÉES ET LA CARTE
@@ -3293,7 +2027,7 @@ ${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**
                 image: worldMap
             };
         } catch (error) {
-            console.error('❌ Erreur génération carte avancée:', error);
+            console.log('⚠️ Erreur génération carte avancée:', error.message);
             return {
                 text: `🗺️ **CARTE DU MONDE - SYSTÈME DE COORDONNÉES**
 
