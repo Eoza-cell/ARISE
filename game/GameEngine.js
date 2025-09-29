@@ -138,10 +138,12 @@ class GameEngine {
         console.log('📊 Gestionnaires de barres de progression initialisés');
 
 
-        // Systèmes de difficulté
-        this.playerFatigue = new Map(); // Fatigue par joueur (0-100)
-        this.combatConditions = new Map(); // Conditions de combat par joueur (ex: 'étourdi', 'saignement')
-        this.playerDifficultySettings = new Map(); // Paramètres de difficulté par joueur
+        // Systèmes de difficulté EXTRÊME - Le monde contre le joueur
+        this.playerFatigue = new Map(); // Fatigue par joueur (0-100) - AUGMENTE RAPIDEMENT
+        this.combatConditions = new Map(); // Conditions de combat permanentes
+        this.playerDifficultySettings = new Map(); // Difficulté toujours au maximum
+        this.worldHostility = new Map(); // Hostilité croissante du monde (0-500%)
+        this.playerMisfortune = new Map(); // Malchance permanente du joueur
 
         this.commandHandlers = {
             // Core commands that definitely exist
@@ -2688,7 +2690,7 @@ Utilise /créer pour créer un nouveau personnage.`
             }
 
             // Supprimer le personnage
-            await dbManager.deleteCharacter(existingCharacter.id);
+            await this.dbManager.deleteCharacter(existingCharacter.id);
 
             // Nettoyer les données temporaires
             await dbManager.clearAllTemporaryData(player.id);
