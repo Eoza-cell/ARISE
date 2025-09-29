@@ -392,7 +392,7 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
     async handleMenuCommand({ player, dbManager, imageGenerator }) {
         await dbManager.clearTemporaryData(player.id, 'game_mode');
 
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
 
         let menuText = `🎮 **FRICTION ULTIMATE - Menu Principal**\n\n`;
 
@@ -433,7 +433,7 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
     }
 
     async handleCreateCharacterCommand({ player, dbManager, imageGenerator, sock, chatId }) {
-        const existingCharacter = await dbManager.getCharacterByPlayer(player.id);
+        const existingCharacter = await this.dbManager.getCharacterByPlayer(player.id);
 
         if (existingCharacter) {
             return {
@@ -2505,6 +2505,86 @@ Crée une narration qui donne envie de connaître la suite !`;
             return 'soir';
         } catch (error) {
             return 'jour';
+        }
+    }
+
+    generateBar(current, max, emoji) {
+        const percentage = Math.max(0, Math.min(100, (current / max) * 100));
+        const filledBars = Math.floor(percentage / 10);
+        const emptyBars = 10 - filledBars;
+
+        return emoji.repeat(filledBars) + '⬜'.repeat(emptyBars) + ` ${current}/${max}`;
+    }
+
+    generateHealthBar(current, max) {
+        return this.generateBar(current, max, '❤️');
+    }
+
+    generateEnergyBar(current, max) {
+        return this.generateBar(current, max, '⚡');
+    }
+
+    formatEquipment(equipment) {
+        if (!equipment || Object.keys(equipment).length === 0) {
+            return '• Aucun équipement spécial';
+        }
+
+        let formatted = '';
+        for (const [slot, item] of Object.entries(equipment)) {
+            formatted += `• ${slot}: ${item}\n`;
+        }
+        return formatted;
+    }
+
+    formatTechniques(techniques) {
+        if (!techniques || techniques.length === 0) {
+            return '• Aucune technique apprise';
+        }
+
+        return techniques.map((tech, index) => `• ${tech.name || tech}`).join('\n');
+    }
+
+    async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
+        try {
+            const existingCharacter = await this.dbManager.getCharacterByPlayer(player.id);
+
+            if (!existingCharacter) {
+                return {
+                    text: `❌ Tu n'as pas de personnage à supprimer !
+
+Utilise /créer pour créer un nouveau personnage.`
+                };
+            }
+
+            // Supprimer le personnage
+            await dbManager.deleteCharacter(existingCharacter.id);
+
+            // Nettoyer les données temporaires
+            await dbManager.clearAllTemporaryData(player.id);
+
+            return {
+                text: `💀 **PERSONNAGE SUPPRIMÉ** 💀
+
+👤 **${existingCharacter.name}** a été définitivement supprimé.
+
+🗑️ **Données effacées :**
+• Statistiques du personnage
+• Équipement et inventaire
+• Progression et expérience
+• Réputation et relations
+
+✨ **Tu peux maintenant créer un nouveau personnage !**
+
+🎮 Utilise /créer pour commencer une nouvelle aventure.`
+            };
+        } catch (error) {
+            console.error('❌ Erreur suppression personnage:', error);
+            return {
+                text: `❌ **Erreur lors de la suppression**
+
+Une erreur s'est produite. Réessaie plus tard.
+Si le problème persiste, contacte un administrateur.`
+            };
         }
     }
 }
