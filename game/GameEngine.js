@@ -2544,6 +2544,83 @@ Crée une narration qui donne envie de connaître la suite !`;
         return techniques.map((tech, index) => `• ${tech.name || tech}`).join('\n');
     }
 
+    async handleHelpCommand({ player, dbManager, imageGenerator }) {
+        try {
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
+            
+            let helpText = `📚 **GUIDE COMPLET - FRICTION ULTIMATE** 📚
+
+🎮 **COMMANDES PRINCIPALES :**
+• /menu - Menu principal
+• /créer - Créer ton personnage
+• /fiche - Voir ta fiche personnage
+• /jouer - Entrer en mode jeu
+
+🏰 **EXPLORATION :**
+• /royaumes - Les 12 royaumes
+• /ordres - Les 7 ordres mystiques
+• /carte - Carte du monde avec coordonnées
+• /coordonnees - Ta position actuelle
+
+⚔️ **COMBAT & PROGRESSION :**
+• /combat - Système de combat
+• /inventaire - Gérer tes objets
+• /reputation - Ton statut dans le monde
+
+🔮 **SYSTÈME AURA :**
+• /aura - Informations sur l'aura
+• /aura_apprendre [type] - Apprendre un type d'aura
+• /aura_session - Session d'entraînement
+• /mediter - Méditation pour régénérer
+
+⏰ **TEMPS & MONDE :**
+• /temps - Heure actuelle du jeu
+• /calendrier - Calendrier du monde
+• /meteo - Conditions météorologiques
+
+🎯 **QUÊTES & ÉVÉNEMENTS :**
+• /evenements - Événements en cours
+• /defis - Défis disponibles
+• /marché - Commerce et échanges
+
+💡 **CONSEILS :**
+- Écris tes actions en langage naturel en mode jeu
+- Chaque action consomme de l'énergie
+- Le monde évolue en permanence
+- Attention aux dangers selon ton niveau !
+
+${character ? `👤 **Ton personnage :** ${character.name} (${character.powerLevel})` : '❌ **Crée d\'abord un personnage avec /créer**'}`;
+
+            try {
+                const helpImage = await imageGenerator.generateHelpImage();
+                return {
+                    text: helpText,
+                    image: helpImage
+                };
+            } catch (imageError) {
+                console.log('⚠️ Impossible de générer l\'image d\'aide:', imageError.message);
+                return {
+                    text: helpText + '\n\n⚠️ Image temporairement indisponible'
+                };
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur handleHelpCommand:', error);
+            return {
+                text: `📚 **AIDE - FRICTION ULTIMATE**
+
+❌ Une erreur s'est produite lors de la génération de l'aide.
+
+🎮 **Commandes de base :**
+• /menu - Menu principal
+• /créer - Créer un personnage
+• /jouer - Entrer en mode jeu
+
+Réessayez dans quelques instants.`
+            };
+        }
+    }
+
     async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
         try {
             const existingCharacter = await this.dbManager.getCharacterByPlayer(player.id);
