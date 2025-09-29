@@ -55,37 +55,41 @@ class HuggingFaceClient {
                 }
             }
 
-            const optimizedPrompt = this.optimizePromptForImageToVideo(prompt);
+            const optimizedPrompt = this.optimizePromptForWanAnimate(prompt, options);
 
             try {
                 let videoBlob;
 
                 if (imageData) {
-                    // Mode image-to-video avec la nouvelle API
-                    console.log(`🎬 Mode image-to-video avec Lightricks/LTX-Video...`);
+                    // Mode image-to-video avec Wan2.2-Animate-14B
+                    console.log(`🎬 Mode image-to-video avec Wan-AI/Wan2.2-Animate-14B...`);
 
                     videoBlob = await this.client.imageToVideo({
-                        provider: "fal-ai",
-                        model: "Lightricks/LTX-Video",
+                        model: "Wan-AI/Wan2.2-Animate-14B",
                         inputs: imageData,
                         parameters: { 
                             prompt: optimizedPrompt,
-                            duration: Math.min(options.duration || 3, 5),
-                            fps: Math.min(options.fps || 8, 12)
+                            num_frames: Math.min(options.num_frames || 49, 49),
+                            fps: Math.min(options.fps || 8, 8),
+                            width: options.width || 768,
+                            height: options.height || 768,
+                            seed: options.seed || Math.floor(Math.random() * 1000000),
+                            motion_bucket_id: options.motion_bucket_id || 127
                         }
                     });
                 } else {
-                    // Mode text-to-video de fallback
-                    console.log(`🎬 Mode text-to-video avec modèle de fallback...`);
+                    // Mode text-to-video avec Wan2.2-Animate-14B
+                    console.log(`🎬 Mode text-to-video avec Wan-AI/Wan2.2-Animate-14B...`);
 
                     videoBlob = await this.client.textToVideo({
-                        model: "damo-vilab/text-to-video-ms-1.7b",
+                        model: "Wan-AI/Wan2.2-Animate-14B",
                         inputs: optimizedPrompt,
                         parameters: {
-                            num_frames: options.num_frames || 16,
+                            num_frames: Math.min(options.num_frames || 49, 49),
                             fps: options.fps || 8,
-                            width: options.width || 256,
-                            height: options.height || 256
+                            width: options.width || 768,
+                            height: options.height || 768,
+                            seed: options.seed || Math.floor(Math.random() * 1000000)
                         }
                     });
                 }
@@ -199,13 +203,86 @@ class HuggingFaceClient {
         return optimized;
     }
 
+    optimizePromptForWanAnimate(prompt, options = {}) {
+        let optimized = prompt
+            .replace(/['"]/g, '')
+            .replace(/\s+/g, ' ')
+            .trim();
+
+        // Extraire la description du personnage et l'action si disponibles
+        if (options.character && options.action) {
+            const character = options.character;
+            const action = options.action;
+
+            // Construire un prompt structuré pour Wan2.2-Animate-14B
+            const characterDesc = this.buildCharacterDescription(character);
+            const actionDesc = this.buildActionDescription(action, options.narration);
+
+            optimized = `${characterDesc} ${actionDesc}`;
+        }
+
+        // Ajouter des mots-clés spécifiques pour Wan2.2-Animate-14B
+        const wanKeywords = [
+            'high quality animation',
+            'detailed character movement',
+            'smooth transitions',
+            'realistic facial expressions',
+            'dynamic motion',
+            'cinematic composition'
+        ];
+
+        wanKeywords.forEach(keyword => {
+            if (!optimized.toLowerCase().includes(keyword.toLowerCase())) {
+                optimized += `, ${keyword}`;
+            }
+        });
+
+        // Limiter la longueur pour Wan2.2-Animate-14B
+        if (optimized.length > 300) {
+            optimized = optimized.substring(0, 297) + '...';
+        }
+
+        console.log(`🎯 Prompt optimisé pour Wan2.2-Animate-14B: "${optimized}"`);
+        return optimized;
+    }
+
+    buildCharacterDescription(character) {
+        let desc = '';
+
+        // Priorité absolue à la description personnalisée
+        if (character.appearance && character.appearance.trim().length > 0) {
+            desc = character.appearance;
+        } else {
+            // Description par défaut basée sur le royaume et le genre
+            const genderDesc = character.gender === 'male' ? 'male warrior' : 'female warrior';
+            desc = `${genderDesc} named ${character.name} from ${character.kingdom} kingdom`;
+        }
+
+        return desc;
+    }
+
+    buildActionDescription(action, narration = '') {
+        let actionDesc = `performing ${action}`;
+
+        if (narration && narration.trim().length > 0) {
+            actionDesc += `, ${narration}`;
+        }
+
+        actionDesc += ', medieval fantasy setting, epic atmosphere';
+
+        return actionDesc;
+    }
+
     // Méthodes RPG spécifiques avec support d'image
     async generateCombatVideo(action, character, outputPath) {
         const prompt = `${character.name} in medieval fantasy combat, ${action}, epic battle scene, dynamic movement, armor and weapons, dramatic lighting, action sequence`;
 
         const result = await this.generateVideoFromText(prompt, outputPath, {
             duration: 4,
-            characterImagePath: character.imagePath || null
+            characterImagePath: character.imagePath || null,
+            character: character,
+            action: action,
+            narration: 'epic battle scene with dynamic movement'
         });
         
         return result || outputPath;
@@ -216,7 +293,10 @@ class HuggingFaceClient {
 
         return await this.generateVideoFromText(prompt, outputPath, {
             duration: 5,
-            characterImagePath: character.imagePath || null
+            characterImagePath: character.imagePath || null,
+            character: character,
+            action: action,
+            narration: `in ${location}, atmospheric environment, cinematic camera angle`
         });
     }
 
@@ -225,7 +305,10 @@ class HuggingFaceClient {
 
         return await this.generateVideoFromText(prompt, outputPath, {
             duration: 6,
-            characterImagePath: character.imagePath || null
+            characterImagePath: character.imagePath || null,
+            character: character,
+            action: 'exploring the area',
+            narration: `in ${location}, epic landscape, atmospheric lighting, cinematic camera movement`
         });
     }
 
@@ -234,11 +317,14 @@ class HuggingFaceClient {
 
         return await this.generateVideoFromText(prompt, outputPath, {
             duration: 4,
-            characterImagePath: character.imagePath || null
+            characterImagePath: character.imagePath || null,
+            character: character,
+            action: `casting ${spellName} magic spell`,
+            narration: 'mystical energy effects, glowing magical aura, dynamic magical particles'
         });
     }
 
-    async generateVideoFromImage(imagePath, prompt, outputPath) {
+    async generateVideoFromImage(imagePath, prompt, outputPath, options = {}) {
         try {
             if (!this.hasValidClient()) {
                 throw new Error('HuggingFace client non disponible - vérifiez HF_TOKEN');
@@ -250,18 +336,21 @@ class HuggingFaceClient {
             // Lire l'image
             const imageBuffer = await fs.readFile(imagePath);
 
-            // Utiliser le modèle LTX-Video comme configuré
+            // Optimiser le prompt pour Wan2.2-Animate-14B
+            const optimizedPrompt = this.optimizePromptForWanAnimate(prompt, options);
+
+            // Utiliser le modèle Wan2.2-Animate-14B
             const video = await this.client.imageToVideo({
-                provider: "fal-ai",
-                model: "Lightricks/LTX-Video",
+                model: "Wan-AI/Wan2.2-Animate-14B",
                 inputs: imageBuffer,
                 parameters: { 
-                    prompt: prompt,
-                    num_frames: 121,
-                    height: 704,
-                    width: 1216,
-                    fps: 25,
-                    seed: Math.floor(Math.random() * 1000000)
+                    prompt: optimizedPrompt,
+                    num_frames: Math.min(options.num_frames || 49, 49),
+                    height: options.height || 768,
+                    width: options.width || 768,
+                    fps: Math.min(options.fps || 8, 8),
+                    seed: options.seed || Math.floor(Math.random() * 1000000),
+                    motion_bucket_id: options.motion_bucket_id || 127
                 }
             });
 
@@ -277,7 +366,7 @@ class HuggingFaceClient {
 
             await fs.writeFile(outputPath, videoBuffer);
 
-            console.log(`✅ Vidéo HuggingFace générée: ${outputPath} (${videoBuffer.length} bytes)`);
+            console.log(`✅ Vidéo HuggingFace générée avec Wan2.2-Animate-14B: ${outputPath} (${videoBuffer.length} bytes)`);
             return outputPath;
 
         } catch (error) {

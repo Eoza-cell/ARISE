@@ -982,13 +982,33 @@ class ImageGenerator {
                 try {
                     console.log(`🤗 Génération vidéo d'action avec HuggingFace: ${action}`);
 
+                    const videoOptions = {
+                        duration: 4,
+                        width: 768,
+                        height: 768,
+                        character: character,
+                        action: action,
+                        narration: narration,
+                        characterImagePath: character.imagePath || null
+                    };
+
                     if (actionImageBuffer) {
+                        // Sauvegarder l'image temporairement pour generateVideoFromImage
+                        const tempImagePath = path.join(this.tempPath, `temp_action_image_${character.id}_${Date.now()}.png`);
+                        await fs.writeFile(tempImagePath, actionImageBuffer);
+
                         // Mode image-to-video avec l'image générée
                         const result = await this.huggingfaceClient.generateVideoFromImage(
-                            actionImageBuffer,
+                            tempImagePath,
                             `${character.name} performing: ${action}, ${narration}, medieval fantasy`,
-                            videoPath
+                            videoPath,
+                            videoOptions
                         );
+
+                        // Nettoyer l'image temporaire
+                        setTimeout(() => {
+                            fs.unlink(tempImagePath, () => {});
+                        }, 5000);
 
                         if (result) {
                             console.log('✅ Vidéo d\'action générée par HuggingFace (image-to-video)');
@@ -999,7 +1019,7 @@ class ImageGenerator {
                         const result = await this.huggingfaceClient.generateVideoFromText(
                             `${character.name} performing: ${action}, ${narration}, medieval fantasy`,
                             videoPath,
-                            { duration: 4, width: 512, height: 512 }
+                            videoOptions
                         );
 
                         if (result) {
