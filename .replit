@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["blender", "freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libuuid", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [workflows]
-runButton = "Project"
+runButton = "Start Bot Fixed Bars"
 
 [[workflows.workflow]]
 name = "Start Friction Bot"
@@ -158,6 +158,23 @@ waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow]]
+name = "Start Bot Fixed Bars"
+author = 48120712
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pkill -f \"node index.js\" || true"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "sleep 3"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node index.js"
 
 [[ports]]
 localPort = 5000

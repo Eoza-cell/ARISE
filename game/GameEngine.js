@@ -1967,12 +1967,34 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
             await this.savePlayerAction(player.id, message, actionResult);
 
 
+            // Générer les barres de progression avec le HealthBarManager
+            const updatedHealth = character.currentLife;
+            const updatedEnergy = Math.max(0, character.currentEnergy - actionResult.energyCost);
+            
+            // Créer un objet temporaire pour les barres
+            const tempCharacter = {
+                ...character,
+                health: updatedHealth,
+                maxHealth: character.maxLife,
+                energy: updatedEnergy,
+                maxEnergy: character.maxEnergy,
+                mana: character.currentMana || 0,
+                maxMana: character.maxMana || 50,
+                aura: character.currentAura || 0,
+                maxAura: character.maxAura || 10
+            };
+
+            // Générer l'affichage des barres
+            const healthDisplay = this.healthBarManager.generateHealthDisplay(tempCharacter);
+
             const response = {
                 text: `🎭 **${character.name}** - ${character.currentLocation}
 
 ${narration}
 
-⚡ **Énergie:** ${Math.max(0, character.currentEnergy - actionResult.energyCost)}/${character.maxEnergy} (-${actionResult.energyCost})
+📊 **ÉTAT DU PERSONNAGE :**
+${healthDisplay}
+
 ✨ **Expérience:** +${actionResult.experience} XP`,
                 image: actionImage
             };
@@ -2174,6 +2196,111 @@ ${narration}
         const fatigue = this.getPlayerFatigue(playerId);
         // La fatigue augmente la difficulté
         return 1 + (fatigue / 100) * 0.8; // Max 80% de difficulté en plus à 100% fatigue
+    }
+
+    /**
+     * Analyse le niveau de ruse d'une action
+     */
+    analyzeCunning(message, character) {
+        const cunningKeywords = {
+            high: ['stratégie', 'ruse', 'piège', 'feinte', 'diversion', 'manipulation', 'astuce', 'tromperie', 'déguise', 'infiltre', 'espion', 'observe', 'analyse', 'planifie', 'étudie', 'prépare'],
+            medium: ['discret', 'prudent', 'silencieux', 'furtif', 'caché', 'évite', 'contourne', 'esquive'],
+            low: ['attaque', 'frappe', 'charge', 'fonce', 'combat direct', 'bourre', 'cogne']
+        };
+
+        const lowerMessage = message.toLowerCase();
+        let cunningLevel = 0;
+        let detectedStrategies = [];
+
+        // Analyser les mots-clés de haute ruse
+        cunningKeywords.high.forEach(keyword => {
+            if (lowerMessage.includes(keyword)) {
+                cunningLevel += 20;
+                detectedStrategies.push(keyword);
+            }
+        });
+
+        // Analyser les mots-clés de ruse moyenne
+        cunningKeywords.medium.forEach(keyword => {
+            if (lowerMessage.includes(keyword)) {
+                cunningLevel += 10;
+                detectedStrategies.push(keyword);
+            }
+        });
+
+        // Pénalité pour les actions brutales
+        cunningKeywords.low.forEach(keyword => {
+            if (lowerMessage.includes(keyword)) {
+                cunningLevel -= 15;
+            }
+        });
+
+        // Bonus pour les phrases complexes (plus de mots = plus de réflexion)
+        const wordCount = message.split(' ').length;
+        if (wordCount > 10) cunningLevel += 10;
+        if (wordCount > 15) cunningLevel += 10;
+
+        // Bonus pour l'utilisation de ponctuation (virgules, points-virgules = réflexion)
+        const punctuationCount = (message.match(/[,;:]/g) || []).length;
+        cunningLevel += punctuationCount * 5;
+
+        return {
+            level: Math.max(0, Math.min(100, cunningLevel)),
+            strategies: detectedStrategies,
+            isStrategic: cunningLevel > 15,
+            isBrutal: cunningLevel < -10
+        };
+    }
+
+    /**
+     * Applique les bonus/malus de ruse
+     */
+    applyCunningEffects(cunningAnalysis, character, baseNarration) {
+        let modifiedNarration = baseNarration;
+        let bonusText = '';
+        let experienceBonus = 0;
+        let energyCostReduction = 0;
+
+        if (cunningAnalysis.isStrategic) {
+            bonusText = `
+
+🧠 **RUSE DÉTECTÉE !** 🧠
+📊 **Niveau de stratégie :** ${cunningAnalysis.level}/100
+✨ **Stratégies utilisées :** ${cunningAnalysis.strategies.join(', ')}
+
+🎯 **BONUS DE RUSE :**
+• +${Math.floor(cunningAnalysis.level / 10)} XP bonus
+• -${Math.floor(cunningAnalysis.level / 20)} énergie requise
+• Chance critique augmentée
+• Réactions ennemies réduites
+
+💡 **FRICTION récompense l'intelligence !** Continuez à être rusé !`;
+
+            experienceBonus = Math.floor(cunningAnalysis.level / 10);
+            energyCostReduction = Math.floor(cunningAnalysis.level / 20);
+
+        } else if (cunningAnalysis.isBrutal) {
+            bonusText = `
+
+💀 **ACTION BRUTALE DÉTECTÉE** 💀
+
+⚠️ **MALUS DE BRUTALITÉ :**
+• Énergie doublée
+• Ennemis alertés
+• Chance d'échec critique
+• Réputation dégradée
+
+🧠 **CONSEIL :** Dans FRICTION, la ruse vaut mieux que la force !
+💡 Essayez des actions comme "j'observe discrètement" ou "je planifie une stratégie"`;
+
+            energyCostReduction = -10; // Malus
+        }
+
+        return {
+            narration: modifiedNarration + bonusText,
+            experienceBonus,
+            energyCostReduction
+        };
     }
 
 
@@ -2887,112 +3014,6 @@ Réessayez avec /royaumes`
 
             ORDERS_DATA.forEach((order, index) => {
                 ordersText += `**${index + 1}. ${order.name}**\n`;
-
-
-    /**
-     * Analyse le niveau de ruse d'une action
-     */
-    analyzeCunning(message, character) {
-        const cunningKeywords = {
-            high: ['stratégie', 'ruse', 'piège', 'feinte', 'diversion', 'manipulation', 'astuce', 'tromperie', 'déguise', 'infiltre', 'espion', 'observe', 'analyse', 'planifie', 'étudie', 'prépare'],
-            medium: ['discret', 'prudent', 'silencieux', 'furtif', 'caché', 'évite', 'contourne', 'esquive'],
-            low: ['attaque', 'frappe', 'charge', 'fonce', 'combat direct', 'bourre', 'cogne']
-        };
-
-        const lowerMessage = message.toLowerCase();
-        let cunningLevel = 0;
-        let detectedStrategies = [];
-
-        // Analyser les mots-clés de haute ruse
-        cunningKeywords.high.forEach(keyword => {
-            if (lowerMessage.includes(keyword)) {
-                cunningLevel += 20;
-                detectedStrategies.push(keyword);
-            }
-        });
-
-        // Analyser les mots-clés de ruse moyenne
-        cunningKeywords.medium.forEach(keyword => {
-            if (lowerMessage.includes(keyword)) {
-                cunningLevel += 10;
-                detectedStrategies.push(keyword);
-            }
-        });
-
-        // Pénalité pour les actions brutales
-        cunningKeywords.low.forEach(keyword => {
-            if (lowerMessage.includes(keyword)) {
-                cunningLevel -= 15;
-            }
-        });
-
-        // Bonus pour les phrases complexes (plus de mots = plus de réflexion)
-        const wordCount = message.split(' ').length;
-        if (wordCount > 10) cunningLevel += 10;
-        if (wordCount > 15) cunningLevel += 10;
-
-        // Bonus pour l'utilisation de ponctuation (virgules, points-virgules = réflexion)
-        const punctuationCount = (message.match(/[,;:]/g) || []).length;
-        cunningLevel += punctuationCount * 5;
-
-        return {
-            level: Math.max(0, Math.min(100, cunningLevel)),
-            strategies: detectedStrategies,
-            isStrategic: cunningLevel > 15,
-            isBrutal: cunningLevel < -10
-        };
-    }
-
-    /**
-     * Applique les bonus/malus de ruse
-     */
-    applyCunningEffects(cunningAnalysis, character, baseNarration) {
-        let modifiedNarration = baseNarration;
-        let bonusText = '';
-        let experienceBonus = 0;
-        let energyCostReduction = 0;
-
-        if (cunningAnalysis.isStrategic) {
-            bonusText = `
-
-🧠 **RUSE DÉTECTÉE !** 🧠
-📊 **Niveau de stratégie :** ${cunningAnalysis.level}/100
-✨ **Stratégies utilisées :** ${cunningAnalysis.strategies.join(', ')}
-
-🎯 **BONUS DE RUSE :**
-• +${Math.floor(cunningAnalysis.level / 10)} XP bonus
-• -${Math.floor(cunningAnalysis.level / 20)} énergie requise
-• Chance critique augmentée
-• Réactions ennemies réduites
-
-💡 **FRICTION récompense l'intelligence !** Continuez à être rusé !`;
-
-            experienceBonus = Math.floor(cunningAnalysis.level / 10);
-            energyCostReduction = Math.floor(cunningAnalysis.level / 20);
-
-        } else if (cunningAnalysis.isBrutal) {
-            bonusText = `
-
-💀 **ACTION BRUTALE DÉTECTÉE** 💀
-
-⚠️ **MALUS DE BRUTALITÉ :**
-• Énergie doublée
-• Ennemis alertés
-• Chance d'échec critique
-• Réputation dégradée
-
-🧠 **CONSEIL :** Dans FRICTION, la ruse vaut mieux que la force !
-💡 Essayez des actions comme "j'observe discrètement" ou "je planifie une stratégie"`;
-
-            energyCostReduction = -10; // Malus
-        }
-
-        return {
-            narration: modifiedNarration + bonusText,
-            experienceBonus,
-            energyCostReduction
-        };
-    }
 
 
                 ordersText += `📜 ${order.description}\n`;
