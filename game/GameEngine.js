@@ -2621,6 +2621,53 @@ Réessayez dans quelques instants.`
         }
     }
 
+    async handlePlayCommand({ player, dbManager }) {
+        try {
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
+            
+            if (!character) {
+                return {
+                    text: `❌ **Aucun personnage trouvé !**
+
+Tu dois d'abord créer un personnage avec /créer pour pouvoir jouer.`
+                };
+            }
+
+            // Activer le mode jeu pour ce joueur
+            await dbManager.setTemporaryData(player.id, 'game_mode', true);
+
+            return {
+                text: `🎮 **MODE JEU ACTIVÉ** 🎮
+
+🎭 **${character.name}** est maintenant en jeu !
+
+📍 **Position :** ${character.currentLocation}
+❤️ **Vie :** ${character.currentLife}/${character.maxLife}
+⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}
+🏆 **Rang :** ${character.powerLevel}
+
+💬 **Comment jouer :**
+Écris simplement tes actions en langage naturel !
+
+💡 **Exemples d'actions :**
+• "Je regarde autour de moi"
+• "Je me dirige vers la taverne"
+• "Je parle au garde"
+• "Je m'entraîne au combat"
+
+⚠️ **Attention :** Chaque action consomme de l'énergie et peut avoir des conséquences !
+
+🚪 **Pour quitter :** Tapez /menu`
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur handlePlayCommand:', error);
+            return {
+                text: `❌ Une erreur s'est produite lors de l'activation du mode jeu. Réessayez.`
+            };
+        }
+    }
+
     async handleDeleteCharacter({ player, dbManager, imageGenerator }) {
         try {
             const existingCharacter = await this.dbManager.getCharacterByPlayer(player.id);
