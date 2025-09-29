@@ -171,6 +171,10 @@ class GameEngine {
             '/regenerate_aura': this.handleRegenerateAuraCommand.bind(this),
             '/regenerer_magie': this.handleRegenerateMagicCommand.bind(this),
             '/regenerate_magic': this.handleRegenerateMagicCommand.bind(this),
+            '/aura_regen': this.handleAuraRegenCommand.bind(this),
+            '/magic_regen': this.handleMagicRegenCommand.bind(this),
+            '/aura_stats': this.handleAuraStatsCommand.bind(this),
+            '/aura_help': this.handleAuraHelpCommand.bind(this),
 
             // Time and weather commands that exist
             '/temps': this.handleTimeCommand.bind(this),
@@ -354,7 +358,7 @@ Tu es maintenant enregistré en tant que : **${username}**
 💡 Tapez /aide pour voir toutes les commandes disponibles.`
                     };
                 }
-                
+
                 const character = await dbManager.getCharacterByPlayer(player.id);
 
                 if (!character) {
@@ -971,13 +975,13 @@ ${defender.currentLife === 0 ? '☠️ ' + defender.name + ' est vaincu !' : '�
      */
     processNPCReaction(actionId, npcData, npcReaction) {
         console.log(`🤖 Traitement réaction PNJ: ${npcData.name} - ${npcReaction.action}`);
-        
+
         // Logique future pour traiter les réactions PNJ
         // - Calculer les effets de la réaction PNJ
         // - Mettre à jour l'état du combat/interaction
         // - Déclencher des événements en chaîne
         // - Affecter la réputation du joueur
-        
+
         // Pour l'instant, juste logger l'événement
         return {
             success: true,
@@ -1695,9 +1699,9 @@ Chaque muscle se tend, chaque sens s'aiguise. ${character.currentEnergy < 50 ? '
 Le destin semble retenir son souffle...`;
     }
 
-    
 
-    
+
+
 
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
         try {
@@ -1729,7 +1733,7 @@ ${character.name} est complètement épuisé ! Vous devez vous reposer avant d'a
                         chatId || 'unknown', 
                         player.id
                     );
-                    
+
                     if (npcReactions.length > 0) {
                         console.log(`🎭 ${npcReactions.length} PNJ détecté(s) pour réaction automatique`);
                     }
@@ -1819,13 +1823,13 @@ Narre cette scène comme si tu étais George R.R. Martin ou J.R.R. Tolkien, avec
 
             // Combiner la narration avec les conséquences (limite stricte)
             let finalText = `🎮 **${character.name}** - ${character.kingdom} 🎮\n\n`;
-            
+
             // S'assurer que la narration ne dépasse pas 700 caractères
             let limitedNarration = narration;
             if (limitedNarration.length > 500) { // Laisser de la place pour le reste
                 limitedNarration = limitedNarration.substring(0, 497) + '...';
             }
-            
+
             finalText += limitedNarration + '\n\n';
 
             if (actionAnalysis.consequences) {
@@ -2331,902 +2335,12 @@ Utilisez /aura_apprendre [type] pour commencer votre formation.`
         }
 
         return {
-            text: `❌ **TECHNIQUE INCONNUE**
+            text: `❌ **TECHNIQUE INCONNUE** ❌
 
 Vous ne maîtrisez pas la technique "${techniqueName}".
-Utilisez /aura_techniques pour voir vos techniques disponibles.`
+
+📚 Utilisez /aura_techniques pour voir vos techniques disponibles.`
         };
-    }
-
-    async handleMeditateCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        return {
-            text: `🧘 **MÉDITATION SPIRITUELLE** 🧘
-
-✨ Vous fermez les yeux et entrez en méditation profonde...
-🌟 Votre esprit se calme et votre aura se stabilise...
-💫 Vous ressentez une paix intérieure profonde...
-
-⚡ **Énergie spirituelle régénérée !**
-🔮 **Concentration améliorée !**
-
-💡 Pour apprendre l'aura, utilisez /aura_apprendre [type]`
-        };
-    }
-
-    async handleRegenerateAuraCommand({ player, dbManager, sock, chatId }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-            };
-        }
-
-        // Démarrer la régénération d'aura
-        const regenId = await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
-
-        return {
-            text: '',
-            skipResponse: true // Pas de réponse immédiate, l'animation gère tout
-        };
-    }
-
-    async handleRegenerateMagicCommand({ player, dbManager, sock, chatId }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Tu n'as pas encore de personnage !
-
-Utilise /créer pour créer ton personnage.`
-            };
-        }
-
-        // Démarrer la régénération de magie
-        const regenId = await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
-
-        return {
-            text: '',
-            skipResponse: true // Pas de réponse immédiate, l'animation gère tout
-        };
-    }
-
-
-    async handleMarketCommand({ player, dbManager }) {
-        const marketEvents = this.advancedMechanics.economyEngine.marketEvents;
-
-        const marketText = `💰 **MARCHÉ DYNAMIQUE**
-
-📈 **Événements économiques actifs :**
-${marketEvents.map(e => `• ${e.event}`).join('\n')}
-
-💡 **Les prix s'adaptent à vos actions et aux événements mondiaux !**
-🔄 **Système économique en temps réel actif**`;
-
-        return { text: marketText };
-    }
-
-    /**
-     * Sauvegarde la partie du joueur
-     */
-    async handleSaveGameCommand({ player, dbManager }) {
-        try {
-            const character = await this.dbManager.getCharacterByPlayer(player.id);
-            if (!character) {
-                return {
-                    text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
-                };
-            }
-
-            // Initialiser la large database si pas encore fait
-            if (!this.largeDB.index.created) {
-                await this.largeDB.initialize();
-            }
-
-            console.log(`💾 Sauvegarde de la partie pour ${player.whatsappNumber}...`);
-
-            // Collecter toutes les données du joueur
-            const gameData = {
-                player: {
-                    id: player.id,
-                    whatsappNumber: player.whatsappNumber,
-                    username: player.username,
-                    createdAt: player.createdAt,
-                    lastActive: player.lastActive
-                },
-                character: character,
-                gameState: {
-                    currentLocation: character.currentLocation,
-                    position: character.position,
-                    gameMode: await dbManager.getTemporaryData(player.id, 'game_mode'),
-                    lastAction: await dbManager.getTemporaryData(player.id, 'last_action')
-                },
-                progress: {
-                    level: character.level,
-                    experience: character.experience,
-                    powerLevel: character.powerLevel,
-                    frictionLevel: character.frictionLevel
-                },
-                inventory: {
-                    coins: character.coins,
-                    equipment: character.equipment,
-                    inventory: character.inventory,
-                    learnedTechniques: character.learnedTechniques
-                },
-                stats: {
-                    currentLife: character.currentLife,
-                    maxLife: character.maxLife,
-                    currentEnergy: character.currentEnergy,
-                    maxEnergy: character.maxEnergy
-                },
-                timestamp: new Date().toISOString(),
-                version: '1.0'
-            };
-
-            // Sauvegarder dans la large database
-            const saveId = await this.largeDB.storeData(
-                this.largeDB.dataTypes.PLAYER_DATA,
-                player.id,
-                gameData,
-                {
-                    characterName: character.name,
-                    kingdom: character.kingdom,
-                    level: character.level
-                }
-            );
-
-            return {
-                text: `💾 **PARTIE SAUVEGARDÉE** 💾
-
-✅ Sauvegarde créée avec succès !
-🆔 **ID de sauvegarde :** ${saveId}
-👤 **Personnage :** ${character.name}
-🏰 **Royaume :** ${character.kingdom}
-📊 **Niveau :** ${character.level} (${character.powerLevel})
-
-📝 **Données sauvegardées :**
-• Informations du personnage
-• État de la partie
-• Inventaire et équipement
-• Progression et statistiques
-
-💡 Utilisez /restore ${saveId} pour restaurer cette sauvegarde`
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur sauvegarde:', error);
-            return {
-                text: `❌ **ERREUR DE SAUVEGARDE**
-
-Une erreur s'est produite lors de la sauvegarde de votre partie.
-Veuillez réessayer plus tard.
-
-Erreur: ${error.message}`
-            };
-        }
-    }
-
-    /**
-     * Crée une sauvegarde complète du serveur
-     */
-    async handleBackupCommand({ player, dbManager }) {
-        try {
-            // Vérifier les permissions admin
-            if (!this.adminManager.isAuthenticated(player.whatsappNumber)) {
-                return {
-                    text: `❌ **ACCÈS REFUSÉ**
-
-Cette commande est réservée aux administrateurs.
-Contactez un administrateur si nécessaire.`
-                };
-            }
-
-            // Initialiser la large database si pas encore fait
-            if (!this.largeDB.index.created) {
-                await this.largeDB.initialize();
-            }
-
-            console.log(`🔄 Création sauvegarde complète demandée par admin ${player.whatsappNumber}...`);
-
-            const backupId = await this.largeDB.createFullBackup();
-            const stats = await this.largeDB.getStats();
-
-            return {
-                text: `💾 **SAUVEGARDE COMPLÈTE CRÉÉE** 💾
-
-✅ Sauvegarde du serveur terminée !
-🆔 **ID de backup :** ${backupId}
-📊 **Statistiques :**
-• ${stats.totalEntries} entrées sauvegardées
-• ${this.largeDB.formatSize(stats.storageUsed)} de données
-• ${stats.storageUsedPercent.toFixed(1)}% d'utilisation
-
-🛡️ **Sécurité :** Toutes les données sont intègres
-⚡ **Performance :** Sauvegarde optimisée`
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur backup:', error);
-            return {
-                text: `❌ **ERREUR DE BACKUP**
-
-Une erreur s'est produite lors de la création de la sauvegarde complète.
-
-Erreur: ${error.message}`
-            };
-        }
-    }
-
-    /**
-     * Restaure une sauvegarde
-     */
-    async handleRestoreCommand({ player, message, dbManager }) {
-        try {
-            const args = message.split(' ');
-            if (args.length < 2) {
-                return {
-                    text: `🔄 **RESTAURATION DE SAUVEGARDE** 🔄
-
-💡 **Usage :** /restore [ID_de_sauvegarde]
-
-📝 **Exemple :** /restore player_data_123_1234567890_abc123def
-
-💾 Utilisez /sauvegarde pour créer une sauvegarde de votre partie`
-                };
-            }
-
-            const saveId = args[1];
-
-            // Initialiser la large database si pas encore fait
-            if (!this.largeDB.index.created) {
-                await this.largeDB.initialize();
-            }
-
-            console.log(`🔄 Restauration de ${saveId} pour ${player.whatsappNumber}...`);
-
-            // Récupérer les données
-            const gameData = await this.largeDB.retrieveData(saveId);
-
-            // Vérifier que la sauvegarde appartient au joueur
-            if (gameData.player.id !== player.id) {
-                return {
-                    text: `❌ **ACCÈS REFUSÉ**
-
-Cette sauvegarde ne vous appartient pas.
-Vous ne pouvez restaurer que vos propres sauvegardes.`
-                };
-            }
-
-            // Restaurer les données du personnage
-            const character = await dbManager.getCharacterByPlayer(player.id);
-            if (character) {
-                await dbManager.updateCharacter(character.id, {
-                    currentLife: gameData.character.currentLife,
-                    maxLife: gameData.character.maxLife,
-                    currentEnergy: gameData.character.currentEnergy,
-                    maxEnergy: gameData.character.maxEnergy,
-                    level: gameData.character.level,
-                    experience: gameData.character.experience,
-                    powerLevel: gameData.character.powerLevel,
-                    frictionLevel: gameData.character.frictionLevel,
-                    currentLocation: gameData.character.currentLocation,
-                    position: gameData.character.position,
-                    equipment: gameData.character.equipment,
-                    learnedTechniques: gameData.character.learnedTechniques,
-                    coins: gameData.character.coins,
-                    inventory: gameData.character.inventory
-                });
-            }
-
-            return {
-                text: `🔄 **SAUVEGARDE RESTAURÉE** 🔄
-
-✅ Restauration réussie !
-👤 **Personnage :** ${gameData.character.name}
-🏰 **Royaume :** ${gameData.character.kingdom}
-📊 **Niveau :** ${gameData.character.level} (${gameData.character.powerLevel})
-💰 **Pièces :** ${gameData.character.coins}
-📍 **Position :** ${gameData.character.currentLocation}
-
-⚡ **Données restaurées :**
-• Statistiques de vie et énergie
-• Progression et niveaux
-• Inventaire et équipement
-• Position dans le monde
-
-🎮 Vous pouvez reprendre votre aventure !`
-            };
-
-        } catch (error) {
-            console.error('❌ Erreur restore:', error);
-            if (error.message.includes('non trouvées')) {
-                return {
-                    text: `❌ **SAUVEGARDE INTROUVABLE**
-
-L'ID de sauvegarde spécifié n'existe pas ou est corrompu.
-Vérifiez l'ID et réessayez.`
-                };
-            }
-
-            return {
-                text: `❌ **ERREUR DE RESTAURATION**
-
-Une erreur s'est produite lors de la restauration.
-
-Erreur: ${error.message}`
-            };
-        }
-    }
-
-    /**
-     * Affiche les statistiques de la base de données
-     */
-    async handleDatabaseStatsCommand({ player, dbManager }) {
-        try {
-            // Initialiser la large database si pas encore fait
-            if (!this.largeDB.index.created) {
-                await this.largeDB.initialize();
-            }
-
-            const stats = await this.largeDB.getStats();
-            const playerSaves = await this.largeDB.searchData({
-                type: this.largeDB.dataTypes.PLAYER_DATA,
-                playerId: player.id
-            });
-
-            let statsText = `📊 **STATISTIQUES BASE DE DONNÉES** 📊
-
-🗄️ **Stockage Global :**
-• ${stats.totalEntries} entrées totales
-• ${this.largeDB.formatSize(stats.storageUsed)} utilisés
-• ${this.largeDB.formatSize(stats.storageAvailable)} disponibles
-• ${stats.storageUsedPercent.toFixed(1)}% d'utilisation
-
-👤 **Vos Sauvegardes :**
-• ${playerSaves.length} sauvegarde(s) trouvée(s)`;
-
-            if (playerSaves.length > 0) {
-                statsText += '\n\n💾 **Liste de vos sauvegardes :**';
-                playerSaves.slice(0, 5).forEach((save, index) => {
-                    const date = new Date(save.created).toLocaleString('fr-FR');
-                    statsText += `\n${index + 1}. ${save.id.substring(0, 20)}...`;
-                    statsText += `\n   📅 ${date} - ${this.largeDB.formatSize(save.size)}`;
-                });
-
-                if (playerSaves.length > 5) {
-                    statsText += `\n   ... et ${playerSaves.length - 5} autres`;
-                }
-            }
-
-            statsText += '\n\n🕐 **Dernière sauvegarde globale :**';
-            statsText += stats.lastBackup ? 
-                `\n📅 ${new Date(stats.lastBackup).toLocaleString('fr-FR')}` : 
-                '\n❌ Aucune sauvegarde globale';
-
-            statsText += '\n\n💡 **Commandes :**';
-            statsText += '\n• /sauvegarde - Créer une sauvegarde';
-            statsText += '\n• /restore [ID] - Restaurer une sauvegarde';
-
-            return { text: statsText };
-
-        } catch (error) {
-            console.error('❌ Erreur stats DB:', error);
-            return {
-                text: `❌ **ERREUR STATISTIQUES**
-
-Impossible de récupérer les statistiques de la base de données.
-
-Erreur: ${error.message}`
-            };
-        }
-    }
-
-    async handleFactionsCommand({ player, dbManager }) {
-        const factionStandings = await dbManager.getTemporaryData(player.id, 'faction_standings') || {};
-
-        const factionsText = `⚔️ **RELATIONS AVEC LES FACTIONS**
-
-${Object.entries(factionStandings).map(([faction, standing]) =>
-    `🏛️ **${faction}:** ${standing}/100 ${this.getReputationBar(standing)}`
-).join('\n')}
-
-💡 **Vos actions affectent vos relations !**
-🤝 **Formez des alliances ou créez des ennemis**`;
-
-        return { text: factionsText };
-    }
-
-    getReputationBar(value) {
-        const filled = Math.floor(value / 10);
-        const empty = 10 - filled;
-        return '█'.repeat(filled) + '░'.repeat(empty);
-    }
-
-    async handleChallengesCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return { text: "❌ Aucun personnage trouvé !" };
-        }
-
-        const challenges = this.advancedMechanics.generateDailyChallenges(character);
-
-        const challengesText = `🏆 **DÉFIS QUOTIDIENS**
-
-${challenges.map((challenge, i) =>
-    `${i + 1}. **${challenge.name}**
-📝 ${challenge.description}
-🏅 Récompense: ${challenge.reward}\n`
-).join('\n')}
-
-💡 **Complétez ces défis pour gagner de l'expérience et des récompenses !**`;
-
-        return { text: challengesText };
-    }
-
-    async handleCombatCommand({ imageGenerator }) {
-        return {
-            text: `⚔️ **SYSTÈME DE COMBAT - FRICTION ULTIMATE**
-
-🌟 **Niveaux de puissance (G à A) :**
-• G - Très faible (débutants)
-• F - Faible (apprentis)
-• E - Moyen-faible (soldats basiques)
-• D - Moyen (combattants aguerris)
-• C - Moyen-fort (guerriers expérimentés)
-• B - Fort (spécialistes du combat)
-• A - Très fort (maîtres du combat)
-
-⚡ **Barres de combat :**
-• ❤️ Vie : Détermine ta survie
-• ⚡ Énergie : Consommée par les actions
-
-💀 **ATTENTION :** Chaque attaque doit être précise :
-• Mouvement exact (distance en mètres)
-• Arme utilisée et angle d'attaque
-• Partie du corps visée
-
-🎯 **Sans précision = vulnérabilité !**`,
-            image: await imageGenerator.generateCombatGuideImage()
-        };
-    }
-
-    async handleInventoryCommand({ player, dbManager, imageGenerator }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `❌ Tu dois d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        return {
-            text: `🎒 **INVENTAIRE DE ${character.name.toUpperCase()}**
-
-💰 **Pièces :** ${character.coins}
-
-⚔️ **Équipement porté :**
-${this.formatEquipment(character.equipment)}
-
-📦 **Objets dans l'inventaire :**
-${this.formatInventory(character.inventory)}
-
-🔧 **Commandes d'équipement :**
-• Pour équiper : "équiper [objet]"
-• Pour déséquiper : "retirer [objet]"
-• Pour utiliser : "utiliser [objet]"`,
-            image: await imageGenerator.generateInventoryImage(character)
-        };
-    }
-
-    formatInventory(inventory) {
-        if (!inventory || inventory.length === 0) {
-            return '• Inventaire vide';
-        }
-
-        return inventory.map(item => `• ${item.itemId} (x${item.quantity})`).join('\n');
-    }
-
-    formatTechniques(techniques) {
-        if (!techniques || techniques.length === 0) {
-            return '• Aucune technique apprise';
-        }
-
-        return techniques.map(technique => `• ${technique}`).join('\n');
-    }
-
-    async handleMapCommand({ imageGenerator }) {
-        return {
-            text: `🗺️ **CARTE DU MONDE - FRICTION ULTIMATE**
-
-🏰 **Les 12 Royaumes sont dispersés à travers :**
-• Plaines fertiles d'Aegyria
-• Forêts sombres de Sombrenuit
-• Déserts brûlants de Khelos
-• Ports fortifiés d'Abrantis
-• Montagnes enneigées de Varha
-• Et bien d'autres contrées dangereuses...
-
-⚔️ **Les 7 Ordres ont établi leurs quartiers :**
-• Dans les sanctuaires profanés
-• Les citadelles fumantes
-• Les forteresses des ombres
-• Et d'autres lieux mystérieux...
-
-💀 **Chaque région est dangereuse !**`,
-            image: await imageGenerator.generateWorldMap()
-        };
-    }
-
-    async handlePlayCommand({ player, dbManager, imageGenerator }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-
-        if (!character) {
-            return {
-                text: `🎮 **MODE JEU ACTIVÉ**
-
-❌ Tu n'as pas encore de personnage !
-
-✨ **Pour commencer à jouer :**
-1️⃣ Utilise /créer pour créer ton personnage
-2️⃣ Puis utilise /jouer pour entrer dans le monde
-
-💬 **Note :** En mode jeu, tes messages seront interprétés comme des actions de jeu.
-Utilise /aide pour voir toutes les commandes disponibles.`,
-                image: await imageGenerator.generateMenuImage()
-            };
-        }
-
-        await dbManager.setTemporaryData(player.id, 'game_mode', true);
-
-        return {
-            text: `🎮 **MODE JEU ACTIVÉ** 🎮
-
-👤 **${character.name}** est maintenant en jeu !
-📍 **Position :** ${character.currentLocation}
-❤️ **Vie :** ${character.currentLife}/${character.maxLife}
-⚡ **Énergie :** ${character.currentEnergy}/${character.maxEnergy}
-
-🎯 **Tes prochains messages seront interprétés comme des actions de jeu.**
-
-📝 **Exemples d'actions :**
-• "Je regarde autour de moi"
-• "J'avance vers le nord"
-• "Je cherche des ennemis"
-• "Je attaque avec mon épée"
-
-💬 **Besoin d'aide :** utilise /aide pour voir toutes les commandes
-⚙️ **Pour sortir du mode jeu :** utilise /menu
-
-🔥 **L'aventure commence maintenant !**`,
-            image: await imageGenerator.generateCharacterImage(character)
-        };
-    }
-    async handleGenderSelection({ player, message, dbManager, imageGenerator }) {
-        await dbManager.setTemporaryData(player.id, 'creation_started', true);
-
-        let gender;
-        const input = message.toUpperCase().trim();
-        if (input === 'HOMME' || input === 'H' || input === '1') {
-            gender = 'male';
-        } else if (input === 'FEMME' || input === 'F' || input === '2') {
-            gender = 'female';
-        } else {
-            return {
-                text: `❌ Choix invalide !
-
-Tape **HOMME**, **H**, **FEMME** ou **F**`
-            };
-        }
-
-        await dbManager.setTemporaryData(player.id, 'creation_gender', gender);
-
-        const kingdoms = await dbManager.getAllKingdoms();
-        let kingdomText = `👤 **Sexe sélectionné :** ${gender === 'male' ? 'HOMME' : 'FEMME'}
-
-🏰 **Étape 2/3 - Choisis ton royaume :**
-
-`;
-
-        kingdoms.forEach((kingdom, index) => {
-            kingdomText += `**${index + 1}.** ${kingdom.name} - ${kingdom.description}\n`;
-        });
-
-        kingdomText += `\n⚡ **Tape le numéro du royaume (1 à 12)**`;
-
-        let kingdomImage = null;
-        try {
-            kingdomImage = await imageGenerator.generateWorldMap({
-                style: '3d',
-                description: 'Fantasy kingdoms overview with multiple realms, castles, and magical lands'
-            });
-        } catch (error) {
-            console.log('⚠️ Impossible de générer l\'image des royaumes, continuons sans image');
-        }
-
-        return {
-            text: kingdomText,
-            image: kingdomImage
-        };
-    }
-
-    async handleKingdomSelection({ player, kingdomNumber, dbManager, imageGenerator }) {
-        const kingdoms = await dbManager.getAllKingdoms();
-
-        if (kingdomNumber < 1 || kingdomNumber > kingdoms.length) {
-            return {
-                text: `❌ Royaume invalide !
-
-Choisis un numéro entre 1 et ${kingdoms.length}`
-            };
-        }
-
-        const selectedKingdom = kingdoms[kingdomNumber - 1];
-
-        const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
-
-        if (!gender) {
-            return {
-                text: `❌ Erreur : genre non trouvé. Recommence la création avec /créer`
-            };
-        }
-
-        await dbManager.setTemporaryData(player.id, 'creation_kingdom', selectedKingdom.id);
-
-        console.log(`✅ Royaume sélectionné: ${selectedKingdom.name} (ID: ${selectedKingdom.id}) pour le joueur ${player.id}`);
-
-        return {
-            text: `🏰 **Royaume sélectionné :** ${selectedKingdom.name}
-
-👤 **Sexe :** ${gender === 'male' ? 'Homme' : 'Femme'}
-🏰 **Royaume :** ${selectedKingdom.name}
-
-📝 **Étape 3/4 - Donne un nom à ton personnage :**
-
-✍️ Écris simplement le nom que tu veux pour ton personnage.
-⚠️ **Attention :** Le nom ne peut pas être modifié après !`,
-            image: await imageGenerator.generateKingdomImage(selectedKingdom.id)
-        };
-    }
-
-    async handleCharacterNameInput({ player, name, dbManager, imageGenerator }) {
-        const gender = await dbManager.getTemporaryData(player.id, 'creation_gender');
-        const kingdomId = await dbManager.getTemporaryData(player.id, 'creation_kingdom');
-
-        if (!gender || !kingdomId) {
-            return {
-                text: `❌ Erreur : données de création manquantes. Recommence avec /créer`
-            };
-        }
-
-        const nameRegex = /^[a-zA-Z0-9àâäéèêëïîôöùûüÿç\s-]{2,20}$/;
-        if (!nameRegex.test(name)) {
-            return {
-                text: `❌ Le nom doit contenir entre 2 et 20 caractères (lettres, chiffres, espaces, tirets uniquement) !`
-            };
-        }
-
-        const existingCharacter = await dbManager.getCharacterByName(name.trim());
-        if (existingCharacter) {
-            return {
-                text: `❌ Ce nom est déjà pris ! Choisis un autre nom.`
-            };
-        }
-
-        await dbManager.setTemporaryData(player.id, 'creation_name', name.trim());
-
-        return {
-            text: `✅ **Nom accepté :** ${name}
-
-📸 **Étape 4/4 - Photo de ton visage :**
-
-🖼️ Envoie une photo de ton visage pour ton personnage.
-⚠️ **Important :**
-• Seule la zone du visage sera utilisée
-• Photo claire et bien éclairée recommandée
-• Si tu n'as pas de photo, écris "SANS_PHOTO"
-
-📷 **Envoie ta photo maintenant...**`
-        };
-    }
-
-    /**
-     * Gère les informations d'aura du joueur
-     */
-    async handleAuraInfoCommand({ player, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        if (!this.auraManager) {
-            return {
-                text: `❌ Système d'aura non disponible`
-            };
-        }
-
-        const auraInfo = this.auraManager.formatAuraInfo(player.id, character.name);
-        return { text: auraInfo };
-    }
-
-    /**
-     * Commencer l'apprentissage d'une aura
-     */
-    async handleLearnAuraCommand({ player, message, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        const args = message.split(' ').slice(1);
-        if (args.length === 0) {
-            return {
-                text: `🔮 **APPRENTISSAGE D'AURA** 🔮
-
-**Usage:** \`/aura_apprendre [type]\`
-
-**Types d'aura disponibles :**
-🔥 **fire** - Aura de Flamme
-🌊 **water** - Aura Aquatique  
-🌍 **earth** - Aura Tellurique
-💨 **wind** - Aura Éolienne
-⚡ **lightning** - Aura Foudroyante
-🌑 **shadow** - Aura Ténébreuse
-✨ **light** - Aura Lumineuse
-
-⚠️ **ATTENTION :** L'entraînement dure 365 jours avec seulement 2% de chance de réussite par session !`
-            };
-        }
-
-        const auraType = args[0].toLowerCase();
-
-        if (!this.auraManager.auraTypes[auraType]) {
-            return {
-                text: `❌ Type d'aura invalide : "${auraType}"
-
-Types valides : fire, water, earth, wind, lightning, shadow, light`
-            };
-        }
-
-        try {
-            const result = await this.auraManager.startAuraTraining(player.id, auraType, `Maîtrise ${auraType}`);
-            return { text: result.message };
-        } catch (error) {
-            return {
-                text: `❌ Erreur lors du démarrage de l'entraînement : ${error.message}`
-            };
-        }
-    }
-
-    /**
-     * Session d'entraînement d'aura
-     */
-    async handleAuraSessionCommand({ player, dbManager, sock, chatId }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        const training = this.auraManager.getPlayerTraining(player.id);
-        if (!training) {
-            return {
-                text: `❌ Aucun entraînement d'aura en cours !
-
-Utilisez \`/aura_apprendre [type]\` pour commencer un entraînement.`
-            };
-        }
-
-        const aura = this.auraManager.auraTypes[training.auraType];
-
-        // Démarrer l'animation d'entraînement
-        try {
-            await this.auraManager.createAuraAnimation(
-                player.id,
-                training.auraType,
-                training.techniqueName,
-                sock,
-                chatId
-            );
-
-            // Tentative de progression après l'animation
-            const growthResult = await this.auraManager.attemptAuraGrowth(player.id, training.auraType);
-
-            setTimeout(async () => {
-                await sock.sendMessage(chatId, { text: growthResult.message });
-            }, 32000); // Après l'animation de 30 secondes + 2 secondes
-
-            return { text: '', skipResponse: true };
-        } catch (error) {
-            return {
-                text: `❌ Erreur pendant la session d'entraînement : ${error.message}`
-            };
-        }
-    }
-
-    /**
-     * Lancer une technique d'aura
-     */
-    async handleCastAuraCommand({ player, message, dbManager }) {
-        const character = await this.dbManager.getCharacterByPlayer(player.id);
-        if (!character) {
-            return {
-                text: `❌ Vous devez d'abord créer un personnage avec /créer !`
-            };
-        }
-
-        // Vérifier d'abord si le joueur a des auras
-        const playerAuras = this.auraManager.getPlayerAuraLevel(player.id);
-        if (!playerAuras || Object.keys(playerAuras).length === 0) {
-            return {
-                text: `❌ **AUCUNE AURA MAÎTRISÉE** ❌
-
-🚫 Vous n'avez appris aucune technique d'aura !
-
-💡 **Pour débuter :**
-• Utilisez \`/aura_apprendre [type]\`
-• Entraînez-vous 365 jours minimum
-• Seuls les plus déterminés y arrivent
-
-🔰 Vous êtes encore un simple humain sans pouvoirs.`
-            };
-        }
-
-        const args = message.split(' ').slice(1);
-        if (args.length === 0) {
-            return {
-                text: `🔮 **LANCER UNE TECHNIQUE D'AURA** 🔮
-
-**Usage:** \`/aura_cast [technique]\`
-
-📚 **Vos techniques disponibles :**
-${Object.entries(playerAuras).map(([type, data]) => {
-    const aura = this.auraManager.auraTypes[type];
-    return `${aura.emoji} **${aura.name}** (Niv. ${data.level}):\n${data.techniques.map(t => `   • ${t}`).join('\n')}`;
-}).join('\n\n')}
-
-⚡ **Exemple :** \`/aura_cast Souffle Ardent\``
-            };
-        }
-
-        const techniqueName = args.join(' ');
-
-        // Chercher la technique dans toutes les auras du joueur
-        let foundAura = null;
-        let foundTechnique = null;
-
-        for (const [auraType, auraData] of Object.entries(playerAuras)) {
-            if (auraData.techniques.includes(techniqueName)) {
-                foundAura = auraType;
-                foundTechnique = techniqueName;
-                break;
-            }
-        }
-
-        if (!foundAura) {
-            return {
-                text: `❌ **TECHNIQUE INCONNUE** ❌
-
-🚫 "${techniqueName}" n'est pas dans votre répertoire !
-
-📚 **Vos techniques :**
-${Object.entries(playerAuras).map(([type, data]) =>
-    data.techniques.map(t => `• ${t}`).join('\n')
-).join('\n')}`
-            };
-        }
-
-        const result = await this.auraManager.castAuraTechnique(player.id, foundAura, foundTechnique);
-        return { text: result.message };
     }
 
     /**
@@ -3286,6 +2400,115 @@ Utilise /créer pour créer ton personnage.`
                 text: `❌ Erreur lors de la régénération magique. Réessayez.`
             };
         }
+    }
+
+
+    // ==================== COMMANDES D'AURA (NOUVELLES) ====================
+
+    /**
+     * Régénération d'aura
+     */
+    async handleAuraRegenCommand({ player, dbManager, sock, chatId }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        await this.auraManager.startAuraRegeneration(player.id, sock, chatId);
+
+        return {
+            text: `🔮 **RÉGÉNÉRATION D'AURA COMMENCÉE** 🔮
+
+⚡ Votre aura spirituelle se reconstitue...
+⏱️ Durée : 60 secondes
+
+✨ Concentrez-vous pendant la régénération !`,
+            skipResponse: true
+        };
+    }
+
+    /**
+     * Régénération de magie
+     */
+    async handleMagicRegenCommand({ player, dbManager, sock, chatId }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        await this.auraManager.startMagicRegeneration(player.id, sock, chatId);
+
+        return {
+            text: `✨ **RÉGÉNÉRATION MAGIQUE COMMENCÉE** ✨
+
+🔥 Votre énergie magique se reconstitue...
+⏱️ Durée : 60 secondes
+
+🌟 Laissez le mana circuler en vous !`,
+            skipResponse: true
+        };
+    }
+
+    /**
+     * Statistiques du système d'aura
+     */
+    async handleAuraStatsCommand({ player, dbManager }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilise /créer pour en créer un.`
+            };
+        }
+
+        const stats = this.auraManager.getAuraStats();
+
+        return {
+            text: `📊 **STATISTIQUES DU SYSTÈME D'AURA** 📊
+
+🔮 **Types d'aura disponibles :** ${stats.totalAuraTypes}
+🏃‍♂️ **Entraînements actifs :** ${stats.activeTrainings}
+⚡ **Animations en cours :** ${stats.activeAnimations}
+👥 **Joueurs avec auras :** ${stats.playersWithAuras}
+
+✨ Le système d'aura est opérationnel !`
+        };
+    }
+
+    /**
+     * Aide pour les commandes d'aura
+     */
+    async handleAuraHelpCommand({ player, dbManager }) {
+        return {
+            text: `🔮 **GUIDE COMPLET DU SYSTÈME D'AURA** 🔮
+
+📚 **COMMANDES DISPONIBLES :**
+
+🌟 **Informations :**
+• \`/aura_info\` - Vos auras et niveaux
+• \`/aura_techniques\` - Techniques disponibles  
+• \`/aura_stats\` - Statistiques système
+
+🎯 **Entraînement :**
+• \`/aura_apprendre [type]\` - Commencer formation
+• \`/aura_session\` - Session d'entraînement
+• \`/aura_cast [technique]\` - Lancer technique
+
+⚡ **Régénération :**
+• \`/aura_regen\` - Recharger aura (60s)
+• \`/magic_regen\` - Recharger magie (60s)
+
+🔥 **Types d'aura disponibles :**
+• fire, water, earth, wind
+• lightning, shadow, light
+
+⚠️ **IMPORTANT :** L'aura demande 365 jours d'entraînement avec seulement 2% de chance de réussite par session !
+
+💡 **Conseil :** Seuls les plus déterminés maîtrisent l'aura après des années d'efforts acharnés.`
+        };
     }
 
 
@@ -3590,4 +2813,4 @@ ${currentTime.seasonInfo.emoji} **${currentTime.seasonInfo.name}**
     }
 }
 
-module.exports = GameEngine;
+module.module.exports = GameEngine;
