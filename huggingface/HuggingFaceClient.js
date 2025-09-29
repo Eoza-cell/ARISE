@@ -48,10 +48,16 @@ class HuggingFaceClient {
             let imageData = null;
             if (options.characterImagePath) {
                 try {
-                    imageData = await fs.readFile(options.characterImagePath);
-                    console.log(`📸 Image du personnage chargée: ${options.characterImagePath}`);
+                    // Vérifier si c'est un Buffer ou un chemin de fichier
+                    if (Buffer.isBuffer(options.characterImagePath)) {
+                        imageData = options.characterImagePath;
+                        console.log(`📸 Buffer image du personnage utilisé`);
+                    } else {
+                        imageData = await fs.readFile(options.characterImagePath);
+                        console.log(`📸 Image du personnage chargée: ${options.characterImagePath}`);
+                    }
                 } catch (error) {
-                    console.log(`⚠️ Impossible de charger l'image: ${options.characterImagePath}`);
+                    console.log(`⚠️ Impossible de charger l'image: ${error.message}`);
                 }
             }
 
@@ -69,10 +75,10 @@ class HuggingFaceClient {
                         inputs: imageData,
                         parameters: { 
                             prompt: optimizedPrompt,
-                            num_frames: Math.min(options.num_frames || 49, 49),
+                            num_frames: Math.min(options.num_frames || 25, 25),
                             fps: Math.min(options.fps || 8, 8),
-                            width: options.width || 768,
-                            height: options.height || 768,
+                            width: options.width || 512,
+                            height: options.height || 512,
                             seed: options.seed || Math.floor(Math.random() * 1000000),
                             motion_bucket_id: options.motion_bucket_id || 127
                         }
@@ -85,17 +91,26 @@ class HuggingFaceClient {
                         model: "Wan-AI/Wan2.2-Animate-14B",
                         inputs: optimizedPrompt,
                         parameters: {
-                            num_frames: Math.min(options.num_frames || 49, 49),
+                            num_frames: Math.min(options.num_frames || 25, 25),
                             fps: options.fps || 8,
-                            width: options.width || 768,
-                            height: options.height || 768,
+                            width: options.width || 512,
+                            height: options.height || 512,
                             seed: options.seed || Math.floor(Math.random() * 1000000)
                         }
                     });
                 }
 
-                // Convertir le Blob en Buffer
-                const videoBuffer = Buffer.from(await videoBlob.arrayBuffer());
+                // Vérifier le type de réponse
+                let videoBuffer;
+                if (videoBlob instanceof Blob) {
+                    videoBuffer = Buffer.from(await videoBlob.arrayBuffer());
+                } else if (Buffer.isBuffer(videoBlob)) {
+                    videoBuffer = videoBlob;
+                } else if (videoBlob && videoBlob.buffer) {
+                    videoBuffer = videoBlob.buffer;
+                } else {
+                    throw new Error('Format de réponse vidéo non supporté');
+                }
 
                 // Vérifier que c'est bien une vidéo
                 if (!videoBuffer || videoBuffer.length < 1000) {
@@ -103,18 +118,14 @@ class HuggingFaceClient {
                 }
 
                 // Créer le dossier et sauvegarder
-                const outputDir = path.dirname(outputPath);
+                const path_module = require('path');
+                const outputDir = path_module.dirname(outputPath);
                 await fs.mkdir(outputDir, { recursive: true });
                 await fs.writeFile(outputPath, videoBuffer);
 
                 console.log(`✅ Vidéo HuggingFace générée: ${outputPath} (${videoBuffer.length} bytes)`);
 
-                return {
-                    success: true,
-                    videoPath: outputPath,
-                    method: 'huggingface',
-                    size: videoBuffer.length
-                };
+                return outputPath;
 
             } catch (apiError) {
                 console.log(`⚠️ Erreur API principale: ${apiError.message}`);

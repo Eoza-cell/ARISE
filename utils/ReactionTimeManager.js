@@ -1,4 +1,3 @@
-
 /**
  * ReactionTimeManager - Gère les temps de réaction par rang
  * Système de combat avec temps limité basé sur le niveau de puissance
@@ -7,24 +6,137 @@ class ReactionTimeManager {
     constructor(gameEngine, sock) {
         this.gameEngine = gameEngine;
         this.sock = sock;
-        this.activeReactions = new Map();
-        
-        // Temps de réaction par rang (en millisecondes) - Les faibles ont PLUS de temps
+        this.activeTimers = new Map(); // actionId -> timer info
         this.reactionTimes = {
-            'NIVEAU_1': 480000,  // 8 minutes - Extrêmement lent
-            'G': 360000,         // 6 minutes
-            'F': 300000,         // 5 minutes  
-            'E': 240000,         // 4 minutes
-            'D': 180000,         // 3 minutes
-            'C': 120000,         // 2 minutes
-            'B': 60000,          // 1 minute
-            'A': 30000,          // 30 secondes
-            'S': 15000,          // 15 secondes
-            'S+': 10000,         // 10 secondes
-            'SS': 8000,          // 8 secondes
-            'SSS': 5000,         // 5 secondes
-            'MONARQUE': 3000     // 3 secondes
+            'G': 360000,    // 6 minutes
+            'F': 300000,    // 5 minutes
+            'E': 240000,    // 4 minutes
+            'D': 180000,    // 3 minutes
+            'C': 120000,    // 2 minutes
+            'B': 60000,     // 1 minute
+            'A': 30000,     // 30 secondes
+            'S': 15000,     // 15 secondes
+            'S+': 10000,    // 10 secondes
+            'SS': 8000,     // 8 secondes
+            'SSS': 5000,    // 5 secondes
+            'MONARQUE': 3000 // 3 secondes
         };
+    }
+
+    async startReactionTimer(actionId, chatId, targetPlayerId, attackerName, targetName, reactionTimeMs) {
+        const startTime = Date.now();
+        const endTime = startTime + reactionTimeMs;
+
+        const timerInfo = {
+            actionId,
+            chatId,
+            targetPlayerId,
+            attackerName,
+            targetName,
+            startTime,
+            endTime,
+            reactionTimeMs,
+            isActive: true
+        };
+
+        this.activeTimers.set(actionId, timerInfo);
+
+        // Envoyer le message initial avec compte à rebours
+        await this.sendCountdownMessage(timerInfo);
+
+        // Démarrer les mises à jour périodiques
+        this.startPeriodicUpdates(timerInfo);
+
+        // Programmer l'expiration
+        setTimeout(() => {
+            this.handleTimeout(actionId);
+        }, reactionTimeMs);
+
+        return actionId;
+    }
+
+    async sendCountdownMessage(timerInfo) {
+        const remainingTime = Math.max(0, timerInfo.endTime - Date.now());
+        const minutes = Math.floor(remainingTime / 60000);
+        const seconds = Math.floor((remainingTime % 60000) / 1000);
+
+        const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+
+        await this.sock.sendMessage(timerInfo.chatId, {
+            text: `⚔️ **COMBAT INITIÉ !**
+
+🎯 **${timerInfo.attackerName}** attaque **${timerInfo.targetName}** !
+
+⏰ **Temps de réaction restant:** ${timeDisplay}
+🛡️ ${timerInfo.targetName} doit répondre avant expiration !
+
+⚠️ Si aucune réponse, ${timerInfo.targetName} subira l'attaque complète !`
+        });
+    }
+
+    startPeriodicUpdates(timerInfo) {
+        const updateInterval = setInterval(() => {
+            if (!timerInfo.isActive || !this.activeTimers.has(timerInfo.actionId)) {
+                clearInterval(updateInterval);
+                return;
+            }
+
+            const remainingTime = Math.max(0, timerInfo.endTime - Date.now());
+
+            // Envoyer des mises à jour à intervalles spécifiques
+            if (remainingTime <= 10000 && remainingTime > 9000) { // 10 secondes
+                this.sendUrgentUpdate(timerInfo, 10);
+            } else if (remainingTime <= 5000 && remainingTime > 4000) { // 5 secondes
+                this.sendUrgentUpdate(timerInfo, 5);
+            } else if (remainingTime <= 3000 && remainingTime > 2000) { // 3 secondes
+                this.sendUrgentUpdate(timerInfo, 3);
+            }
+
+            if (remainingTime <= 0) {
+                clearInterval(updateInterval);
+            }
+        }, 1000);
+    }
+
+    async sendUrgentUpdate(timerInfo, secondsLeft) {
+        await this.sock.sendMessage(timerInfo.chatId, {
+            text: `🚨 **URGENT !** 🚨
+
+⏰ **${secondsLeft} secondes restantes** pour ${timerInfo.targetName} !
+
+${secondsLeft <= 3 ? '💀 **DERNIÈRE CHANCE !**' : '⚠️ **DÉPÊCHEZ-VOUS !**'}`
+        });
+    }
+
+    async handleTimeout(actionId) {
+        const timerInfo = this.activeTimers.get(actionId);
+        if (!timerInfo || !timerInfo.isActive) {
+            return;
+        }
+
+        timerInfo.isActive = false;
+
+        await this.sock.sendMessage(timerInfo.chatId, {
+            text: `⏰ **TEMPS ÉCOULÉ !**
+
+${timerInfo.targetName} n'a pas réagi à temps !
+💥 L'attaque de ${timerInfo.attackerName} réussit automatiquement !`
+        });
+
+        this.activeTimers.delete(actionId);
+
+        // Traiter l'action automatiquement
+        if (this.gameEngine.processActionTimeout) {
+            this.gameEngine.processActionTimeout(actionId);
+        }
+    }
+
+    cancelTimer(actionId) {
+        const timerInfo = this.activeTimers.get(actionId);
+        if (timerInfo) {
+            timerInfo.isActive = false;
+            this.activeTimers.delete(actionId);
+        }
     }
 
     /**
@@ -34,14 +146,14 @@ class ReactionTimeManager {
         let character;
         let reactionTime;
         let isNPC = false;
-        
+
         // Gérer les PNJ simulés (ID commençant par 'npc_')
         if (defenderId.startsWith('npc_')) {
             isNPC = true;
             // PNJ simulé - utiliser des valeurs par défaut
             const npcPowerLevels = ['G', 'F', 'E', 'D', 'C', 'B', 'A'];
             const randomPowerLevel = npcPowerLevels[Math.floor(Math.random() * npcPowerLevels.length)];
-            
+
             character = {
                 name: `PNJ-${defenderId.slice(-5)}`,
                 powerLevel: randomPowerLevel,
@@ -108,7 +220,7 @@ class ReactionTimeManager {
         ];
 
         const lowerAction = playerAction.toLowerCase();
-        
+
         // Vérifier s'il y a une action qui nécessite une réaction
         const hasActionKeyword = actionKeywords.some(keyword => lowerAction.includes(keyword));
         if (!hasActionKeyword) return [];
@@ -120,10 +232,10 @@ class ReactionTimeManager {
                 // Générer un ID unique pour le PNJ
                 const npcId = `npc_${npcKeyword}_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`;
                 const actionId = `action_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-                
+
                 // Démarrer le temps de réaction pour ce PNJ
                 const started = await this.startReactionTimer(actionId, npcId, chatId, playerAction);
-                
+
                 if (started) {
                     detectedNPCs.push({
                         actionId,
@@ -131,7 +243,7 @@ class ReactionTimeManager {
                         npcType: npcKeyword,
                         detected: true
                     });
-                    
+
                     console.log(`🎯 Réaction PNJ démarrée: ${npcKeyword} (${actionId})`);
                 }
             }
@@ -147,7 +259,7 @@ class ReactionTimeManager {
         const timeInSeconds = Math.floor(reactionData.reactionTime / 1000);
         const timeInMinutes = Math.floor(timeInSeconds / 60);
         const remainingSeconds = timeInSeconds % 60;
-        
+
         let timeDisplay;
         if (timeInMinutes > 0) {
             timeDisplay = remainingSeconds > 0 ? 
@@ -189,7 +301,7 @@ class ReactionTimeManager {
      */
     scheduleReminders(reactionData) {
         const { actionId, reactionTime } = reactionData;
-        
+
         // Rappel à 50% du temps
         setTimeout(() => {
             if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
@@ -240,7 +352,7 @@ class ReactionTimeManager {
 
         let character;
         let isNPC = false;
-        
+
         // Vérifier si c'est un PNJ simulé
         if (reactionData.defenderId.startsWith('npc_')) {
             isNPC = true;
@@ -253,7 +365,7 @@ class ReactionTimeManager {
         } else {
             character = await this.gameEngine.dbManager.getCharacterByPlayer(reactionData.defenderId);
         }
-        
+
         if (!character) {
             console.log(`⚠️ Personnage introuvable pour timeout: ${reactionData.defenderId}`);
             this.activeReactions.delete(actionId);
@@ -279,7 +391,7 @@ class ReactionTimeManager {
 ❌ Aucune défense ne sera appliquée !
 
 💥 L'attaque va maintenant être traitée...`;
-        
+
         await this.sock.sendMessage(reactionData.chatId, { text: timeoutMessage });
 
         // Notifier le système de combat si la méthode existe
@@ -288,7 +400,7 @@ class ReactionTimeManager {
         } else {
             console.log(`💥 Action timeout traité: ${actionId} - ${character.name} (${isNPC ? 'PNJ' : 'Joueur'})`);
         }
-        
+
         this.activeReactions.delete(actionId);
     }
 
@@ -302,7 +414,7 @@ class ReactionTimeManager {
         // Calculer le temps de réaction du PNJ (plus court que le timeout)
         const maxReactionTime = reactionData.reactionTime * 0.8; // 80% du temps max
         const minReactionTime = reactionData.reactionTime * 0.3; // 30% du temps max
-        
+
         // Temps aléatoire dans cette plage
         const npcReactionTime = Math.random() * (maxReactionTime - minReactionTime) + minReactionTime;
 
@@ -377,7 +489,7 @@ class ReactionTimeManager {
 
         // Déterminer le type de réaction selon le niveau du PNJ et l'action du joueur
         let reactionType = 'neutral';
-        
+
         if (playerAction.toLowerCase().includes('attaque') || playerAction.toLowerCase().includes('frappe')) {
             reactionType = ['G', 'F'].includes(npcData.powerLevel) ? 'defensive' : 'aggressive';
         } else if (playerAction.toLowerCase().includes('parle') || playerAction.toLowerCase().includes('dit')) {

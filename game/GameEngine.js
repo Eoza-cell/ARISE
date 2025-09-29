@@ -600,12 +600,12 @@ Décris le personnage que tu veux incarner :
 • Style d'armure/vêtements
 • Royaume d'origine
 • Personnalité
-• Histoire/objectifs
+• Histoire
 
 🚀 **Écris ta description maintenant !**`
                     };
                 } catch (saveError) {
-                    console.error('❌ Erreur sauvegarde image:', saveError);
+                    console.error('❌ Erreur sauvegarde:', saveError);
                     return {
                         text: `❌ **Erreur de sauvegarde**
 
@@ -1703,68 +1703,102 @@ Le destin semble retenir son souffle...`;
         try {
             console.log(`🎭 Traitement action IA pour ${character.name}: ${message}`);
 
-            // Validation de l'action
-            const actionValidation = this.validateAction(character, message);
-            if (actionValidation.length > 0) {
-                return {
-                    text: `❌ **Actions impossibles détectées :**\n\n${actionValidation.join('\n')}\n\n💡 Vérifiez votre équipement et vos capacités.`
-                };
-            }
-
-            // Générer la narration avec l'IA AMÉLIORÉE
-            let narration = "Vous effectuez une action dans le monde de Friction Ultimate.";
-
+            // Générer une narration enrichie avec l'IA
+            let narration = '';
             if (this.groqClient && this.groqClient.hasValidClient()) {
                 try {
-                    // Détecter les réactions PNJ avec contexte enrichi
-                    const npcInteraction = this.detectNPCInteraction(message);
+                    const prompt = `Tu es le narrateur du jeu RPG "Friction Ultimate". Le personnage ${character.name} (niveau ${character.level}, rang ${character.powerLevel}) du royaume ${character.kingdom} effectue l'action suivante: "${message}".
 
-                    if (npcInteraction) {
-                        console.log(`🤖 Interaction PNJ détectée: ${npcInteraction.type} avec ${npcInteraction.target}`);
+Localisation actuelle: ${character.currentLocation}
 
-                        // Générer une réaction PNJ si appropriée
-                        const npcReaction = await this.generateNPCReaction(character, npcInteraction, player.whatsappNumber);
-                        if (npcReaction) {
-                            console.log(`🎭 Réaction PNJ générée: ${npcReaction.response}`);
-                        }
-                    }
+Génère une narration immersive et captivante qui:
+1. Décrit l'action du personnage de manière épique
+2. Inclut des détails sur l'environnement
+3. Mentionne les sensations physiques du personnage
+4. Ajoute des éléments atmosphériques
+5. Garde un ton médiéval-fantastique
 
-                    const enhancedPrompt = this.buildEnhancedNarrationPrompt(character, message);
-                    narration = await this.groqClient.generateNarration(enhancedPrompt, 600);
+Narration (200 mots maximum):`;
 
+                    narration = await this.groqClient.generateNarration(prompt, 300);
                     console.log(`✅ Narration IA enrichie générée: ${narration.substring(0, 100)}...`);
-                } catch (error) {
-                    console.error('❌ Erreur narration IA:', error);
-                    narration = this.generateFallbackNarration(character, message);
+                } catch (narrationError) {
+                    console.error('❌ Erreur génération narration IA:', narrationError);
+                    narration = `${character.name} effectue l'action demandée dans ${character.currentLocation}.`;
                 }
+            } else {
+                narration = `${character.name} effectue "${message}" dans ${character.currentLocation}.`;
             }
 
-            // Ajouter des éléments dynamiques à la narration
-            narration = this.enrichNarrationWithDynamicElements(narration, character, message);
-
-            // Mettre à jour les statistiques du personnage
-            await this.updateCharacterAfterAction(character, message, dbManager);
-
-            // Générer l'image d'action si possible
+            // Générer une image pour l'action
             let actionImage = null;
-            if (imageGenerator) {
-                try {
-                    actionImage = await imageGenerator.generateCharacterActionImage(character, message, narration);
-                    console.log('✅ Image d\'action générée');
-                } catch (imageError) {
-                    console.log('⚠️ Impossible de générer l\'image d\'action:', imageError.message);
-                }
+            try {
+                actionImage = await imageGenerator.generateCharacterActionImage(character, message, narration, {
+                    style: '3d',
+                    perspective: 'first_person',
+                    nudity: false
+                });
+            } catch (imageError) {
+                console.error('⚠️ Erreur génération image action:', imageError);
             }
 
-            return {
-                text: narration,
+            // Générer une vidéo pour l'action si HuggingFace est disponible
+            let actionVideo = null;
+            try {
+                if (imageGenerator.hasHuggingFace && imageGenerator.huggingfaceClient) {
+                    console.log('🎬 Génération vidéo pour l\'action...');
+
+                    // Obtenir l'image du personnage
+                    const characterImagePath = await imageGenerator.getCustomCharacterImage(character.id);
+
+                    const videoPath = `temp/action_video_${character.id}_${Date.now()}.mp4`;
+
+                    const videoResult = await imageGenerator.huggingfaceClient.generateCharacterActionVideo(
+                        message, 
+                        character, 
+                        character.currentLocation, 
+                        videoPath
+                    );
+
+                    if (videoResult && typeof videoResult === 'string') {
+                        actionVideo = videoResult;
+                        console.log('✅ Vidéo d\'action générée avec succès');
+                    }
+                }
+            } catch (videoError) {
+                console.error('⚠️ Erreur génération vidéo action:', videoError);
+            }
+
+            // Traiter l'action et mettre à jour le personnage
+            const actionResult = {
+                energyCost: Math.floor(Math.random() * 10) + 5,
+                experience: Math.floor(Math.random() * 20) + 10,
+                newLocation: character.currentLocation // Peut être modifié selon l'action
+            };
+
+            await this.updateCharacterAfterAction(character, message, actionResult);
+
+            const response = {
+                text: `🎭 **${character.name}** - ${character.currentLocation}
+
+${narration}
+
+⚡ **Énergie:** ${character.currentEnergy - actionResult.energyCost}/${character.maxEnergy} (-${actionResult.energyCost})
+✨ **Expérience:** +${actionResult.experience} XP`,
                 image: actionImage
             };
+
+            // Ajouter la vidéo si disponible
+            if (actionVideo) {
+                response.video = actionVideo;
+            }
+
+            return response;
 
         } catch (error) {
             console.error('❌ Erreur traitement action IA:', error);
             return {
-                text: `⚡ Une erreur s'est produite lors du traitement de votre action. Réessayez.`
+                text: `❌ Une erreur s'est produite lors du traitement de votre action. Veuillez réessayer.`
             };
         }
     }
@@ -2485,13 +2519,13 @@ Tu n'as pas de personnage créé.`
             }
 
             // Supprimer le personnage
-            await dbManager.deleteCharacter(character.id);
+            await this.dbManager.deleteCharacter(character.id);
 
             // Nettoyer les données temporaires
-            await dbManager.clearTemporaryData(player.id, 'creation_started');
-            await dbManager.clearTemporaryData(player.id, 'creation_mode');
-            await dbManager.clearTemporaryData(player.id, 'photo_received');
-            await dbManager.clearTemporaryData(player.id, 'game_mode');
+            await this.dbManager.clearTemporaryData(player.id, 'creation_started');
+            await this.dbManager.clearTemporaryData(player.id, 'creation_mode');
+            await this.dbManager.clearTemporaryData(player.id, 'photo_received');
+            await this.dbManager.clearTemporaryData(player.id, 'game_mode');
 
             return {
                 text: `✅ **PERSONNAGE SUPPRIMÉ** ✅
