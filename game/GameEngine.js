@@ -73,18 +73,18 @@ class GameEngine {
             item: ['utilise', 'prend', 'équipe', 'boit', 'mange', 'use', 'take', 'equip']
         };
 
-        // Techniques de combat de base par défaut - EXTRÊMEMENT FAIBLES NIVEAU 1
+        // Techniques de combat de base par défaut - Coûts énergétiques réduits
         this.basicCombatTechniques = {
-            'coup de poing': { name: 'Coup de Poing Faible', power: 3, energy: 8, precision: 'very_low' },
-            'coup de poing droit': { name: 'Coup de Poing Droit Maladroit', power: 4, energy: 10, precision: 'very_low' },
-            'coup de poing gauche': { name: 'Coup de Poing Gauche Hésitant', power: 3, energy: 9, precision: 'very_low' },
-            'uppercut': { name: 'Uppercut Raté', power: 5, energy: 15, precision: 'very_low' },
-            'direct': { name: 'Direct Tremblant', power: 4, energy: 12, precision: 'very_low' },
-            'crochet': { name: 'Crochet Désespéré', power: 3, energy: 11, precision: 'very_low' },
-            'coup de pied': { name: 'Coup de Pied Pathétique', power: 4, energy: 14, precision: 'very_low' },
-            'balayage': { name: 'Balayage Inutile', power: 2, energy: 10, precision: 'very_low' },
-            'coup de genou': { name: 'Coup de Genou Faible', power: 5, energy: 16, precision: 'very_low' },
-            'coup de coude': { name: 'Coup de Coude Mou', power: 4, energy: 13, precision: 'very_low' }
+            'coup de poing': { name: 'Coup de Poing Faible', power: 3, energy: 4, precision: 'very_low' },
+            'coup de poing droit': { name: 'Coup de Poing Droit Maladroit', power: 4, energy: 5, precision: 'very_low' },
+            'coup de poing gauche': { name: 'Coup de Poing Gauche Hésitant', power: 3, energy: 4, precision: 'very_low' },
+            'uppercut': { name: 'Uppercut Raté', power: 5, energy: 7, precision: 'very_low' },
+            'direct': { name: 'Direct Tremblant', power: 4, energy: 6, precision: 'very_low' },
+            'crochet': { name: 'Crochet Désespéré', power: 3, energy: 5, precision: 'very_low' },
+            'coup de pied': { name: 'Coup de Pied Pathétique', power: 4, energy: 7, precision: 'very_low' },
+            'balayage': { name: 'Balayage Inutile', power: 2, energy: 5, precision: 'very_low' },
+            'coup de genou': { name: 'Coup de Genou Faible', power: 5, energy: 8, precision: 'very_low' },
+            'coup de coude': { name: 'Coup de Coude Mou', power: 4, energy: 6, precision: 'very_low' }
         };
 
         // Puissance des PNJ - même les gardes sont dangereux pour les débutants
@@ -1815,9 +1815,9 @@ ${character.name} est complètement épuisé !
                 };
             }
 
-            // Traitement spécial pour le repos
+            // Traitement spécial pour le repos - récupération améliorée
             if (message.toLowerCase().includes('me repose') || message.toLowerCase().includes('repos')) {
-                const energyRecovered = Math.min(25, character.maxEnergy - character.currentEnergy);
+                const energyRecovered = Math.min(40, character.maxEnergy - character.currentEnergy); // Augmenté de 25 à 40
                 const newEnergy = Math.min(character.maxEnergy, character.currentEnergy + energyRecovered);
 
                 await dbManager.updateCharacter(character.id, {
@@ -1956,7 +1956,7 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
 
             // Traiter l'action et mettre à jour le personnage
             const actionResult = {
-                energyCost: Math.floor(Math.random() * 10) + 5,
+                energyCost: Math.floor(Math.random() * 5) + 2, // Réduit de 3-15 à 2-7
                 experience: Math.floor(Math.random() * 20) + 10,
                 newLocation: character.currentLocation // Peut être modifié selon l'action
             };
@@ -2038,9 +2038,9 @@ ${healthDisplay}
                 }
             }
 
-            // Calculer la nouvelle énergie (coût plus élevé selon la fatigue)
-            const fatigueMultiplier = 1 + (this.getPlayerFatigue(character.playerId) * 0.01);
-            const adjustedEnergyCost = Math.floor(actionResult.energyCost * fatigueMultiplier);
+            // Calculer la nouvelle énergie (coût réduit pour un gameplay plus équilibré)
+            const fatigueMultiplier = 1 + (this.getPlayerFatigue(character.playerId) * 0.005); // Réduit de moitié
+            const adjustedEnergyCost = Math.floor(actionResult.energyCost * fatigueMultiplier * 0.6); // Réduit de 40%
             const newEnergy = Math.max(0, character.currentEnergy - adjustedEnergyCost);
 
             // Calculer la nouvelle vie (dégâts des événements)
@@ -2099,11 +2099,11 @@ ${healthDisplay}
         let fatigueIncrease = 0;
 
         if (action.toLowerCase().includes('combat') || action.toLowerCase().includes('attaque')) {
-            fatigueIncrease = (energyCost * 0.5) + (Math.random() * 5); // Fatigue accrue en combat
+            fatigueIncrease = (energyCost * 0.2) + (Math.random() * 2); // Fatigue réduite en combat
         } else if (action.toLowerCase().includes('court') || action.toLowerCase().includes('saute') || action.toLowerCase().includes('grimpe')) {
-            fatigueIncrease = (energyCost * 0.3) + (Math.random() * 3); // Fatigue modérée pour les mouvements
+            fatigueIncrease = (energyCost * 0.15) + (Math.random() * 1.5); // Fatigue réduite pour les mouvements
         } else {
-            fatigueIncrease = (energyCost * 0.1) + (Math.random() * 1); // Fatigue légère pour actions simples
+            fatigueIncrease = (energyCost * 0.05) + (Math.random() * 0.5); // Fatigue très légère pour actions simples
         }
 
         const newFatigue = Math.min(100, currentFatigue + fatigueIncrease);
