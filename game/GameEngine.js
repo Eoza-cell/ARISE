@@ -2711,6 +2711,126 @@ Si le problème persiste, contacte un administrateur.`
             };
         }
     }
+
+    async handleKingdomsCommand({ player, dbManager, imageGenerator }) {
+        try {
+            const { KINGDOMS_DATA } = require('../data/GameData');
+            
+            let kingdomsText = `🏰 **LES 12 ROYAUMES DE FRICTION ULTIMATE** 🏰\n\n`;
+            
+            kingdomsText += `🌍 **Chaque royaume possède sa propre culture, ses spécialités et ses défis uniques !**\n\n`;
+            
+            KINGDOMS_DATA.forEach((kingdom, index) => {
+                kingdomsText += `**${index + 1}. ${kingdom.name} (${kingdom.id})**\n`;
+                kingdomsText += `📍 ${kingdom.description}\n`;
+                kingdomsText += `🌄 *Géographie:* ${kingdom.geography}\n`;
+                kingdomsText += `⚔️ *Spécialités:* ${kingdom.specialties.join(', ')}\n`;
+                kingdomsText += `✨ *Particularité:* ${kingdom.particularities}\n\n`;
+            });
+            
+            kingdomsText += `💡 **Conseils pour choisir ton royaume :**
+• Chaque royaume offre des techniques et équipements uniques
+• Ta réputation varie selon le royaume où tu te trouves
+• Certaines quêtes ne sont disponibles que dans certains royaumes
+• Les PNJ réagissent différemment selon ton origine
+
+🎮 **Pour créer un personnage :** /créer
+🗺️ **Pour voir la carte complète :** /carte`;
+
+            try {
+                const kingdomImage = await imageGenerator.generateKingdomsOverviewImage();
+                return {
+                    text: kingdomsText,
+                    image: kingdomImage
+                };
+            } catch (error) {
+                console.log('⚠️ Impossible de générer l\'image des royaumes:', error.message);
+                return {
+                    text: kingdomsText + '\n\n⚠️ Image temporairement indisponible'
+                };
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur handleKingdomsCommand:', error);
+            return {
+                text: `🏰 **LES 12 ROYAUMES DE FRICTION ULTIMATE**
+
+❌ Une erreur s'est produite lors de l'affichage des royaumes.
+
+🎮 **Les royaumes disponibles sont :**
+• Aegyria - Royaume des paladins
+• Sombrenuit - Peuple mystérieux de la forêt
+• Khelos - Nomades du désert
+• Abrantis - Marins et commerçants
+• Varha - Guerriers des montagnes
+• Sylvaria - Druides et archers
+• Et 6 autres royaumes uniques...
+
+Réessayez avec /royaumes`
+            };
+        }
+    }
+
+    async handleOrdersCommand({ player, dbManager, imageGenerator }) {
+        try {
+            const { ORDERS_DATA } = require('../data/GameData');
+            
+            let ordersText = `⚔️ **LES 7 ORDRES MYSTIQUES** ⚔️\n\n`;
+            
+            ordersText += `🔮 **Rejoindre un ordre te donne accès à des techniques et pouvoirs exclusifs !**\n\n`;
+            
+            ORDERS_DATA.forEach((order, index) => {
+                ordersText += `**${index + 1}. ${order.name}**\n`;
+                ordersText += `📜 ${order.description}\n`;
+                ordersText += `🎯 *Spécialités:* ${order.specialties.join(', ')}\n`;
+                if (order.location) {
+                    ordersText += `📍 *Localisation:* ${order.location}\n`;
+                }
+                if (order.kingdom) {
+                    ordersText += `🏰 *Royaume associé:* ${order.kingdom}\n`;
+                }
+                ordersText += `\n`;
+            });
+            
+            ordersText += `💡 **Comment rejoindre un ordre :**
+• Atteins un certain niveau de maîtrise
+• Complète des quêtes spécifiques à l'ordre
+• Démontre ta valeur lors d'épreuves
+• Certains ordres ont des conditions particulières
+
+🎮 **Pour commencer ton aventure :** /créer
+🏰 **Pour explorer les royaumes :** /royaumes`;
+
+            try {
+                const orderImage = await imageGenerator.generateOrdersOverviewImage();
+                return {
+                    text: ordersText,
+                    image: orderImage
+                };
+            } catch (error) {
+                console.log('⚠️ Impossible de générer l\'image des ordres:', error.message);
+                return {
+                    text: ordersText + '\n\n⚠️ Image temporairement indisponible'
+                };
+            }
+
+        } catch (error) {
+            console.error('❌ Erreur handleOrdersCommand:', error);
+            return {
+                text: `⚔️ **LES 7 ORDRES MYSTIQUES**
+
+❌ Une erreur s'est produite lors de l'affichage des ordres.
+
+🔮 **Les ordres mystiques incluent :**
+• L'Ordre du Seigneur Démoniaque
+• L'Ordre de l'Aube Éternelle
+• L'Ordre des Lames Silencieuses
+• Et 4 autres ordres puissants...
+
+Réessayez avec /ordres`
+            };
+        }
+    }
 }
 
 module.exports = GameEngine;
