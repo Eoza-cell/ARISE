@@ -8,7 +8,7 @@ channel = "stable-25_05"
 packages = ["blender", "freetype", "lcms2", "libimagequant", "libjpeg", "libtiff", "libuuid", "libwebp", "libxcrypt", "openjpeg", "tcl", "tk", "zlib"]
 
 [workflows]
-runButton = "Start Bot Fixed Bars"
+runButton = "Project"
 
 [[workflows.workflow]]
 name = "Start Friction Bot"
@@ -49,10 +49,6 @@ args = "node index.js"
 name = "Project"
 mode = "parallel"
 author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "WhatsApp RPG Bot"
 
 [[workflows.workflow.tasks]]
 task = "workflow.run"
@@ -102,18 +98,6 @@ task = "shell.exec"
 args = "node index.js"
 
 [[workflows.workflow]]
-name = "WhatsApp RPG Bot"
-author = "agent"
-
-[workflows.workflow.metadata]
-outputType = "webview"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "node index.js"
-waitForPort = 5000
-
-[[workflows.workflow]]
 name = "Start Fixed Bot"
 author = 48093534
 mode = "sequential"
@@ -151,13 +135,12 @@ args = "node index.js"
 name = "WhatsApp Bot"
 author = "agent"
 
+[workflows.workflow.metadata]
+outputType = "console"
+
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node index.js"
-waitForPort = 5000
-
-[workflows.workflow.metadata]
-outputType = "webview"
 
 [[workflows.workflow]]
 name = "Start Bot Fixed Bars"
