@@ -3,8 +3,8 @@ const path = require('path');
 
 class HuggingFaceClient {
     constructor() {
-        // Clé API Hugging Face intégrée directement pour déploiement
-        this.apiKey = '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';
+        // Utiliser la clé API depuis les variables d'environnement (sécurisé)
+        this.apiKey = process.env.HF_TOKEN;
         this.isAvailable = false;
         this.client = null;
 
@@ -82,17 +82,13 @@ class HuggingFaceClient {
                         }
                     });
                 } else {
-                    // Fallback text-to-video avec modèle alternatif
-                    console.log(`🎬 Mode text-to-video avec damo-vilab/text-to-video-ms-1.7b...`);
+                    // Mode text-to-video avec Wan-AI/Wan2.1-T2V-14B (nouveau modèle haute qualité)
+                    console.log(`🎬 Mode text-to-video avec Wan-AI/Wan2.1-T2V-14B...`);
 
                     videoBlob = await this.client.textToVideo({
-                        model: "damo-vilab/text-to-video-ms-1.7b",
-                        inputs: optimizedPrompt,
-                        parameters: {
-                            num_frames: Math.min(options.num_frames || 16, 16),
-                            width: options.width || 256,
-                            height: options.height || 256
-                        }
+                        provider: "auto",
+                        model: "Wan-AI/Wan2.1-T2V-14B",
+                        inputs: optimizedPrompt
                     });
                 }
 
@@ -339,6 +335,9 @@ class HuggingFaceClient {
     }
 
     async generateVideoFromImage(imagePath, prompt, outputPath, options = {}) {
+        // Déclarer imageBuffer ici pour qu'il soit accessible dans le fallback
+        let imageBuffer;
+        
         try {
             if (!this.hasValidClient()) {
                 throw new Error('HuggingFace client non disponible - vérifiez HF_TOKEN');
@@ -348,9 +347,9 @@ class HuggingFaceClient {
             console.log(`🎯 Prompt: "${prompt}"`);
 
             // Lire l'image
-            const imageBuffer = await fs.readFile(imagePath);
+            imageBuffer = await fs.readFile(imagePath);
 
-            // Optimiser le prompt pour Wan2.2-Animate-14B
+            // Optimiser le prompt pour Wan2.1-T2V-14B
             const optimizedPrompt = this.optimizePromptForWanAnimate(prompt, options);
 
             // Utiliser le modèle Stable Video Diffusion
@@ -378,36 +377,40 @@ class HuggingFaceClient {
 
             await fs.writeFile(outputPath, videoBuffer);
 
-            console.log(`✅ Vidéo HuggingFace générée avec Wan2.2-Animate-14B: ${outputPath} (${videoBuffer.length} bytes)`);
+            console.log(`✅ Vidéo HuggingFace générée avec stabilityai/stable-video-diffusion: ${outputPath} (${videoBuffer.length} bytes)`);
             return outputPath;
 
         } catch (error) {
             console.error('❌ Erreur génération vidéo HuggingFace:', error);
 
-            // Fallback avec un modèle alternatif
-            try {
-                console.log('🔄 Tentative avec modèle alternatif...');
-                const video = await this.client.imageToVideo({
-                    model: "stabilityai/stable-video-diffusion-img2vid-xt",
-                    inputs: imageBuffer,
-                    parameters: {
-                        height: 576,
-                        width: 1024,
-                        num_frames: 25,
-                        motion_bucket_id: 127,
-                        fps: 6
-                    }
-                });
+            // Fallback avec un modèle alternatif (seulement si imageBuffer a été chargé)
+            if (imageBuffer) {
+                try {
+                    console.log('🔄 Tentative avec modèle alternatif...');
+                    const video = await this.client.imageToVideo({
+                        model: "stabilityai/stable-video-diffusion-img2vid-xt",
+                        inputs: imageBuffer,
+                        parameters: {
+                            height: 576,
+                            width: 1024,
+                            num_frames: 25,
+                            motion_bucket_id: 127,
+                            fps: 6
+                        }
+                    });
 
-                const videoBuffer = Buffer.from(await video.arrayBuffer());
-                await fs.writeFile(outputPath, videoBuffer);
+                    const videoBuffer = Buffer.from(await video.arrayBuffer());
+                    await fs.writeFile(outputPath, videoBuffer);
 
-                console.log(`✅ Vidéo HuggingFace générée (fallback): ${outputPath}`);
-                return outputPath;
-            } catch (fallbackError) {
-                console.error('❌ Échec fallback:', fallbackError);
-                throw error;
+                    console.log(`✅ Vidéo HuggingFace générée (fallback): ${outputPath}`);
+                    return outputPath;
+                } catch (fallbackError) {
+                    console.error('❌ Échec fallback:', fallbackError);
+                }
             }
+            
+            // Si fallback échoue ou imageBuffer non disponible, propager l'erreur
+            throw error;
         }
     }
 }
