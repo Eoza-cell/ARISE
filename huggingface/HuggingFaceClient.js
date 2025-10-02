@@ -82,12 +82,12 @@ class HuggingFaceClient {
                         }
                     });
                 } else {
-                    // Mode text-to-video avec Wan-AI/Wan2.1-T2V-14B (nouveau modèle haute qualité)
-                    console.log(`🎬 Mode text-to-video avec Wan-AI/Wan2.1-T2V-14B...`);
+                    // Mode text-to-video avec Wan-AI/Wan2.2-T2V-A14B (dernier modèle haute qualité)
+                    console.log(`🎬 Mode text-to-video avec Wan-AI/Wan2.2-T2V-A14B...`);
 
                     videoBlob = await this.client.textToVideo({
                         provider: "auto",
-                        model: "Wan-AI/Wan2.1-T2V-14B",
+                        model: "Wan-AI/Wan2.2-T2V-A14B",
                         inputs: optimizedPrompt
                     });
                 }
@@ -224,14 +224,15 @@ class HuggingFaceClient {
             optimized = `${characterDesc} ${actionDesc}`;
         }
 
-        // Ajouter des mots-clés spécifiques pour Wan2.2-Animate-14B
+        // Ajouter des mots-clés optimisés pour Wan2.2-T2V-A14B (modèle text-to-video avancé)
         const wanKeywords = [
-            'high quality animation',
-            'detailed character movement',
-            'smooth transitions',
-            'realistic facial expressions',
-            'dynamic motion',
-            'cinematic composition'
+            'high quality video',
+            'detailed movement',
+            'smooth animation',
+            'realistic motion',
+            'cinematic quality',
+            'dynamic action',
+            'professional video production'
         ];
 
         wanKeywords.forEach(keyword => {
@@ -240,12 +241,12 @@ class HuggingFaceClient {
             }
         });
 
-        // Limiter la longueur pour Wan2.2-Animate-14B
-        if (optimized.length > 300) {
-            optimized = optimized.substring(0, 297) + '...';
+        // Limiter la longueur pour Wan2.2-T2V-A14B
+        if (optimized.length > 350) {
+            optimized = optimized.substring(0, 347) + '...';
         }
 
-        console.log(`🎯 Prompt optimisé pour Wan2.2-Animate-14B: "${optimized}"`);
+        console.log(`🎯 Prompt optimisé pour Wan2.2-T2V-A14B: "${optimized}"`);
         return optimized;
     }
 

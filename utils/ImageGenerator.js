@@ -110,11 +110,11 @@ class ImageGenerator {
             this.huggingfaceClient = new HuggingFaceClient();
             this.hasHuggingFace = this.huggingfaceClient.hasValidClient();
             if (this.hasHuggingFace) {
-                console.log('🤗 HuggingFaceClient initialisé - Génération de vidéos IA avec ltxv-13b-098-distilled activée');
-                console.log('🎬 Vidéos image-to-video avec images de personnages disponibles');
+                console.log('🤗 HuggingFaceClient initialisé - Génération de vidéos IA avec Wan2.2-T2V-A14B activée');
+                console.log('🎬 Vidéos image-to-video et text-to-video disponibles');
             } else {
                 console.log('⚠️ HF_TOKEN non configurée - HuggingFace vidéos désactivées');
-                console.log('💡 Ajoutez HF_TOKEN dans les secrets pour activer les vidéos ltxv-13b-098-distilled');
+                console.log('💡 Ajoutez HF_TOKEN dans les secrets pour activer les vidéos Wan2.2-T2V-A14B');
             }
         } catch (error) {
             console.error('❌ Erreur initialisation HuggingFaceClient:', error.message);
