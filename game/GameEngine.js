@@ -1857,61 +1857,28 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
                     );
                     
                     console.log(`✅ Narration Groq générée (${narration.length} caractères)`);
-                } catch (groqError) {
-                    console.error('❌ Erreur narration Groq:', groqError.message);
-                    // Fallback simple si Groq échoue
-                    narration = `${character.name} effectue l'action : ${message}\n\nLieu : ${character.currentLocation}`;
-                }
-            } else {
-                console.log('⚠️ Groq non disponible - narration basique');
-                narration = `${character.name} effectue l'action : ${message}\n\nLieu : ${character.currentLocation}`;
-            }
-
-            if (this.groqClient && this.groqClient.hasValidClient()) {
-                try {
-                    console.log('🤖 Génération narration avec Groq...');
-                    const sessionId = `player_${player.id}`;
-
-                    // Contexte enrichi pour une meilleure narration
-                    const enrichedContext = {
-                        character: character,
-                        action: message,
-                        location: character.currentLocation,
-                        actionType: actionContext.type,
-                        previousActions: await this.getRecentPlayerActions(player.id),
-                        environmentalFactors: this.getEnvironmentalFactors(character.currentLocation),
-                        timeOfDay: await this.getGameTimeOfDay(player.id)
-                    };
-
-                    narration = await this.groqClient.generateExplorationNarration(
-                        character.currentLocation,
-                        message,
-                        sessionId,
-                        character
-                    );
                     
-                    console.log(`✅ Narration Groq générée: ${narration.substring(0, 50)}...`);
-                } catch (groqError) {
-                    console.error('❌ Erreur narration Groq:', groqError.message);
-                    narration = `${character.name} effectue : ${message}`;
-                }
-                        character.currentLocation,
-                        message,
-                        sessionId,
-                        character
-                    );
-
                     // Ajouter des éléments narratifs supplémentaires selon le type d'action
                     narration = this.enhanceNarrationWithContext(narration, actionContext, character);
-
-                } catch (error) {
-                    console.error('❌ Erreur Groq, fallback vers Gemini:', error);
+                    
+                } catch (groqError) {
+                    console.error('❌ Erreur narration Groq:', groqError.message);
+                    
+                    // Fallback vers Gemini
                     if (this.geminiClient && this.geminiClient.isAvailable) {
-                        narration = await this.geminiClient.generateNarration({
-                            character: character,
-                            action: message,
-                            location: character.currentLocation
-                        }, `player_${player.id}`);
+                        try {
+                            console.log('🔄 Fallback vers Gemini...');
+                            narration = await this.geminiClient.generateNarration({
+                                character: character,
+                                action: message,
+                                location: character.currentLocation
+                            }, `player_${player.id}`);
+                        } catch (geminiError) {
+                            console.error('❌ Erreur Gemini:', geminiError.message);
+                            narration = `${character.name} effectue l'action : ${message}\n\nLieu : ${character.currentLocation}`;
+                        }
+                    } else {
+                        narration = `${character.name} effectue l'action : ${message}\n\nLieu : ${character.currentLocation}`;
                     }
                 }
             } else if (this.geminiClient && this.geminiClient.isAvailable) {
@@ -1921,6 +1888,9 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
                     action: message,
                     location: character.currentLocation
                 }, `player_${player.id}`);
+            } else {
+                console.log('⚠️ Aucune IA disponible - narration basique');
+                narration = `${character.name} effectue l'action : ${message}\n\nLieu : ${character.currentLocation}`;
             }
 
             // Si aucune IA n'est disponible, utiliser la narration immersive
