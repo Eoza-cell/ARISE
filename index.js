@@ -68,6 +68,21 @@ class FrictionUltimateBot {
                 global.gc();
             }
         }, this.cacheCleanupInterval);
+        
+        // Nettoyage d'urgence si mémoire > 95%
+        setInterval(() => {
+            const usage = process.memoryUsage();
+            const usagePercent = (usage.heapUsed / usage.heapTotal) * 100;
+            
+            if (usagePercent > 95) {
+                console.log('🚨 Nettoyage mémoire d\'urgence!');
+                this.processedMessages.clear();
+                if (global.gc) {
+                    global.gc();
+                    global.gc(); // Double GC en urgence
+                }
+            }
+        }, 30000); // Check toutes les 30 secondes
 
         // Injecter l'ImageGenerator dans le GameEngine
         this.gameEngine.imageGenerator = this.imageGenerator;

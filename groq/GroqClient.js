@@ -2,6 +2,56 @@ const Groq = require('groq-sdk');
 
 class GroqClient {
     constructor() {
+        try {
+            const apiKey = process.env.GROQ_API_KEY;
+            
+            if (!apiKey) {
+                console.log('⚠️ GROQ_API_KEY non configurée - Client Groq désactivé');
+                this.client = null;
+                return;
+            }
+            
+            this.client = new Groq({
+                apiKey: apiKey
+            });
+            
+            console.log('✅ Client Groq initialisé avec succès');
+        } catch (error) {
+            console.error('❌ Erreur initialisation Groq:', error.message);
+            this.client = null;
+        }
+    }
+    
+    hasValidClient() {
+        return this.client !== null && this.client !== undefined;
+    }
+    
+    async generateNarration(prompt, maxTokens = 500) {
+        if (!this.hasValidClient()) {
+            console.log('⚠️ Client Groq non disponible - Utilisation fallback');
+            return `Le personnage agit. ${prompt.substring(0, 100)}...`;
+        }
+        
+        try {
+            const response = await this.client.chat.completions.create({
+                messages: [{ role: 'user', content: prompt }],
+                model: 'llama3-8b-8192',
+                max_tokens: maxTokens,
+                temperature: 0.7
+            });
+            
+            return response.choices[0]?.message?.content || 'Narration non disponible';
+        } catch (error) {
+            console.error('❌ Erreur Groq API:', error.message);
+            return `Action observée. ${prompt.substring(0, 100)}...`;
+        }
+    }
+}
+
+module.exports = GroqClient;
+
+class GroqClient {
+    constructor() {
         // Clé API Groq intégrée directement pour déploiement
         this.apiKey = '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';
         this.client = null;

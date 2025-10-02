@@ -10,6 +10,23 @@ class WorldMapGenerator {
     constructor() {
         this.mapWidth = 2048;
         this.mapHeight = 1536;
+        
+        // Temps de déplacement selon le terrain - INITIALISER EN PREMIER
+        this.movementCosts = {
+            plains: 1,
+            road: 0.5,
+            forest: 2,
+            mountains: 3,
+            desert: 2.5,
+            swamp: 4,
+            snow: 3,
+            jungle: 2.5,
+            wasteland: 3.5,
+            ocean: 999, // Impossible sans navire
+            river: 5, // Nécessite de nager ou pont
+            bridge: 0.8
+        };
+        
         this.coordinateSystem = this.initializeCoordinateSystem();
         this.kingdoms = this.getKingdomsWithCoordinates();
         this.terrainColors = {
@@ -38,22 +55,6 @@ class WorldMapGenerator {
 
         // Points d'intérêt et obstacles
         this.pointsOfInterest = this.createPointsOfInterest();
-
-        // Temps de déplacement selon le terrain
-        this.movementCosts = {
-            plains: 1,
-            road: 0.5,
-            forest: 2,
-            mountains: 3,
-            desert: 2.5,
-            swamp: 4,
-            snow: 3,
-            jungle: 2.5,
-            wasteland: 3.5,
-            ocean: 999, // Impossible sans navire
-            river: 5, // Nécessite de nager ou pont
-            bridge: 0.8
-        };
     }
 
     /**
@@ -177,12 +178,21 @@ class WorldMapGenerator {
     calculateTravelTime(path) {
         let totalTime = 0;
 
+        if (!path || !Array.isArray(path)) {
+            console.log('⚠️ Path invalide dans calculateTravelTime');
+            return 1;
+        }
+
         path.forEach(point => {
+            if (!point || !point.terrain) {
+                console.log('⚠️ Point sans terrain détecté');
+                return;
+            }
             const cost = this.movementCosts[point.terrain] || 2;
             totalTime += cost;
         });
 
-        return Math.round(totalTime * 0.5); // Heures de voyage
+        return Math.round(totalTime * 0.5) || 1; // Heures de voyage
     }
 
     /**
