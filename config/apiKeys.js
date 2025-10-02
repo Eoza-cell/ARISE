@@ -17,8 +17,8 @@ const apiKeys = {
     },
 
     groq: {
-        apiKey: process.env.GROQ_API_KEY || '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',
-        enabled: !!(process.env.GROQ_API_KEY || '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')
+        apiKey: process.env.GROQ_API_KEY || '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',
+        enabled: !!(process.env.GROQ_API_KEY || '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')
     },
 
     // Génération d'images

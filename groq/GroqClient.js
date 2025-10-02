@@ -4,7 +4,7 @@ const Groq = require('groq-sdk');
 class GroqClient {
     constructor() {
         try {
-            const apiKey = process.env.GROQ_API_KEY || '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';
+            const apiKey = process.env.GROQ_API_KEY || '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';
             
             if (!apiKey) {
                 console.log('⚠️ GROQ_API_KEY non configurée - Client Groq désactivé');
