@@ -1,65 +1,40 @@
+
 const Groq = require('groq-sdk');
 
 class GroqClient {
     constructor() {
         try {
-            const apiKey = process.env.GROQ_API_KEY;
+            const apiKey = process.env.GROQ_API_KEY || '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';
             
             if (!apiKey) {
                 console.log('⚠️ GROQ_API_KEY non configurée - Client Groq désactivé');
                 this.client = null;
+                this.isAvailable = false;
                 return;
             }
             
             this.client = new Groq({
-                apiKey: apiKey
+                apiKey: apiKey,
+                timeout: 15000
             });
+            
+            this.isAvailable = false;
+            this.model = 'llama-3.3-70b-versatile';
+            this.sessionMemory = new Map();
+            this.maxMemoryPerSession = 12;
+            
+            this.initializeClient();
             
             console.log('✅ Client Groq initialisé avec succès');
         } catch (error) {
             console.error('❌ Erreur initialisation Groq:', error.message);
             this.client = null;
+            this.isAvailable = false;
         }
     }
     
     hasValidClient() {
-        return this.client !== null && this.client !== undefined;
-    }
-    
-    async generateNarration(prompt, maxTokens = 500) {
-        if (!this.hasValidClient()) {
-            console.log('⚠️ Client Groq non disponible - Utilisation fallback');
-            return `Le personnage agit. ${prompt.substring(0, 100)}...`;
-        }
-        
-        try {
-            const response = await this.client.chat.completions.create({
-                messages: [{ role: 'user', content: prompt }],
-                model: 'llama3-8b-8192',
-                max_tokens: maxTokens,
-                temperature: 0.7
-            });
-            
-            return response.choices[0]?.message?.content || 'Narration non disponible';
-        } catch (error) {
-            console.error('❌ Erreur Groq API:', error.message);
-            return `Action observée. ${prompt.substring(0, 100)}...`;
-        }
-    }
-}
-
-module.exports = GroqClient;
-
-class GroqClient {
-    constructor() {
-        // Clé API Groq intégrée directement pour déploiement
-        this.apiKey = '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';
-        this.client = null;
-        this.isAvailable = false;
-        this.model = 'llama-3.3-70b-versatile'; // Modèle Groq récent pour la narration
-        this.sessionMemory = new Map(); // sessionId => [{role, content, timestamp, location}]
-        this.maxMemoryPerSession = 12; // Mémoire plus longue pour Groq
-        this.initializeClient();
+        return this.isAvailable && this.client !== null && this.client !== undefined;
     }
 
     addToMemory(sessionId, role, content, location = null) {
@@ -74,7 +49,6 @@ class GroqClient {
             timestamp: Date.now()
         });
 
-        // Limiter la taille mémoire
         if (memories.length > this.maxMemoryPerSession) {
             memories.splice(0, memories.length - this.maxMemoryPerSession);
         }
@@ -97,16 +71,11 @@ class GroqClient {
 
     async initializeClient() {
         try {
-            if (!this.apiKey) {
-                console.log('⚠️ GROQ_API_KEY non définie - Groq indisponible');
+            if (!this.client) {
+                console.log('⚠️ Client Groq non initialisé');
                 this.isAvailable = false;
                 return;
             }
-
-            this.client = new Groq({
-                apiKey: this.apiKey,
-                timeout: 15000 // Timeout de 15 secondes pour des réponses rapides
-            });
 
             // Test de connexion
             await this.client.chat.completions.create({
@@ -122,18 +91,13 @@ class GroqClient {
             this.isAvailable = false;
         }
     }
-
-    hasValidClient() {
-        return this.isAvailable && this.client;
-    }
-
+    
     async generateNarration(prompt, maxTokens = 150) {
         try {
             if (!this.hasValidClient()) {
                 throw new Error('Client Groq non disponible');
             }
 
-            // Narration objective et concise comme un arbitre impartial
             const enhancedPrompt = `Tu es un arbitre RPG impartial qui rapporte uniquement les faits observables.
 
 RÈGLES STRICTES DE NARRATION :
@@ -154,14 +118,12 @@ Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 car
                 messages: [{ role: 'user', content: enhancedPrompt }],
                 model: this.model,
                 max_tokens: maxTokens,
-                temperature: 1.9 // Créativité élevée mais contrôlée
+                temperature: 1.9
             });
 
             let narration = response.choices[0]?.message?.content?.trim() || '';
             
-            // Forcer la limite STRICTE de 700 caractères
             if (narration.length > 700) {
-                // Couper au dernier espace pour éviter de couper un mot
                 const truncated = narration.substring(0, 697);
                 const lastSpace = truncated.lastIndexOf(' ');
                 narration = (lastSpace > 600 ? truncated.substring(0, lastSpace) : truncated) + '...';
@@ -176,7 +138,6 @@ Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 car
     }
 
     async generateCombatNarration(combatData, maxTokens = 80) {
-        // Logique pour la continuité des actions et la gestion des PV en combat
         let actionDescription = `Le combat entre ${combatData.attacker} et ${combatData.defender} continue.`;
         if (combatData.action) {
             actionDescription = `Action de ${combatData.attacker} : ${combatData.action}.`;
@@ -185,7 +146,6 @@ Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 car
         let damageInfo = '';
         if (combatData.damage !== undefined && combatData.damage !== null) {
             damageInfo = `Dégâts infligés : ${combatData.damage}.`;
-            // Vérifier si la mort survient sans combat explicite
             if (combatData.attacker === combatData.defender && combatData.damage > 0 && combatData.result === 'mort' && !combatData.action) {
                  actionDescription += " La mort semble survenir de manière inexpliquée sans action directe.";
             } else if (combatData.result === 'mort') {
@@ -219,7 +179,6 @@ Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 car
 
             console.log(`🗺️ Génération narration exploration avec Groq pour: ${action}`);
 
-            // Récupérer la continuité et les événements dynamiques
             const locationContinuity = this.getLocationContinuity(sessionId, location);
             const dynamicEvents = this.generateDynamicEvents(location, character);
             const npcReactions = this.generateSmartNPCReactions(character, action);
@@ -276,8 +235,8 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: prompt }],
                 model: this.model,
-                max_tokens: 1200, // Augmenté pour plus de détails
-                temperature: 0.85 // Légèrement plus créatif
+                max_tokens: 1200,
+                temperature: 0.85
             });
 
             let narration = response.choices[0]?.message?.content?.trim();
@@ -286,7 +245,6 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
                 throw new Error('Réponse Groq vide');
             }
 
-            // Ajouter les événements dynamiques à la mémoire
             this.addToMemory(sessionId, "system", `Événements: ${dynamicEvents}`, location);
             this.addToMemory(sessionId, "exploration", narration, location);
 
@@ -300,31 +258,30 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
     }
 
     analyzeActionType(action) {
-            const lowerAction = action.toLowerCase();
+        const lowerAction = action.toLowerCase();
 
-            if (lowerAction.includes('coup de poing droit')) {
-                return "🥊 TECHNIQUE MARTIALE: Coup de poing droit - Technique de boxe précise avec rotation du corps et extension du bras dominant.";
-            }
-            if (lowerAction.includes('coup de poing gauche')) {
-                return "🥊 TECHNIQUE MARTIALE: Coup de poing gauche - Jab rapide avec le bras non-dominant.";
-            }
-            if (lowerAction.includes('uppercut')) {
-                return "🥊 TECHNIQUE MARTIALE: Uppercut - Coup ascendant puissant visant le menton ou le plexus.";
-            }
-            if (lowerAction.includes('crochet')) {
-                return "🥊 TECHNIQUE MARTIALE: Crochet - Coup circulaire horizontal avec rotation du buste.";
-            }
-            if (lowerAction.includes('coup de pied')) {
-                return "🦵 TECHNIQUE MARTIALE: Coup de pied - Attaque utilisant la force des jambes.";
-            }
-            if (lowerAction.includes('coup de poing')) {
-                return "🥊 TECHNIQUE MARTIALE: Coup de poing basique - Frappe directe avec le poing.";
-            }
-
-            return "⚡ ACTION GÉNÉRAL‍E: Analyser selon le contexte et les détails fournis.";
+        if (lowerAction.includes('coup de poing droit')) {
+            return "🥊 TECHNIQUE MARTIALE: Coup de poing droit - Technique de boxe précise avec rotation du corps et extension du bras dominant.";
+        }
+        if (lowerAction.includes('coup de poing gauche')) {
+            return "🥊 TECHNIQUE MARTIALE: Coup de poing gauche - Jab rapide avec le bras non-dominant.";
+        }
+        if (lowerAction.includes('uppercut')) {
+            return "🥊 TECHNIQUE MARTIALE: Uppercut - Coup ascendant puissant visant le menton ou le plexus.";
+        }
+        if (lowerAction.includes('crochet')) {
+            return "🥊 TECHNIQUE MARTIALE: Crochet - Coup circulaire horizontal avec rotation du buste.";
+        }
+        if (lowerAction.includes('coup de pied')) {
+            return "🦵 TECHNIQUE MARTIALE: Coup de pied - Attaque utilisant la force des jambes.";
+        }
+        if (lowerAction.includes('coup de poing')) {
+            return "🥊 TECHNIQUE MARTIALE: Coup de poing basique - Frappe directe avec le poing.";
         }
 
-    // Générer des événements dynamiques comme dans GTA
+        return "⚡ ACTION GÉNÉRALE: Analyser selon le contexte et les détails fournis.";
+    }
+
     generateDynamicEvents(location, character) {
         const events = [
             "🚨 Une patrouille de gardes passe dans la rue principale",
@@ -349,7 +306,6 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
         return randomEvents.join('\n');
     }
 
-    // Générer des réactions PNJ intelligentes
     generateSmartNPCReactions(character, action) {
         const reactions = [];
 
@@ -420,7 +376,6 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
 
             const response = completion.choices[0]?.message?.content || `"Bonjour ${context.playerName}."`;
 
-            // S'assurer que la réponse est entre guillemets
             if (!response.startsWith('"')) {
                 return `"${response.replace(/"/g, '')}"`;
             }
@@ -434,7 +389,6 @@ Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
     }
 
     buildDialoguePrompt(character, playerMessage) {
-        // Construction du prompt pour les dialogues avec les PNJ
         return `Tu es un PNJ du royaume ${character.kingdom} dans le monde de Friction Ultimate.
 
 CONTEXTE:
@@ -506,13 +460,11 @@ Génère UNIQUEMENT la réponse du PNJ, rien d'autre:`;
         }
     }
 
-    // Helper method to create fallback narration when Groq is not available
     createFallbackNarration(action) {
         console.log(`Fallback narration for action: ${action}`);
         return `A mysterious event occurred: ${action}. The adventure continues...`;
     }
 
-    // Helper method to create narration prompt, now with improved type checking
     createNarrationPrompt(context, action, result) {
         const characterName = context?.character?.name || 'Aventurier';
         const actionText = typeof action === 'string' ? action : String(action || 'action inconnue');
@@ -529,7 +481,6 @@ Contexte: ${contextText}
 Utilise un style narratif captivant à la deuxième personne, comme un maître de jeu expérimenté.`;
     }
 
-    // Method to ensure valid message format for Groq API
     async generateNarrationWithFormatCheck(context, action, result) {
         try {
             if (!this.hasValidClient()) {
@@ -537,14 +488,12 @@ Utilise un style narratif captivant à la deuxième personne, comme un maître d
             }
 
             const prompt = this.createNarrationPrompt(context, action, result);
-
-            // S'assurer que le prompt est une chaîne de caractères valide
             const validPrompt = typeof prompt === 'string' ? prompt : String(prompt || 'Action effectuée');
 
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: validPrompt }],
                 model: this.model,
-                max_tokens: 600, // Default max tokens for narration
+                max_tokens: 600,
                 temperature: 0.8
             });
 
