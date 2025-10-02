@@ -2258,6 +2258,71 @@ ${healthDisplay}
     }
 
     /**
+     * Enrichit la narration avec le contexte de l'action
+     */
+    enhanceNarrationWithContext(narration, actionContext, character) {
+        if (!narration) return '';
+        
+        // Ajouter des détails selon le type d'action
+        let enhancement = narration;
+        
+        if (actionContext.type === 'combat') {
+            enhancement += `\n\n⚔️ Combat engagé avec intensité ${actionContext.intensity}.`;
+        } else if (actionContext.type === 'exploration') {
+            enhancement += `\n\n🔍 Exploration en cours.`;
+        }
+        
+        return enhancement;
+    }
+
+    /**
+     * Analyse l'action pour obtenir du contexte
+     */
+    analyzeActionForContext(message, character) {
+        const lowerMessage = message.toLowerCase();
+        
+        let type = 'generic';
+        let intensity = 'medium';
+        
+        if (lowerMessage.includes('attaque') || lowerMessage.includes('combat')) {
+            type = 'combat';
+            intensity = 'high';
+        } else if (lowerMessage.includes('explore') || lowerMessage.includes('cherche')) {
+            type = 'exploration';
+            intensity = 'medium';
+        } else if (lowerMessage.includes('parle') || lowerMessage.includes('dit')) {
+            type = 'dialogue';
+            intensity = 'low';
+        }
+        
+        return { type, intensity };
+    }
+
+    /**
+     * Sauvegarde l'action du joueur pour la continuité
+     */
+    async savePlayerAction(playerId, action, result) {
+        try {
+            // Sauvegarder dans la mémoire temporaire pour la continuité narrative
+            const recentActions = await this.dbManager.getTemporaryData(playerId, 'recent_actions') || [];
+            recentActions.push({
+                action,
+                result,
+                timestamp: Date.now()
+            });
+            
+            // Garder seulement les 10 dernières actions
+            if (recentActions.length > 10) {
+                recentActions.shift();
+            }
+            
+            await this.dbManager.setTemporaryData(playerId, 'recent_actions', recentActions);
+        } catch (error) {
+            console.error('❌ Erreur sauvegarde action:', error);
+        }
+    }
+
+    /**
      * Applique les bonus/malus de ruse
      */
     applyCunningEffects(cunningAnalysis, character, baseNarration) {
