@@ -1843,6 +1843,30 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
             let narration = '';
             let actionImage = null;
 
+            // Utiliser Groq pour la narration (ultra-rapide)
+            if (this.groqClient && this.groqClient.hasValidClient()) {
+                try {
+                    console.log('🤖 Génération narration avec Groq...');
+                    const sessionId = `player_${player.id}`;
+
+                    narration = await this.groqClient.generateExplorationNarration(
+                        character.currentLocation,
+                        message,
+                        sessionId,
+                        character
+                    );
+                    
+                    console.log(`✅ Narration Groq générée (${narration.length} caractères)`);
+                } catch (groqError) {
+                    console.error('❌ Erreur narration Groq:', groqError.message);
+                    // Fallback simple si Groq échoue
+                    narration = `${character.name} effectue l'action : ${message}\n\nLieu : ${character.currentLocation}`;
+                }
+            } else {
+                console.log('⚠️ Groq non disponible - narration basique');
+                narration = `${character.name} effectue l'action : ${message}\n\nLieu : ${character.currentLocation}`;
+            }
+
             if (this.groqClient && this.groqClient.hasValidClient()) {
                 try {
                     console.log('🤖 Génération narration avec Groq...');
@@ -1860,6 +1884,17 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
                     };
 
                     narration = await this.groqClient.generateExplorationNarration(
+                        character.currentLocation,
+                        message,
+                        sessionId,
+                        character
+                    );
+                    
+                    console.log(`✅ Narration Groq générée: ${narration.substring(0, 50)}...`);
+                } catch (groqError) {
+                    console.error('❌ Erreur narration Groq:', groqError.message);
+                    narration = `${character.name} effectue : ${message}`;
+                }
                         character.currentLocation,
                         message,
                         sessionId,

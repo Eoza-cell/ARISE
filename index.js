@@ -46,8 +46,8 @@ class FrictionUltimateBot {
         this.isConnected = false;
         // Système de déduplication optimisé pour économiser la mémoire
         this.processedMessages = new Map(); // ID du message -> timestamp
-        this.maxCacheSize = 200; // Réduire encore plus la limite de cache pour économiser la mémoire
-        this.cacheCleanupInterval = 90 * 1000; // Nettoyer le cache toutes les 90 secondes (plus fréquent)
+        this.maxCacheSize = 50; // Cache minimal pour libérer de la mémoire
+        this.cacheCleanupInterval = 30 * 1000; // Nettoyer le cache toutes les 30 secondes
 
 
         // Gestionnaire de temps de réaction (sera initialisé après connexion)
@@ -69,20 +69,19 @@ class FrictionUltimateBot {
             }
         }, this.cacheCleanupInterval);
         
-        // Nettoyage d'urgence si mémoire > 95%
+        // Nettoyage d'urgence si mémoire > 90% (plus proactif)
         setInterval(() => {
             const usage = process.memoryUsage();
             const usagePercent = (usage.heapUsed / usage.heapTotal) * 100;
             
-            if (usagePercent > 95) {
-                console.log('🚨 Nettoyage mémoire d\'urgence!');
+            if (usagePercent > 90) {
+                console.log('🚨 Nettoyage mémoire préventif!');
                 this.processedMessages.clear();
                 if (global.gc) {
                     global.gc();
-                    global.gc(); // Double GC en urgence
                 }
             }
-        }, 30000); // Check toutes les 30 secondes
+        }, 20000); // Check toutes les 20 secondes
 
         // Injecter l'ImageGenerator dans le GameEngine
         this.gameEngine.imageGenerator = this.imageGenerator;
