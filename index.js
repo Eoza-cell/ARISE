@@ -1,9 +1,10 @@
 // The following code integrates RunwayML video generation into the bot's action response system.
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
-const qrcode = require('qrcode-terminal');
+const qrcode = require('qrcode');
 const fs = require('fs');
 const path = require('path');
+const { updateQrCode } = require('./server/keepalive');
 
 // Importation des modules du jeu
 const GameEngine = require('./game/GameEngine');
@@ -251,8 +252,15 @@ class FrictionUltimateBot {
                 this.qrCodeAttempts++;
                 this.lastQrCodeTime = now;
 
-                console.log(`📱 QR Code généré (${this.qrCodeAttempts}/${this.maxQrCodeAttempts}) - Scannez avec WhatsApp:`);
-                qrcode.generate(qr, { small: true });
+                console.log(`📱 QR Code généré (${this.qrCodeAttempts}/${this.maxQrCodeAttempts}). Affichage via l'interface web.`);
+                try {
+                    const qrDataUrl = await qrcode.toDataURL(qr);
+                    updateQrCode(qrDataUrl);
+                    const replitUrl = process.env.REPLIT_DEV_DOMAIN || process.env.REPLIT_DEPLOYMENT_DOMAIN || 'your-repl.replit.dev';
+                    console.log(`⚡ Scannez le QR Code ici: https://${replitUrl}/qr`);
+                } catch (err) {
+                    console.error('❌ Erreur lors de la génération du QR code data URL', err);
+                }
 
                 // Sauvegarder le QR code dans le SessionManager si nécessaire
                 await sessionManager.saveQrCode(qr);
@@ -1097,7 +1105,7 @@ class FrictionUltimateBot {
 const bot = new FrictionUltimateBot();
 
 // Démarrer le serveur keep-alive pour UptimeRobot
-require('./server/keepalive');
+// require('./server/keepalive'); // This is now handled by the import at the top of the file
 
 // Gestion propre de l'arrêt du processus
 process.on('SIGINT', () => {

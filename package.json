@@ -27,6 +27,7 @@
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.44.5",
     "edge-tts-nodejs": "^1.0.6",
+    "express": "^5.1.0",
     "fabric": "^6.7.1",
     "groq-sdk": "^0.32.0",
     "leaflet": "^1.9.4",
@@ -37,7 +38,7 @@
     "pixi.js": "^8.13.2",
     "playht": "^0.21.0",
     "puter": "^1.0.0",
-    "qrcode-terminal": "^0.12.0",
+    "qrcode": "^1.5.4",
     "sharp": "^0.34.4",
     "typescript": "^5.9.2",
     "ws": "^8.18.3"
