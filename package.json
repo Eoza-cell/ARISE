@@ -24,6 +24,7 @@
     "axios": "^1.12.0",
     "bytez.js": "^1.1.15",
     "canvas": "^3.2.0",
+    "dotenv": "^17.2.3",
     "drizzle-kit": "^0.31.4",
     "drizzle-orm": "^0.44.5",
     "edge-tts-nodejs": "^1.0.6",

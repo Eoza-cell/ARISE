@@ -1,3 +1,4 @@
+require('dotenv').config();
 // The following code integrates RunwayML video generation into the bot's action response system.
 const { default: makeWASocket, DisconnectReason, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const { Boom } = require('@hapi/boom');
@@ -189,18 +190,18 @@ class FrictionUltimateBot {
 
         try {
             // Initialiser la base de données
-            await this.dbManager.initialize();
-            console.log('✅ Base de données initialisée');
+            // await this.dbManager.initialize();
+            // console.log('✅ Base de données initialisée');
 
             // Initialiser la large database
-            if (this.gameEngine.largeDB) {
-                await this.gameEngine.largeDB.initialize();
-                console.log('✅ Large Database initialisée');
-            }
+            // if (this.gameEngine.largeDB) {
+            //     await this.gameEngine.largeDB.initialize();
+            //     console.log('✅ Large Database initialisée');
+            // }
 
             // Initialiser les données du jeu (royaumes, ordres, etc.)
-            await initializeGameData(this.dbManager);
-            console.log('✅ Données du jeu initialisées');
+            // await initializeGameData(this.dbManager);
+            // console.log('✅ Données du jeu initialisées');
 
             // Démarrer la connexion WhatsApp
             await this.startWhatsApp();
@@ -227,7 +228,7 @@ class FrictionUltimateBot {
                 process.env.WHATSAPP_BROWSER_TYPE || 'Desktop',
                 process.env.WHATSAPP_BROWSER_VERSION || '1.0.0'
             ],
-            logger: require('pino')({ level: 'error' }) // Reduce sensitive logging
+            logger: require('pino')({ level: 'info' }) // Increase log level for debugging
         });
 
         // Gestion des événements de connexion
@@ -268,7 +269,7 @@ class FrictionUltimateBot {
 
             if (connection === 'close') {
                 const shouldReconnect = (lastDisconnect?.error)?.output?.statusCode !== DisconnectReason.loggedOut;
-                console.log('❌ Connexion fermée, reconnexion:', shouldReconnect);
+                console.log('❌ Connexion fermée, raison:', lastDisconnect.error, 'reconnexion:', shouldReconnect);
 
                 // Vérifier si c'est un problème de clé privée invalide
                 const errorMessage = lastDisconnect?.error?.message;
