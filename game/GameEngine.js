@@ -3533,6 +3533,31 @@ Exemple: /aura_visualiser fire`
         }
     }
 
+    async handleMeditateCommand({ player, dbManager, imageGenerator }) {
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return {
+                text: `❌ Tu n'as pas encore de personnage ! Utilisez /créer pour en créer un.`
+            };
+        }
+
+        return {
+            text: `🧘 **MÉDITATION** 🧘
+
+🔮 **${character.name} entre en méditation profonde...**
+
+✨ **Effets de la méditation:**
+• Régénération d'énergie
+• Clarté mentale accrue
+• Connexion avec l'aura
+
+⏰ **Durée:** 5 minutes
+⚡ **Énergie régénérée:** +20 points
+
+🚧 **Système de méditation en développement**`
+        };
+    }
+
 
 🚧 **Système en développement**
 💡 **Les techniques s'utilisent naturellement en jeu**`
