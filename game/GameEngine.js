@@ -3498,6 +3498,10 @@ ${character ? `👤 **${character.name}** (Niveau ${character.level})` : '❌ Cr
 
 ⚡ **Coût en énergie:** Variable selon la technique
 
+🚧 **Système en développement**
+💡 **Les techniques s'utilisent naturellement en jeu**`
+        };
+    }
 
     async handleAuraVisualizeCommand({ player, chatId, message, sock }) {
         try {
@@ -3667,14 +3671,16 @@ Utilisez /jouer pour explorer le monde et découvrir naturellement les maîtres 
     }
 
     async handleTimeCommand({ player, dbManager, imageGenerator }) {
-        const gameTime = this.getGameTimeOfDay();
+        const now = new Date();
+        const hour = now.getHours();
+        const minute = now.getMinutes();
+        
         return {
             text: `⏰ **TEMPS DU JEU** ⏰
 
-🌍 **Heure actuelle du monde:** ${gameTime.hour}:${gameTime.minute.toString().padStart(2, '0')}
-📅 **Date:** Jour ${gameTime.day}, Mois ${gameTime.month}, Année ${gameTime.year}
-🌞 **Période:** ${gameTime.period}
-🌍 **Saison:** ${gameTime.season}
+🌍 **Heure actuelle du monde:** ${hour}:${minute.toString().padStart(2, '0')}
+📅 **Date:** Jour ${now.getDate()}, Mois ${now.getMonth() + 1}, Année ${now.getFullYear()}
+🌞 **Période:** ${hour < 12 ? 'Matin' : hour < 18 ? 'Après-midi' : 'Soir'}
 
 🔄 **Le temps s'écoule en permanence dans le monde de Friction Ultimate**
 
