@@ -197,6 +197,8 @@ class GameEngine {
             '/magic_regen': this.handleMagicRegenCommand.bind(this),
             '/aura_stats': this.handleAuraStatsCommand.bind(this),
             '/aura_help': this.handleAuraHelpCommand.bind(this),
+            '/aura_visualiser': this.handleAuraVisualizeCommand.bind(this),
+            '/aura_visualize': this.handleAuraVisualizeCommand.bind(this),
 
             // Time and weather commands that exist
             '/temps': this.handleTimeCommand.bind(this),
@@ -3495,6 +3497,42 @@ ${character ? `👤 **${character.name}** (Niveau ${character.level})` : '❌ Cr
 • Exemple: "Je lance une boule de feu"
 
 ⚡ **Coût en énergie:** Variable selon la technique
+
+
+    async handleAuraVisualizeCommand({ player, chatId, message, sock }) {
+        try {
+            const character = await this.dbManager.getCharacterByPlayer(player.id);
+            if (!character) {
+                return {
+                    text: '❌ Vous devez créer un personnage d\'abord avec /créer'
+                };
+            }
+
+            const args = message.split(' ');
+            const auraType = args[1];
+
+            if (!auraType || !this.auraManager.auraTypes[auraType]) {
+                return {
+                    text: `❌ **Type d'aura invalide !**
+
+Types disponibles: ${Object.keys(this.auraManager.auraTypes).join(', ')}
+
+Exemple: /aura_visualiser fire`
+                };
+            }
+
+            await this.auraManager.sendAuraVisualization(player.id, auraType, sock, chatId);
+
+            return { text: '' }; // Message déjà envoyé par sendAuraVisualization
+
+        } catch (error) {
+            console.error('❌ Erreur visualisation aura:', error);
+            return {
+                text: '❌ Erreur lors de la génération de la visualisation d\'aura'
+            };
+        }
+    }
+
 
 🚧 **Système en développement**
 💡 **Les techniques s'utilisent naturellement en jeu**`

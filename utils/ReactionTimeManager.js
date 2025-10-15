@@ -62,15 +62,19 @@ class ReactionTimeManager {
 
         const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
+        // Tag le joueur cible pour notification
+        const targetTag = `@${timerInfo.targetPlayerId}`;
+
         await this.sock.sendMessage(timerInfo.chatId, {
             text: `⚔️ **COMBAT INITIÉ !**
 
 🎯 **${timerInfo.attackerName}** attaque **${timerInfo.targetName}** !
 
 ⏰ **Temps de réaction restant:** ${timeDisplay}
-🛡️ ${timerInfo.targetName} doit répondre avant expiration !
+🛡️ ${targetTag} ${timerInfo.targetName} doit répondre avant expiration !
 
-⚠️ Si aucune réponse, ${timerInfo.targetName} subira l'attaque complète !`
+⚠️ Si aucune réponse, ${timerInfo.targetName} subira l'attaque complète !`,
+            mentions: [timerInfo.targetPlayerId]
         });
     }
 
@@ -99,12 +103,15 @@ class ReactionTimeManager {
     }
 
     async sendUrgentUpdate(timerInfo, secondsLeft) {
+        const targetTag = `@${timerInfo.targetPlayerId}`;
+        
         await this.sock.sendMessage(timerInfo.chatId, {
             text: `🚨 **URGENT !** 🚨
 
-⏰ **${secondsLeft} secondes restantes** pour ${timerInfo.targetName} !
+⏰ **${secondsLeft} secondes restantes** pour ${targetTag} ${timerInfo.targetName} !
 
-${secondsLeft <= 3 ? '💀 **DERNIÈRE CHANCE !**' : '⚠️ **DÉPÊCHEZ-VOUS !**'}`
+${secondsLeft <= 3 ? '💀 **DERNIÈRE CHANCE !**' : '⚠️ **DÉPÊCHEZ-VOUS !**'}`,
+            mentions: [timerInfo.targetPlayerId]
         });
     }
 

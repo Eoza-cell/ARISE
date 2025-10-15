@@ -10,6 +10,9 @@ class AuraManager {
         this.activeAnimations = new Map(); // Animations en cours
         this.auraLevels = new Map(); // Niveaux d'aura des joueurs
         
+        // Clé API pour génération de médias d'aura
+        this.mediaApiKey = 'mIRrmon88azKhadBebEFrER6VFP3hoWVsLmDAaJV2ghx4E62ZCsejpj6';
+        
         // Types d'aura disponibles
         this.auraTypes = {
             fire: {
@@ -759,3 +762,88 @@ ${aura.color} **Type:** ${aura.name}
 }
 
 module.exports = AuraManager;
+
+
+    /**
+     * Génère une image visuelle de l'aura
+     */
+    async generateAuraVisualization(playerId, auraType, level) {
+        try {
+            const aura = this.auraTypes[auraType];
+            if (!aura) return null;
+
+            const axios = require('axios');
+            const fs = require('fs').promises;
+            const path = require('path');
+
+            const prompt = `${aura.name} mystical aura visualization, ${aura.description}, level ${level}, magical energy particles, ${aura.emoji} element, glowing ethereal effect, high quality, detailed, fantasy art`;
+
+            const response = await axios.post('https://api.runware.ai/v1', {
+                apiKey: this.mediaApiKey,
+                prompt: prompt,
+                model: 'runware:100@1',
+                width: 512,
+                height: 512,
+                numberResults: 1
+            }, {
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.mediaApiKey}`
+                },
+                timeout: 30000
+            });
+
+            if (response.data && response.data.images && response.data.images.length > 0) {
+                const imageUrl = response.data.images[0].url;
+                
+                // Télécharger l'image
+                const imageResponse = await axios.get(imageUrl, {
+                    responseType: 'arraybuffer',
+                    timeout: 10000
+                });
+
+                const imageBuffer = Buffer.from(imageResponse.data);
+                
+                // Sauvegarder temporairement
+                const tempPath = path.join(__dirname, '../temp');
+                await fs.mkdir(tempPath, { recursive: true });
+                
+                const imagePath = path.join(tempPath, `aura_${playerId}_${auraType}_${Date.now()}.png`);
+                await fs.writeFile(imagePath, imageBuffer);
+
+                console.log(`✅ Image d'aura générée: ${imagePath}`);
+                return imageBuffer;
+            }
+
+            return null;
+        } catch (error) {
+            console.error('❌ Erreur génération image aura:', error.message);
+            return null;
+        }
+    }
+
+    /**
+     * Envoie une visualisation d'aura avec l'animation
+     */
+    async sendAuraVisualization(playerId, auraType, sock, chatId) {
+        const playerAuras = this.getPlayerAuraLevel(playerId);
+        const auraData = playerAuras[auraType];
+        
+        if (!auraData) return;
+
+        const imageBuffer = await this.generateAuraVisualization(playerId, auraType, auraData.level);
+        
+        if (imageBuffer) {
+            const aura = this.auraTypes[auraType];
+            await sock.sendMessage(chatId, {
+                image: imageBuffer,
+                caption: `${aura.emoji} **VISUALISATION D'AURA** ${aura.emoji}
+
+🔮 **Type:** ${aura.name}
+⭐ **Niveau:** ${auraData.level}/${aura.maxLevel}
+⚡ **Maîtrise:** ${auraData.masteryPoints} points
+
+✨ Votre aura rayonne de puissance mystique !`
+            });
+        }
+    }

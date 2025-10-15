@@ -43,13 +43,16 @@ class RPEncounterManager {
         // Générer une narration d'introduction avec l'IA
         const introNarration = await this.generateEncounterIntroduction(player1, player2, location);
 
+        const currentPlayerId = encounterData.players[encounterData.currentTurn];
+        const currentPlayerTag = `@${currentPlayerId}`;
+        
         const welcomeMessage = `🎭 **RENCONTRE ROLEPLAY INITIÉE** 🎭
 
 ${introNarration}
 
 👥 **Participants :**
-• **${player1.name}** (${player1.powerLevel})
-• **${player2.name}** (${player2.powerLevel})
+• **${player1.name}** (${player1.powerLevel}) @${player1.id}
+• **${player2.name}** (${player2.powerLevel}) @${player2.id}
 
 📍 **Lieu :** ${location}
 ⏰ **Système de tours :** 6 minutes par action
@@ -62,10 +65,13 @@ ${introNarration}
 • Si vous ne répondez pas dans les 6 minutes, vous restez immobile
 • Les messages hors RP seront supprimés automatiquement
 
-🎬 **${encounterData.playerNames[encounterData.currentTurn]}, c'est à vous de commencer !**
+🎬 **${currentPlayerTag} ${encounterData.playerNames[encounterData.currentTurn]}, c'est à vous de commencer !**
 ⏱️ Vous avez 6 minutes pour décrire votre première action.`;
 
-        await this.sock.sendMessage(chatId, { text: welcomeMessage });
+        await this.sock.sendMessage(chatId, { 
+            text: welcomeMessage,
+            mentions: [player1.id, player2.id, currentPlayerId]
+        });
 
         // Démarrer le timer pour le premier joueur
         this.startActionTimer(encounterId, encounterData.players[encounterData.currentTurn]);
@@ -156,8 +162,11 @@ ${introNarration}
         
         const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
+        const playerTag = `@${timerData.playerId}`;
+        
         await this.sock.sendMessage(encounterData.chatId, {
-            text: `${message}\n⏳ Temps exact restant: **${timeDisplay}**`
+            text: `${playerTag} ${message}\n⏳ Temps exact restant: **${timeDisplay}**`,
+            mentions: [timerData.playerId]
         });
     }
 
