@@ -221,12 +221,14 @@ class FrictionUltimateBot {
 
         this.sock = makeWASocket({
             auth: state,
-            browser: [
-                process.env.WHATSAPP_BROWSER_NAME || 'Friction Ultimate',
-                process.env.WHATSAPP_BROWSER_TYPE || 'Desktop',
-                process.env.WHATSAPP_BROWSER_VERSION || '1.0.0'
-            ],
-            logger: require('pino')({ level: 'error' }) // Reduce sensitive logging
+            printQRInTerminal: false,
+            browser: ['Ubuntu', 'Chrome', '128.0.6613.86'],
+            version: [2, 3000, 1025190524],
+            getMessage: async key => {
+                console.log('⚠️ Message non déchiffré, retry demandé:', key);
+                return { conversation: '🔄 Réessaye d\'envoyer ton message' };
+            },
+            logger: require('pino')({ level: 'error' })
         });
 
         // Gestion des événements de connexion
