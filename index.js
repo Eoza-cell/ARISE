@@ -25,6 +25,7 @@ const KieAiClient = require('./kieai/KieAiClient');
 const FreepikClient = require('./freepik/FreepikClient');
 
 // Client audio et vidéo
+const GroqTTSClient = require('./groq/GroqTTSClient');
 const PlayHTClient = require('./playht/PlayHTClient');
 const CambAIClient = require('./camb/CambAIClient');
 const PuterClient = require('./puter/PuterClient');

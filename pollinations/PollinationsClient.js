@@ -1,6 +1,7 @@
 const axios = require('axios');
 const fs = require('fs').promises;
 const path = require('path');
+const GroqTTSClient = require('../groq/GroqTTSClient');
 const PlayHTClient = require('../playht/PlayHTClient');
 const CambAIClient = require('../camb/CambAIClient');
 
@@ -9,10 +10,13 @@ class PollinationsClient {
         this.baseURL = 'https://image.pollinations.ai/prompt';
         this.isAvailable = true;
 
-        // Initialiser le client de synthèse vocale Camb AI en priorité
+        // Initialiser Groq TTS en priorité (rapide et puissant)
+        this.groqTTSClient = new GroqTTSClient();
+
+        // Initialiser le client de synthèse vocale Camb AI comme fallback
         this.cambAIClient = new CambAIClient();
 
-        // Initialiser PlayHT comme fallback
+        // Initialiser PlayHT comme fallback secondaire
         this.playhtClient = new PlayHTClient();
 
         console.log('✅ PollinationsClient initialisé avec succès (GRATUIT)');
@@ -685,7 +689,30 @@ class PollinationsClient {
         try {
             console.log(`🎭 Génération dialogue vocal pour ${npcName}: "${dialogue.substring(0, 30)}..."`);
 
-            // Préparer les options de voix optimisées pour Camb AI
+            // Essayer d'abord Groq TTS (rapide et puissant)
+            if (this.groqTTSClient && this.groqTTSClient.hasValidClient()) {
+                console.log('🎙️ Génération dialogue avec Groq TTS PlayAI...');
+                try {
+                    const groqResult = await this.groqTTSClient.generateDialogueVoice(
+                        npcName,
+                        dialogue,
+                        outputPath,
+                        'neutral',
+                        character.gender || 'female'
+                    );
+
+                    if (groqResult) {
+                        console.log('✅ Dialogue généré avec Groq TTS PlayAI');
+                        return groqResult;
+                    }
+                } catch (groqError) {
+                    console.log('⚠️ Groq TTS dialogue échec:', groqError.message);
+                }
+            } else {
+                console.log('⚠️ Groq TTS non disponible pour le dialogue');
+            }
+
+            // Préparer les options de voix optimisées pour Camb AI (fallback)
             const voiceOptions = {
                 gender: character.gender || 'male',
                 age: this.getAgeForCharacterType(npcName),
@@ -694,7 +721,7 @@ class PollinationsClient {
                 ...options
             };
 
-            // Essayer d'abord Camb AI (qualité supérieure)
+            // Essayer Camb AI comme fallback
             if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
                 console.log('🎙️ Génération dialogue avec Camb AI MARS5...');
                 try {
@@ -784,7 +811,23 @@ class PollinationsClient {
         try {
             console.log(`📖 Génération narration vocale: "${narration.substring(0, 30)}..."`);
 
-            // Préparer les options pour la narration avec Camb AI
+            // Essayer d'abord Groq TTS (rapide et puissant)
+            if (this.groqTTSClient && this.groqTTSClient.hasValidClient()) {
+                console.log('🎙️ Génération narration avec Groq TTS PlayAI...');
+                try {
+                    const groqResult = await this.groqTTSClient.generateNarrationVoice(narration, outputPath);
+                    if (groqResult) {
+                        console.log('✅ Narration générée avec Groq TTS PlayAI');
+                        return groqResult;
+                    }
+                } catch (groqError) {
+                    console.log('⚠️ Groq TTS narration échec:', groqError.message);
+                }
+            } else {
+                console.log('⚠️ Groq TTS non disponible pour la narration');
+            }
+
+            // Préparer les options pour la narration avec Camb AI (fallback)
             const voiceOptions = {
                 gender: options.gender || 'male',
                 age: options.age || 35,
@@ -793,7 +836,7 @@ class PollinationsClient {
                 ...options
             };
 
-            // Essayer d'abord Camb AI (qualité supérieure MARS5)
+            // Essayer Camb AI comme fallback
             if (this.cambAIClient && await this.cambAIClient.hasValidClient()) {
                 console.log('🎙️ Génération narration avec Camb AI MARS5...');
                 try {
