@@ -160,17 +160,28 @@ class AdminManager {
 
         console.log(`🔐 Vérification admin pour: "${userId}"`);
 
-        // Vérifier si l'utilisateur a une session authentifiée valide
-        const session = this.authenticatedSessions.get(userId);
-        if (session) {
-            // Vérifier si la session n'a pas expiré
-            if (Date.now() - session.timestamp < this.sessionTimeout) {
-                console.log(`✅ Admin authentifié (session valide): ${userId}`);
-                return true;
-            } else {
-                // Session expirée, la supprimer
-                this.authenticatedSessions.delete(userId);
-                console.log(`⏰ Session admin expirée: ${userId}`);
+        // Nettoyer l'ID et créer toutes les variantes possibles
+        const cleanUserId = userId.replace(/[^0-9]/g, '');
+        const userIdVariants = [
+            userId,
+            cleanUserId,
+            `${cleanUserId}@lid`,
+            `${cleanUserId}@s.whatsapp.net`
+        ];
+
+        // Vérifier si l'utilisateur a une session authentifiée valide (toutes les variantes)
+        for (const variant of userIdVariants) {
+            const session = this.authenticatedSessions.get(variant);
+            if (session) {
+                // Vérifier si la session n'a pas expiré
+                if (Date.now() - session.timestamp < this.sessionTimeout) {
+                    console.log(`✅ Admin authentifié (session valide): ${userId} via ${variant}`);
+                    return true;
+                } else {
+                    // Session expirée, la supprimer
+                    this.authenticatedSessions.delete(variant);
+                    console.log(`⏰ Session admin expirée: ${variant}`);
+                }
             }
         }
 

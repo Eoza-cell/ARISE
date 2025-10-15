@@ -152,10 +152,25 @@ class GameEngine {
         this.playerCunning = new Map(); // Niveau de ruse du joueur (0-100)
         this.strategicActions = new Map(); // Actions stratégiques du joueur
 
+        // Initialiser les managers manquants
+        const ShopManager = require('../utils/ShopManager');
+        this.shopManager = new ShopManager(dbManager);
+
         this.commandHandlers = {
             // Core commands that definitely exist
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
+            
+            // Nouvelles commandes
+            '/boutique': this.handleShopCommand.bind(this),
+            '/shop': this.handleShopCommand.bind(this),
+            '/acheter': this.handleBuyCommand.bind(this),
+            '/buy': this.handleBuyCommand.bind(this),
+            '/vetements': this.handleClothingCommand.bind(this),
+            '/clothes': this.handleClothingCommand.bind(this),
+            '/quetes': this.handleQuestsCommand.bind(this),
+            '/quests': this.handleQuestsCommand.bind(this),
+            '/countdown': this.handleCountdownCommand.bind(this),
             '/créer_personnage': this.handleCreateCharacterCommand.bind(this),
             '/fiche': this.handleCharacterSheetCommand.bind(this),
             '/aide': this.handleHelpCommand.bind(this),
@@ -482,6 +497,103 @@ Tu es maintenant enregistré en tant que : **${username}**
                     text: `💬 Utilisez /menu pour voir les commandes disponibles.`
                 };
             }
+
+
+    async handleShopCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return { text: '❌ Créez d\'abord un personnage avec /créer' };
+        }
+
+        return {
+            text: this.shopManager.getShopDisplay('all') + `\n\n💰 **Vos pièces:** ${character.coins}`
+        };
+    }
+
+    async handleBuyCommand({ player, message, dbManager }) {
+        const args = message.split(' ');
+        if (args.length < 2) {
+            return { text: '❌ Usage: `/acheter <id_item>`' };
+        }
+
+        const itemId = args[1];
+        const result = await this.shopManager.buyItem(player.id, itemId);
+
+        return { text: result.message };
+    }
+
+    async handleClothingCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return { text: '❌ Créez d\'abord un personnage avec /créer' };
+        }
+
+        return {
+            text: this.shopManager.getShopDisplay('clothing') + `\n\n💰 **Vos pièces:** ${character.coins}`
+        };
+    }
+
+    async handleQuestsCommand({ player, dbManager }) {
+        const character = await dbManager.getCharacterByPlayer(player.id);
+        if (!character) {
+            return { text: '❌ Créez d\'abord un personnage avec /créer' };
+        }
+
+        if (!this.questManager) {
+            const QuestManager = require('../utils/QuestManager');
+            this.questManager = new QuestManager(dbManager);
+        }
+
+        await this.questManager.generateAllQuests();
+        const quests = this.questManager.getAvailableQuests(character.level, character.kingdom, 5);
+
+        let text = '📜 **QUÊTES DISPONIBLES** 📜\n\n';
+        if (quests.length === 0) {
+            text += '❌ Aucune quête disponible pour votre niveau';
+        } else {
+            quests.forEach((quest, index) => {
+                text += `${index + 1}. ${this.questManager.formatQuestDisplay(quest)}\n\n`;
+            });
+        }
+
+        return { text };
+    }
+
+    async handleCountdownCommand({ player, message, sock, chatId }) {
+        const args = message.split(' ');
+        if (args.length < 2) {
+            return { text: '❌ Usage: `/countdown <secondes>`' };
+        }
+
+        const seconds = parseInt(args[1]);
+        if (isNaN(seconds) || seconds < 1 || seconds > 300) {
+            return { text: '❌ Durée invalide (1-300 secondes)' };
+        }
+
+        let remaining = seconds;
+        const initialMsg = await sock.sendMessage(chatId, {
+            text: `⏰ **COMPTE À REBOURS** ⏰\n\n⏳ Temps restant: ${remaining} secondes`
+        });
+
+        const interval = setInterval(async () => {
+            remaining--;
+            
+            if (remaining > 0) {
+                await sock.sendMessage(chatId, {
+                    text: `⏰ **COMPTE À REBOURS** ⏰\n\n⏳ Temps restant: ${remaining} secondes`,
+                    edit: initialMsg.key.id
+                });
+            } else {
+                clearInterval(interval);
+                await sock.sendMessage(chatId, {
+                    text: `⏰ **TEMPS ÉCOULÉ !** ⏰\n\n✅ Le compte à rebours de ${seconds} secondes est terminé !`
+                });
+            }
+        }, 1000);
+
+        return { text: '' };
+    }
+
 
             const command = message.toLowerCase().trim();
             let response = null;
