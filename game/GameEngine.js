@@ -3558,12 +3558,6 @@ Exemple: /aura_visualiser fire`
         };
     }
 
-
-🚧 **Système en développement**
-💡 **Les techniques s'utilisent naturellement en jeu**`
-        };
-    }
-
     async handleMeditateCommand({ player, dbManager, imageGenerator }) {
         const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
