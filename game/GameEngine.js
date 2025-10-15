@@ -15,6 +15,7 @@ const ReactionTimeManager = require('../utils/ReactionTimeManager');
 const HealthBarManager = require('../utils/HealthBarManager');
 const RPEncounterManager = require('../utils/RPEncounterManager');
 const ProgressBarRenderer = require('../utils/ProgressBarRenderer');
+const PrecisionActionSystem = require('../utils/PrecisionActionSystem');
 const path = require('path');
 
 class GameEngine {
@@ -136,6 +137,10 @@ class GameEngine {
         this.progressBarRenderer = new ProgressBarRenderer();
         this.loadingBarManager = new LoadingBarManager();
         console.log('📊 Gestionnaires de barres de progression initialisés');
+
+        // Initialiser le système de précision d'actions
+        this.precisionActionSystem = new PrecisionActionSystem(this);
+        console.log('🎯 Système de précision d\'actions initialisé');
 
 
         // Systèmes de difficulté EXTRÊME - Le monde contre le joueur
@@ -1817,6 +1822,34 @@ ${character.name} est complètement épuisé !
                 };
             }
 
+            // NOUVEAU: Analyser la précision de l'action de combat
+            const isCombatAction = this.detectIntentions(message).includes('attack');
+            let precisionResult = null;
+            
+            if (isCombatAction) {
+                // Vérifier si le joueur est immobilisé
+                const playerStats = this.precisionActionSystem.getPlayerStats(character.playerId);
+                if (playerStats.isImmobilized) {
+                    return {
+                        text: this.precisionActionSystem.getImmobilizationMessage(character.playerId)
+                    };
+                }
+
+                // Analyser la précision de l'action de combat
+                precisionResult = await this.precisionActionSystem.analyzeActionPrecision(
+                    message, 
+                    character,
+                    null // Contexte NPC à implémenter si besoin
+                );
+
+                if (!precisionResult.success) {
+                    // L'action a échoué - le joueur est immobilisé
+                    return {
+                        text: precisionResult.message
+                    };
+                }
+            }
+
             // Traitement spécial pour le repos - récupération améliorée
             if (message.toLowerCase().includes('me repose') || message.toLowerCase().includes('repos')) {
                 const energyRecovered = Math.min(40, character.maxEnergy - character.currentEnergy); // Augmenté de 25 à 40
@@ -1962,11 +1995,26 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
 
 
             // Traiter l'action et mettre à jour le personnage
-            const actionResult = {
+            let actionResult = {
                 energyCost: Math.floor(Math.random() * 5) + 2, // Réduit de 3-15 à 2-7
                 experience: Math.floor(Math.random() * 20) + 10,
                 newLocation: character.currentLocation // Peut être modifié selon l'action
             };
+
+            // Appliquer les bonus/malus de précision si c'est un combat
+            if (precisionResult && precisionResult.success) {
+                const precisionBonus = precisionResult.bonusEffects;
+                
+                // Réduire le coût en énergie si précision élevée
+                actionResult.energyCost = Math.floor(actionResult.energyCost * precisionBonus.energyCostReduction);
+                
+                // Augmenter l'XP si précision élevée
+                actionResult.experience = Math.floor(actionResult.experience * precisionBonus.damageMultiplier);
+                
+                // Ajouter les bonus à afficher
+                actionResult.precisionBonus = precisionBonus;
+                actionResult.precisionLevel = precisionResult.precisionLevel;
+            }
 
             // Mettre à jour le personnage avec le système de difficulté
             await this.updateCharacterAfterAction(character, message, actionResult, dbManager);
@@ -1994,6 +2042,17 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
             // Générer l'affichage des barres
             const healthDisplay = this.healthBarManager.generateHealthDisplay(tempCharacter);
 
+            // Construire le message de précision si applicable
+            let precisionMessage = '';
+            if (precisionResult && precisionResult.success && actionResult.precisionBonus) {
+                const bonus = actionResult.precisionBonus;
+                precisionMessage = `\n\n🎯 **PRÉCISION D'ACTION: ${actionResult.precisionLevel.toUpperCase()}**
+✨ Multiplicateur de dégâts: x${bonus.damageMultiplier}
+⚡ Réduction énergie: ${Math.floor((1 - bonus.energyCostReduction) * 100)}%
+🎲 Chance critique: +${Math.floor(bonus.criticalChance * 100)}%
+🏆 Bonus réputation: ${bonus.reputationBonus > 0 ? '+' : ''}${bonus.reputationBonus}`;
+            }
+
             const response = {
                 text: `🎭 **${character.name}** - ${character.currentLocation}
 
@@ -2002,7 +2061,7 @@ ${narration}
 📊 **ÉTAT DU PERSONNAGE :**
 ${healthDisplay}
 
-✨ **Expérience:** +${actionResult.experience} XP`,
+✨ **Expérience:** +${actionResult.experience} XP${precisionMessage}`,
                 image: actionImage
             };
 
