@@ -759,12 +759,7 @@ ${aura.color} **Type:** ${aura.name}
 
 **Effet:** Technique exécutée avec une puissance exceptionnelle !`;
     }
-}
-
-module.exports = AuraManager;
-
-
-    /**
+/**
      * Génère une image visuelle de l'aura
      */
     async generateAuraVisualization(playerId, auraType, level) {
@@ -847,3 +842,6 @@ module.exports = AuraManager;
             });
         }
     }
+}
+
+module.exports = AuraManager;
