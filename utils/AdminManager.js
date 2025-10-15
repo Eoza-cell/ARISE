@@ -121,13 +121,24 @@ class AdminManager {
         });
 
         if (isValidAdmin) {
-            // Créer une session authentifiée
+            // Créer une session authentifiée pour TOUS les formats possibles de l'ID
+            const cleanUserId = userId.replace(/[^0-9]/g, '');
+            
+            // Authentifier avec tous les formats possibles
             this.authenticatedSessions.set(userId, {
                 timestamp: Date.now(),
                 authenticated: true
             });
+            this.authenticatedSessions.set(cleanUserId, {
+                timestamp: Date.now(),
+                authenticated: true
+            });
+            this.authenticatedSessions.set(`${cleanUserId}@lid`, {
+                timestamp: Date.now(),
+                authenticated: true
+            });
 
-            console.log(`✅ Admin authentifié avec succès: ${userId}`);
+            console.log(`✅ Admin authentifié avec succès: ${userId} (+ variantes)`);
             return true;
         }
 
