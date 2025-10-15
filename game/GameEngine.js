@@ -213,8 +213,166 @@ class GameEngine {
             '/position': this.handleCoordinatesCommand.bind(this),
             '/calendrier': this.handleCalendarCommand.bind(this),
             '/calendar': this.handleCalendarCommand.bind(this),
-            '/time_system': this.handleTimeSystemCommand.bind(this)
+            '/time_system': this.handleTimeSystemCommand.bind(this),
+
+            // Commandes d'administration
+            '/admin_stats': this.handleAdminStatsCommand.bind(this),
+            '/admin_give': this.handleAdminGiveCommand.bind(this),
+            '/admin_level': this.handleAdminLevelCommand.bind(this),
+            '/admin_teleport': this.handleAdminTeleportCommand.bind(this),
+            '/admin_heal': this.handleAdminHealCommand.bind(this),
+            '/admin_power': this.handleAdminPowerCommand.bind(this),
+            '/admin_time': this.handleAdminTimeCommand.bind(this),
+            '/admin_weather': this.handleAdminWeatherCommand.bind(this),
+            '/admin_event': this.handleAdminEventCommand.bind(this),
+            '/admin_kingdom': this.handleAdminKingdomCommand.bind(this),
+            '/admin_groups': this.handleAdminGroupsCommand.bind(this),
+            '/admin_reset_kingdom': this.handleAdminResetKingdomCommand.bind(this),
+            '/admin_debug': this.handleAdminDebugCommand.bind(this),
+            '/admin_backup': this.handleAdminBackupCommand.bind(this),
+            '/admin_reload': this.handleAdminReloadCommand.bind(this),
+            '/admin_announce': this.handleAdminAnnounceCommand.bind(this),
+            '/admin_help': this.handleAdminHelpCommand.bind(this)
         };
+    }
+
+    // Méthodes pour les commandes d'administration
+    async handleAdminStatsCommand({ player, playerNumber, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        return { text: await this.adminManager.processAdminCommand('/admin_stats', playerNumber, {}) };
+    }
+
+    async handleAdminGiveCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_give', args);
+        return { text: await this.adminManager.processAdminCommand('/admin_give', playerNumber, params) };
+    }
+
+    async handleAdminLevelCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_level', args);
+        return { text: await this.adminManager.processAdminCommand('/admin_level', playerNumber, params) };
+    }
+
+    async handleAdminTeleportCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_teleport', args);
+        return { text: await this.adminManager.processAdminCommand('/admin_teleport', playerNumber, params) };
+    }
+
+    async handleAdminHealCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_heal', args);
+        return { text: await this.adminManager.processAdminCommand('/admin_heal', playerNumber, params) };
+    }
+
+    async handleAdminPowerCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_power', args);
+        return { text: await this.adminManager.processAdminCommand('/admin_power', playerNumber, params) };
+    }
+
+    async handleAdminTimeCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_time', args);
+        return { text: await this.adminManager.processAdminCommand('/admin_time', playerNumber, params) };
+    }
+
+    async handleAdminWeatherCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        return { text: `⚠️ Commande /admin_weather non encore implémentée.` };
+    }
+
+    async handleAdminEventCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        return { text: `⚠️ Commande /admin_event non encore implémentée.` };
+    }
+
+    async handleAdminKingdomCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_kingdom', args);
+        return { text: await this.adminManager.processAdminCommand('/admin_kingdom', playerNumber, params) };
+    }
+
+    async handleAdminGroupsCommand({ player, playerNumber, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        return { text: await this.adminManager.processAdminCommand('/admin_groups', playerNumber, {}) };
+    }
+
+    async handleAdminResetKingdomCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        return { text: `⚠️ Commande /admin_reset_kingdom non encore implémentée.` };
+    }
+
+    async handleAdminDebugCommand({ player, playerNumber, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        return { text: await this.adminManager.processAdminCommand('/admin_debug', playerNumber, {}) };
+    }
+
+    async handleAdminBackupCommand({ player, playerNumber, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        return { text: await this.adminManager.processAdminCommand('/admin_backup', playerNumber, {}) };
+    }
+
+    async handleAdminReloadCommand({ player, playerNumber, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        return { text: await this.adminManager.processAdminCommand('/admin_reload', playerNumber, {}) };
+    }
+
+    async handleAdminAnnounceCommand({ player, playerNumber, message, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        const args = message.split(' ').slice(1);
+        const params = this.adminManager.parseAdminCommand('/admin_announce', args);
+        return { text: await this.adminManager.processAdminCommand('/admin_announce', playerNumber, params) };
+    }
+
+    async handleAdminHelpCommand({ player, playerNumber, dbManager }) {
+        if (!this.adminManager.isAdmin(playerNumber)) {
+            return { text: '❌ Accès refusé. Vous n\'êtes pas administrateur.' };
+        }
+        return { text: this.adminManager.getAdminHelp() };
     }
 
     async processPlayerMessage({ playerNumber, chatId, message, imageMessage, originalMessage, sock, dbManager, imageGenerator, isCommand = false }) {
