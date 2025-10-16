@@ -498,6 +498,93 @@ Tu es maintenant enregistré en tant que : **${username}**
                 };
             }
 
+            const command = message.toLowerCase().trim();
+            let response = null;
+
+            if (this.characterCustomization && this.characterCustomization.activeCustomizations.has(playerNumber)) {
+                const handled = await this.characterCustomization.handleCustomizationResponse(playerNumber, chatId, message);
+                if (handled) {
+                    return { text: '' };
+                }
+            }
+
+            if (imageMessage) {
+                const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
+                const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
+
+                if (creationMode === 'description' && creationStarted) {
+                    return await this.handlePhotoReceived({ player, imageMessage, originalMessage, sock, dbManager, imageGenerator });
+                }
+            }
+
+            const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
+            const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
+            const photoReceived = await dbManager.getTemporaryData(player.id, 'photo_received');
+
+            if (creationMode === 'description' && creationStarted && photoReceived && message && !this.commandHandlers[command]) {
+                return await this.handleDescriptionCreation({ player, description: message, dbManager, imageGenerator });
+            }
+
+            if (message && message.toUpperCase().trim() === 'SUPPRIMER_PERSONNAGE') {
+                return await this.handleDeleteCharacter({ player, dbManager, imageGenerator });
+            }
+
+            if (this.commandHandlers[command]) {
+                response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock, playerNumber });
+            } else {
+                // Vérifier les tentatives d'actions impossibles
+                const character = await dbManager.getCharacterByPlayer(player.id); // Récupérer le personnage ici pour la vérification
+                const impossibleAction = await this.checkImpossibleAction(message, character);
+                if (impossibleAction) {
+                    return impossibleAction;
+                }
+            }
+
+            const playerId = player.id;
+            const normalizedMessage = message.toLowerCase().trim();
+
+
+            if (!response) {
+                // Si c'est une commande non reconnue, retourner aide sans narration IA
+                if (isCommand) {
+                    console.log(`⚡ Commande inconnue: ${message} - AUCUNE NARRATION`);
+                    return {
+                        text: `❓ **Commande inconnue : ${message}**
+
+📱 **Commandes disponibles :**
+• /menu - Menu principal
+• /créer - Créer ton personnage
+• /aide - Liste complète des commandes
+• /jouer - Entrer en mode jeu
+
+💡 Tapez /aide pour voir toutes les commandes disponibles.`
+                    };
+                }
+
+                const character = await dbManager.getCharacterByPlayer(player.id);
+
+                if (!character) {
+                    return {
+                        text: `❌ Tu n'as pas encore de personnage !
+
+Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.`
+                    };
+                }
+
+                // Toutes les actions sont traitées par la narration IA
+                console.log(`🎭 Action RPG: ${message} - NARRATION IA GÉNÉRÉE`);
+                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
+            }
+
+            return response;
+
+        } catch (error) {
+            console.error('❌ Erreur dans le moteur de jeu:', error);
+            return {
+                text: `❌ Une erreur s'est produite dans le moteur de jeu. Veuillez réessayer.`
+            };
+        }
+    }
 
     async handleShopCommand({ player, dbManager }) {
         const character = await dbManager.getCharacterByPlayer(player.id);
@@ -592,95 +679,6 @@ Tu es maintenant enregistré en tant que : **${username}**
         }, 1000);
 
         return { text: '' };
-    }
-
-
-            const command = message.toLowerCase().trim();
-            let response = null;
-
-            if (this.characterCustomization && this.characterCustomization.activeCustomizations.has(playerNumber)) {
-                const handled = await this.characterCustomization.handleCustomizationResponse(playerNumber, chatId, message);
-                if (handled) {
-                    return { text: '' };
-                }
-            }
-
-            if (imageMessage) {
-                const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
-                const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
-
-                if (creationMode === 'description' && creationStarted) {
-                    return await this.handlePhotoReceived({ player, imageMessage, originalMessage, sock, dbManager, imageGenerator });
-                }
-            }
-
-            const creationMode = await dbManager.getTemporaryData(player.id, 'creation_mode');
-            const creationStarted = await dbManager.getTemporaryData(player.id, 'creation_started');
-            const photoReceived = await dbManager.getTemporaryData(player.id, 'photo_received');
-
-            if (creationMode === 'description' && creationStarted && photoReceived && message && !this.commandHandlers[command]) {
-                return await this.handleDescriptionCreation({ player, description: message, dbManager, imageGenerator });
-            }
-
-            if (message && message.toUpperCase().trim() === 'SUPPRIMER_PERSONNAGE') {
-                return await this.handleDeleteCharacter({ player, dbManager, imageGenerator });
-            }
-
-            if (this.commandHandlers[command]) {
-                response = await this.commandHandlers[command]({ player, chatId, message, dbManager, imageGenerator, sock, playerNumber });
-            } else {
-                // Vérifier les tentatives d'actions impossibles
-                const character = await dbManager.getCharacterByPlayer(player.id); // Récupérer le personnage ici pour la vérification
-                const impossibleAction = await this.checkImpossibleAction(message, character);
-                if (impossibleAction) {
-                    return impossibleAction;
-                }
-            }
-
-            const playerId = player.id;
-            const normalizedMessage = message.toLowerCase().trim();
-
-
-            if (!response) {
-                // Si c'est une commande non reconnue, retourner aide sans narration IA
-                if (isCommand) {
-                    console.log(`⚡ Commande inconnue: ${message} - AUCUNE NARRATION`);
-                    return {
-                        text: `❓ **Commande inconnue : ${message}**
-
-📱 **Commandes disponibles :**
-• /menu - Menu principal
-• /créer - Créer ton personnage
-• /aide - Liste complète des commandes
-• /jouer - Entrer en mode jeu
-
-💡 Tapez /aide pour voir toutes les commandes disponibles.`
-                    };
-                }
-
-                const character = await dbManager.getCharacterByPlayer(player.id);
-
-                if (!character) {
-                    return {
-                        text: `❌ Tu n'as pas encore de personnage !
-
-Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.`
-                    };
-                }
-
-                // Toutes les actions sont traitées par la narration IA
-                console.log(`🎭 Action RPG: ${message} - NARRATION IA GÉNÉRÉE`);
-                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
-            }
-
-            return response;
-
-        } catch (error) {
-            console.error('❌ Erreur dans le moteur de jeu:', error);
-            return {
-                text: `❌ Une erreur s'est produite dans le moteur de jeu. Veuillez réessayer.`
-            };
-        }
     }
 
     async handleMenuCommand({ player, dbManager, imageGenerator }) {
