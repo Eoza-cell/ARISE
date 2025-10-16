@@ -1785,24 +1785,19 @@ ${updateProgress}
 
 🧠 **TEMPS POUR LA RUSE :** Préparez votre stratégie maintenant !`;
 
-            try {
-                if (messageId) {
-                    await sock.sendMessage(chatId, {
-                        text: updateMessage,
-                        edit: messageId
-                    });
-                } else {
-                    // Si l'édition échoue, envoyer un nouveau message
-                    const newResponse = await sock.sendMessage(chatId, { text: updateMessage });
-                    messageId = newResponse.key.id;
-                }
-            } catch (error) {
-                // En cas d'erreur d'édition, envoyer un nouveau message
+            // Envoyer uniquement des messages importants (toutes les 10 secondes ou moments clés)
+            const secondsRemaining = Math.floor(remaining / 1000);
+            const shouldSendUpdate = 
+                secondsRemaining % 10 === 0 || // Toutes les 10 secondes
+                secondsRemaining === 30 ||      // 30 secondes
+                secondsRemaining === 15 ||      // 15 secondes
+                secondsRemaining === 5;         // 5 secondes
+            
+            if (shouldSendUpdate) {
                 try {
-                    const newResponse = await sock.sendMessage(chatId, { text: updateMessage });
-                    messageId = newResponse.key.id;
-                } catch (sendError) {
-                    console.log('⚠️ Erreur envoi message:', sendError.message);
+                    await sock.sendMessage(chatId, { text: updateMessage });
+                } catch (error) {
+                    console.log('⚠️ Erreur envoi mise à jour:', error.message);
                 }
             }
         }, 5000); // Mise à jour toutes les 5 secondes

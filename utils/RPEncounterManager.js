@@ -20,7 +20,7 @@ class RPEncounterManager {
      */
     async startRPEncounter(player1, player2, chatId, location) {
         const encounterId = `rp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        
+
         const encounterData = {
             id: encounterId,
             players: [player1.id, player2.id],
@@ -45,7 +45,7 @@ class RPEncounterManager {
 
         const currentPlayerId = encounterData.players[encounterData.currentTurn];
         const currentPlayerTag = `@${currentPlayerId}`;
-        
+
         const welcomeMessage = `🎭 **RENCONTRE ROLEPLAY INITIÉE** 🎭
 
 ${introNarration}
@@ -104,7 +104,7 @@ ${introNarration}
         };
 
         this.actionTimers.set(actionId, timerData);
-        
+
         // Programmer les rappels de temps
         this.scheduleActionReminders(actionId, timeout);
 
@@ -125,21 +125,21 @@ ${introNarration}
         // Rappel à 3 minutes (50%)
         setTimeout(() => {
             if (this.actionTimers.has(actionId) && this.actionTimers.get(actionId).status === 'waiting') {
-                this.sendActionReminder(actionId, '⏰ 3 minutes restantes pour votre action RP !');
+                this.sendTimeReminder(actionId, '⏰ 3 minutes restantes pour votre action RP !');
             }
         }, totalTime * 0.5);
 
         // Rappel à 1 minute (83%)
         setTimeout(() => {
             if (this.actionTimers.has(actionId) && this.actionTimers.get(actionId).status === 'waiting') {
-                this.sendActionReminder(actionId, '⚠️ Plus que 1 minute ! Dépêchez-vous !');
+                this.sendTimeReminder(actionId, '⚠️ Plus que 1 minute ! Dépêchez-vous !');
             }
         }, totalTime * 0.833);
 
         // Rappel à 30 secondes (92%)
         setTimeout(() => {
             if (this.actionTimers.has(actionId) && this.actionTimers.get(actionId).status === 'waiting') {
-                this.sendActionReminder(actionId, '🚨 URGENT ! 30 secondes restantes !');
+                this.sendTimeReminder(actionId, '🚨 URGENT ! 30 secondes restantes !');
             }
         }, totalTime * 0.916);
     }
@@ -149,7 +149,7 @@ ${introNarration}
      * @param {string} actionId - ID de l'action
      * @param {string} message - Message de rappel
      */
-    async sendActionReminder(actionId, message) {
+    async sendTimeReminder(actionId, message) {
         const timerData = this.actionTimers.get(actionId);
         if (!timerData) return;
 
@@ -159,15 +159,16 @@ ${introNarration}
         const timeLeft = Math.max(0, timerData.deadline - Date.now());
         const minutes = Math.floor(timeLeft / 60000);
         const seconds = Math.floor((timeLeft % 60000) / 1000);
-        
+
         const timeDisplay = minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
 
-        const playerTag = `@${timerData.playerId}`;
-        
+        // Envoyer un nouveau message au lieu d'essayer d'éditer
         await this.sock.sendMessage(encounterData.chatId, {
-            text: `${playerTag} ${message}\n⏳ Temps exact restant: **${timeDisplay}**`,
+            text: `${message}\n⏳ Temps restant: **${timeDisplay}**`,
             mentions: [timerData.playerId]
         });
+
+        console.log(`⏰ Rappel envoyé pour ${actionId}: ${timeDisplay} restantes`);
     }
 
     /**
@@ -182,7 +183,7 @@ ${introNarration}
         if (!encounterData) return;
 
         timerData.status = 'timeout';
-        
+
         const playerCharacter = await this.gameEngine.dbManager.getCharacterByPlayer(timerData.playerId);
         const playerName = playerCharacter ? playerCharacter.name : `Joueur ${timerData.playerId.slice(-4)}`;
 
@@ -202,7 +203,7 @@ ${inactionNarration}
 
         // Passer au joueur suivant
         this.switchToNextPlayer(timerData.encounterId);
-        
+
         this.actionTimers.delete(actionId);
     }
 
@@ -280,7 +281,7 @@ ${actionNarration}
         if (!encounterData) return;
 
         encounterData.currentTurn = 1 - encounterData.currentTurn; // Alterner entre 0 et 1
-        
+
         // Démarrer le timer pour le joueur suivant
         this.startActionTimer(encounterId, encounterData.players[encounterData.currentTurn]);
     }

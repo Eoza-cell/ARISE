@@ -44,7 +44,57 @@ class ReactionTimeManager {
         this.activeTimers.set(actionId, timerInfo);
 
         // Envoyer le message initial avec compte à rebours
-        await this.sendCountdownMessage(timerInfo);
+        const timeLeftSeconds = Math.floor(reactionTimeMs / 1000);
+        await this.sock.sendMessage(chatId, {
+            text: `⚔️ **ATTAQUE EN COURS !** ⚔️
+
+🎯 **${attackerName}** attaque **${targetName}** !
+
+⏰ **TEMPS DE RÉACTION : ${timeLeftSeconds} secondes**
+
+💡 **${targetName}** doit riposter MAINTENANT !
+Décrivez votre action de défense ou contre-attaque.
+
+⚠️ Si aucune réponse dans ${timeLeftSeconds}s, l'attaque réussira automatiquement !`,
+            mentions: [targetPlayerId]
+        });
+
+        // Envoyer des rappels toutes les 5 secondes
+        const updateInterval = setInterval(async () => {
+            if (!this.activeTimers.has(actionId)) {
+                clearInterval(updateInterval);
+                return;
+            }
+
+            const now = Date.now();
+            const remaining = Math.max(0, endTime - now);
+            const secondsLeft = Math.floor(remaining / 1000);
+
+            if (remaining <= 0) {
+                clearInterval(updateInterval);
+                return;
+            }
+
+            // Envoyer des mises à jour uniquement à des moments clés
+            if (secondsLeft === Math.floor(reactionTimeMs / 2000)) {
+                await this.sock.sendMessage(chatId, {
+                    text: `⏰ **50% DU TEMPS ÉCOULÉ !**\n⏳ ${secondsLeft} secondes restantes pour ${targetName}`,
+                    mentions: [targetPlayerId]
+                });
+            } else if (secondsLeft === 10 && reactionTimeMs > 15000) {
+                await this.sock.sendMessage(chatId, {
+                    text: `🚨 **10 SECONDES RESTANTES !**\nRipostez MAINTENANT ${targetName} !`,
+                    mentions: [targetPlayerId]
+                });
+            } else if (secondsLeft === 5 && reactionTimeMs > 10000) {
+                await this.sock.sendMessage(chatId, {
+                    text: `💀 **5 SECONDES !** DERNIÈRE CHANCE !`,
+                    mentions: [targetPlayerId]
+                });
+            }
+        }, 1000); // Vérifier chaque seconde
+
+        timerInfo.updateInterval = updateInterval(timerInfo);
 
         // Démarrer les mises à jour périodiques
         this.startPeriodicUpdates(timerInfo);
@@ -321,33 +371,7 @@ ${timerInfo.targetName} n'a pas réagi à temps !
             }
         }, reactionTime * 0.25);
 
-        // Rappel à 50% du temps
-        setTimeout(() => {
-            if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
-                this.sendTimeReminder(actionId, '⏰ 50% du temps écoulé - Ripostez MAINTENANT');
-            }
-        }, reactionTime * 0.5);
-
-        // Rappel à 75% du temps  
-        setTimeout(() => {
-            if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
-                this.sendTimeReminder(actionId, '🚨 75% du temps écoulé - URGENCE !');
-            }
-        }, reactionTime * 0.75);
-
-        // Rappel à 90% du temps
-        setTimeout(() => {
-            if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
-                this.sendTimeReminder(actionId, '💀 90% du temps écoulé - DERNIERS INSTANTS !');
-            }
-        }, reactionTime * 0.9);
-
-        // Rappel final à 95% du temps
-        setTimeout(() => {
-            if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
-                this.sendTimeReminder(actionId, '☠️ DERNIÈRE CHANCE ! 5% du temps restant !');
-            }
-        }, reactionTime * 0.95);
+        // Les rappels sont maintenant gérés dans le setInterval de startReactionTimer
     }
 
     /**
