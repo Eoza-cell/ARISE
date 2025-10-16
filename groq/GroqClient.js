@@ -20,7 +20,7 @@ class GroqClient {
             
             this.model = 'llama-3.3-70b-versatile';
             this.sessionMemory = new Map();
-            this.maxMemoryPerSession = 50; // Augmenté pour une mémoire plus vaste
+            this.maxMemoryPerSession = 100; // Mémoire équilibrée: contexte suffisant sans crash
             
             // Initialiser directement à true car le client est créé avec succès
             this.isAvailable = true;
@@ -188,60 +188,25 @@ Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 car
             const dynamicEvents = this.generateDynamicEvents(location, character);
             const npcReactions = this.generateSmartNPCReactions(character, action);
 
-            const prompt = `Tu es un narrateur IA ULTRA-PERFORMANT pour un RPG comme GTA mais médiéval-technologique.
+            const recentContext = this.getRecentMemory(sessionId).slice(-3).map(m => m.content).join('; ');
+            
+            const prompt = `Narrateur RPG style GTA médiéval. Narration FLUIDE et DIRECTE.
 
-CONTEXTE AVANCÉ:
-- Personnage: ${character.name} (Niveau ${character.powerLevel})
-- Lieu: ${location}
-- Action: "${action}"
-- Royaume: ${character.kingdom}
-- Continuité: ${locationContinuity}
+CONTEXTE: ${character.name} (${character.powerLevel}) à ${location}
+ACTION: "${action}"
+${recentContext ? `PRÉCÉDEMMENT: ${recentContext}` : ''}
+${dynamicEvents ? `ÉVÉNEMENTS: ${dynamicEvents}` : ''}
+${npcReactions ? `PNJ: ${npcReactions}` : ''}
 
-ÉVÉNEMENTS DYNAMIQUES EN COURS:
-${dynamicEvents}
-
-RÉACTIONS PNJ INTELLIGENTES:
-${npcReactions}
-
-ANALYSE SPÉCIALE DE L'ACTION:
-${this.analyzeActionType(action)}
-
-RÈGLES DE NARRATION COMBAT:
-🥊 Si l'action contient "coup de poing", "uppercut", "crochet" = DÉCRIRE la technique martial précise
-🎯 Si c'est une technique de combat nommée = RESPECTER le nom et décrire l'exécution
-⚔️ Éviter d'inventer des détails non mentionnés par le joueur
-🔥 Se concentrer sur l'ACTION EXACTE demandée par le joueur
-
-RÈGLES DE DIALOGUE PNJ:
-💬 Si l'action contient "parle", "dit", "demande" = INCLURE la réponse du PNJ dans la narration
-🗣️ Créer des réponses PNJ cohérentes avec leur rôle (garde, marchand, noble, etc.)
-🎭 Varier les personnalités des PNJ selon leur fonction et le lieu
-📍 Adapter les dialogues au royaume et à la situation actuelle
-
-SYSTÈME IA RÉACTIVE GTA-STYLE:
-1. 🌍 MONDE VIVANT - Les PNJ continuent leur vie même sans le joueur
-2. 🎯 CONSÉQUENCES RÉALISTES - Chaque action a des répercussions à long terme
-3. 🧠 MÉMOIRE PERSISTANTE - Le monde se souvient des actions passées
-4. 📈 RÉPUTATION DYNAMIQUE - Les factions réagissent selon l'historique
-5. 🎲 ÉVÉNEMENTS ALÉATOIRES - Surprises constantes et opportunités
-6. 👥 IA SOCIALE - Relations complexes entre personnages
-7. 🔄 ADAPTATION - L'environnement s'adapte au style de jeu
-
-Génère une narration ÉPIQUE et PRÉCISE qui:
-- RESPECTE exactement l'action demandée (si "coup de poing droit" = décrire un coup de poing droit)
-- Intègre les événements dynamiques en cours
-- Montre les réactions intelligentes des PNJ
-- Crée des opportunités et des défis inattendus
-- Utilise la mémoire du monde pour la cohérence
-- Maintient le suspense et l'engagement
-
-Style: Immersif, cinématographique, FIDÈLE à l'action demandée.`;
+STYLE: Action immédiate, continuité fluide, pas de répétitions. Utilise le contexte précédent pour cohérence.
+Si dialogue: inclure réponse PNJ. Si combat: décrire technique précise.
+Max 700 caractères.`;
 
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: prompt }],
                 model: this.model,
-                max_tokens: 1200,
-                temperature: 0.85
+                max_tokens: 400,
+                temperature: 0.7
             });
 
             let narration = response.choices[0]?.message?.content?.trim();

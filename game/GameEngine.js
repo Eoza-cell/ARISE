@@ -2371,6 +2371,14 @@ ${healthDisplay}
     }
 
     /**
+     * Traite les actions de dialogue avec narration IA
+     */
+    async processDialogueAction({ player, character, message, dbManager, imageGenerator, sock, chatId }) {
+        // Les dialogues sont traités de la même manière que les actions normales
+        return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator, sock, chatId });
+    }
+
+    /**
      * Met à jour le personnage après une action avec système de difficulté
      */
     async updateCharacterAfterAction(character, action, actionResult, dbManager) {
