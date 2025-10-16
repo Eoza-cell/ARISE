@@ -308,35 +308,79 @@ class ImmersiveNarrationManager {
     }
 
     /**
-     * Génère une narration de déplacement logique
+     * Génère une narration de déplacement DÉTAILLÉE et IMMERSIVE
      */
     async generateMovementNarration(context) {
         const { character, action, location } = context;
         
-        let narration = `🚶 **DÉPLACEMENT OBSERVÉ**\n\n`;
+        let narration = `🚶 **═══════ DÉPLACEMENT EN COURS ═══════** 🚶\n\n`;
         
-        // Description factuelle du déplacement
-        narration += `${character.name} initie un déplacement dans ${location}.\n\n`;
+        // Scène initiale détaillée
+        narration += `📍 **ENVIRONNEMENT DE DÉPART**\n`;
+        narration += `${character.name} se trouve actuellement dans ${location}.\n\n`;
         
-        // Action spécifique
-        narration += `📍 **Action :** ${action}\n\n`;
-        
-        // Conditions de terrain observées
+        // Description du terrain avec détails
         const currentPos = character.position || { x: 0, y: 0 };
         const WorldMapGenerator = require('./WorldMapGenerator');
         const mapGen = new WorldMapGenerator();
         const terrain = mapGen.getTerrainAt(currentPos.x, currentPos.y);
         
-        narration += `🗺️ **Terrain actuel :** ${this.getTerrainDescription(terrain)}\n`;
+        narration += `🗺️ **ANALYSE DU TERRAIN**\n`;
+        narration += `• Type : ${this.getTerrainDescription(terrain)}\n`;
+        narration += `• Texture du sol : ${this.getDetailedTerrainTexture(terrain)}\n`;
+        narration += `• Inclinaison : ${Math.floor(Math.random() * 15)}° vers ${['le nord', 'le sud', 'l\'est', 'l\'ouest'][Math.floor(Math.random() * 4)]}\n`;
+        narration += `• Friction estimée : ${this.getTerrainFriction(terrain)}\n`;
+        narration += `• Visibilité : ${this.getTerrainVisibility(terrain)} mètres\n\n`;
         
-        // Temps requis calculé
+        // Action de déplacement détaillée
+        narration += `🎯 **ACTION DE DÉPLACEMENT**\n`;
+        narration += `${action}\n\n`;
+        
+        // Séquence de mouvement
+        narration += `⏱️ **SÉQUENCE DE MOUVEMENT**\n`;
+        const distance = 5 + Math.floor(Math.random() * 15); // Distance aléatoire réaliste
+        const speed = 4 + Math.floor(Math.random() * 3); // Vitesse de marche km/h
+        
+        narration += `• Distance à parcourir : ${distance} mètres\n`;
+        narration += `• Vitesse de déplacement : ${speed} km/h (${(speed / 3.6).toFixed(1)} m/s)\n`;
+        narration += `• Cadence de pas : ${80 + Math.floor(Math.random() * 40)} pas/minute\n`;
+        narration += `• Longueur de foulée : ${0.6 + Math.random() * 0.4} mètres\n\n`;
+        
+        // Chronologie du déplacement
         const terrainCost = this.movementRules.terrainCosts[terrain] || 2;
         const travelTime = Math.ceil(terrainCost * this.timeConstraints.travel.local);
+        const travelMinutes = travelTime * 60;
         
-        narration += `⏰ **Temps estimé :** ${travelTime}h pour ce type de terrain\n\n`;
+        narration += `📊 **CHRONOLOGIE DÉTAILLÉE**\n`;
+        narration += `• T+0 min : Début du déplacement, orientation ${['nord', 'sud', 'est', 'ouest'][Math.floor(Math.random() * 4)]}\n`;
+        narration += `• T+${Math.floor(travelMinutes * 0.25)} min : Traversée du premier quart de distance\n`;
+        narration += `• T+${Math.floor(travelMinutes * 0.5)} min : Point médian atteint, pause brève 15s\n`;
+        narration += `• T+${Math.floor(travelMinutes * 0.75)} min : Trois quarts du parcours accomplis\n`;
+        narration += `• T+${travelMinutes} min : Destination atteinte\n\n`;
         
-        // Conditions observables
+        // Conditions environnementales observées
+        narration += `🌍 **CONDITIONS ENVIRONNEMENTALES**\n`;
         narration += this.getObservableConditions(terrain, location);
+        narration += `\n`;
+        
+        // Observations sensorielles pendant le trajet
+        narration += `👁️ **OBSERVATIONS PENDANT LE TRAJET**\n`;
+        narration += `• Vue : ${this.getVisualObservations(terrain)}\n`;
+        narration += `• Ouïe : ${this.getAudioObservations(terrain)}\n`;
+        narration += `• Odorat : ${this.getOlfactiveObservations(terrain)}\n`;
+        narration += `• Sensations : ${this.getTactileObservations(terrain)}\n\n`;
+        
+        // Impact physiologique
+        narration += `⚙️ **IMPACT PHYSIOLOGIQUE**\n`;
+        narration += `• Dépense calorique : ${50 + Math.floor(Math.random() * 100)} kcal\n`;
+        narration += `• Fréquence cardiaque : ${70 + Math.floor(Math.random() * 30)} bpm\n`;
+        narration += `• Respiration : ${12 + Math.floor(Math.random() * 8)} cycles/minute\n`;
+        narration += `• Fatigue musculaire : +${Math.floor(Math.random() * 10)}%\n\n`;
+        
+        // Temps total
+        narration += `⏰ **TEMPS TOTAL DE DÉPLACEMENT**\n`;
+        narration += `• Durée estimée : ${travelTime}h (${travelMinutes} minutes)\n`;
+        narration += `• Coefficient terrain : x${terrainCost.toFixed(1)}\n`;
 
         // Temps écoulé réaliste
         await this.addWorldTime(character.playerId, 'travel', 'local', travelTime);
@@ -346,10 +390,103 @@ class ImmersiveNarrationManager {
             outcome: {
                 type: 'movement',
                 timeElapsed: travelTime,
-                terrain: terrain
+                terrain: terrain,
+                distance: distance
             },
             valid: true
         };
+    }
+    
+    getDetailedTerrainTexture(terrain) {
+        const textures = {
+            plains: 'Herbe courte, légèrement humide, quelques cailloux épars',
+            forest: 'Humus riche, racines apparentes, feuilles mortes',
+            mountains: 'Roche granitique, graviers instables, mousses vertes',
+            desert: 'Sable fin doré, légèrement chaud au toucher',
+            swamp: 'Boue épaisse, végétation aquatique décomposée',
+            snow: 'Neige compacte avec cristaux de glace',
+            jungle: 'Terre riche et sombre, débris végétaux denses',
+            wasteland: 'Terre craquelée, poussière grise, débris métalliques',
+            river: 'Galets lisses, sable humide en bordure',
+            road: 'Pierre pavée usée, joints d\'herbe entre les dalles'
+        };
+        return textures[terrain] || 'Sol standard de composition mixte';
+    }
+    
+    getTerrainFriction(terrain) {
+        const frictions = {
+            plains: 'Moyenne (coefficient 0.7)',
+            forest: 'Variable (coefficient 0.5-0.8)',
+            mountains: 'Faible (coefficient 0.4)',
+            desert: 'Très faible (coefficient 0.3)',
+            swamp: 'Minimale (coefficient 0.2)',
+            snow: 'Faible (coefficient 0.3)',
+            jungle: 'Moyenne-élevée (coefficient 0.6)',
+            wasteland: 'Moyenne (coefficient 0.5)',
+            river: 'Très faible si mouillé (coefficient 0.2)',
+            road: 'Élevée (coefficient 0.9)'
+        };
+        return frictions[terrain] || 'Coefficient 0.5';
+    }
+    
+    getTerrainVisibility(terrain) {
+        const visibility = {
+            plains: 500 + Math.floor(Math.random() * 500),
+            forest: 20 + Math.floor(Math.random() * 30),
+            mountains: 800 + Math.floor(Math.random() * 700),
+            desert: 1000 + Math.floor(Math.random() * 1000),
+            swamp: 30 + Math.floor(Math.random() * 40),
+            snow: 200 + Math.floor(Math.random() * 300),
+            jungle: 10 + Math.floor(Math.random() * 20),
+            wasteland: 300 + Math.floor(Math.random() * 400),
+            river: 100 + Math.floor(Math.random() * 200),
+            road: 400 + Math.floor(Math.random() * 600)
+        };
+        return visibility[terrain] || 150;
+    }
+    
+    getVisualObservations(terrain) {
+        const observations = {
+            plains: 'Horizon dégagé, ciel bleu parsemé de nuages blancs, ombres longues projetées par le soleil',
+            forest: 'Canopée dense filtrant la lumière, jeux d\'ombres et de lumière, mouvements de branches',
+            mountains: 'Pics rocheux au loin, roches aux teintes grises et brunes, neige sur sommets',
+            desert: 'Dunes ondulantes dorées, mirages thermiques à l\'horizon, ciel d\'azur intense',
+            swamp: 'Eau stagnante verdâtre, brumes basses, végétation aquatique émergente'
+        };
+        return observations[terrain] || 'Paysage environnant visible avec clarté modérée';
+    }
+    
+    getAudioObservations(terrain) {
+        const sounds = {
+            plains: 'Bruissement d\'herbes au vent, chants d\'oiseaux lointains, silence paisible',
+            forest: 'Craquements de branches, pépiements d\'oiseaux, froissement de feuilles',
+            mountains: 'Écho des pas sur roche, sifflement du vent, roulement de pierres',
+            desert: 'Silence presque total, léger sifflement du vent sur les dunes',
+            swamp: 'Croassements de grenouilles, clapotis d\'eau, bourdonnements d\'insectes'
+        };
+        return sounds[terrain] || 'Sons ambiants typiques du terrain';
+    }
+    
+    getOlfactiveObservations(terrain) {
+        const smells = {
+            plains: 'Odeur d\'herbe fraîche, senteurs florales légères',
+            forest: 'Parfum d\'humus riche, arôme de résine de pins',
+            mountains: 'Air pur et frais, légère odeur minérale',
+            desert: 'Air sec sans odeur particulière, chaleur palpable',
+            swamp: 'Odeur de végétation en décomposition, humidité marquée'
+        };
+        return smells[terrain] || 'Odeurs neutres de l\'environnement';
+    }
+    
+    getTactileObservations(terrain) {
+        const sensations = {
+            plains: 'Sol ferme sous les pieds, brise légère sur la peau',
+            forest: 'Humidité ambiante perceptible, fraîcheur de l\'ombre',
+            mountains: 'Air frais et sec, sol dur et inégal',
+            desert: 'Chaleur intense rayonnante, air sec asséchant',
+            swamp: 'Humidité collante, sol mou et instable'
+        };
+        return sensations[terrain] || 'Sensations physiques de marche standard';
     }
 
     /**
@@ -400,44 +537,72 @@ class ImmersiveNarrationManager {
     }
 
     /**
-     * Génère une narration de combat IMPARTIALE et factuelle
+     * Génère une narration de combat DÉTAILLÉE et IMMERSIVE
      */
     async generateCombatNarration(context) {
         const { character, action, enemies, powerLevel } = context;
         
-        let narration = `⚔️ **ENGAGEMENT COMBAT DÉTECTÉ**\n\n`;
+        let narration = `⚔️ **═══════ ENGAGEMENT COMBAT ═══════** ⚔️\n\n`;
         
-        // Rapport factuel de la situation
-        narration += `Confrontation observée entre ${character.name} (niveau ${character.level}, grade ${character.powerLevel}) `;
-        narration += `et ${enemies.length} adversaire(s) dans ${context.location}.\n\n`;
+        // Description de la scène initiale
+        narration += `📍 **SCÈNE DE COMBAT**\n`;
+        narration += `${character.name} se trouve dans ${context.location}.\n`;
         
-        // Analyse des forces en présence
-        narration += `📊 **Analyse des forces :**\n`;
-        narration += `• Combattant : ${character.name} - ${powerLevel.difficulty}\n`;
-        narration += `• Points de vie actuels : ${character.currentLife}/${character.maxLife}\n`;
-        narration += `• Énergie disponible : ${character.currentEnergy}/${character.maxEnergy}\n\n`;
-        
-        // Action engagée
-        narration += `🎯 **Action engagée :** ${action}\n\n`;
-        
-        // Conditions environnementales factuelles
         const environmentalFactors = this.getEnvironmentalFactors(context.location, character);
-        narration += `🌍 **Conditions :** ${environmentalFactors.combat}\n`;
-        narration += `🌤️ **Météo :** ${environmentalFactors.weather}\n`;
-        narration += `🕐 **Moment :** ${environmentalFactors.timeOfDay}\n\n`;
-
-        // Déroulement factuel (sans dramaturgie excessive)
-        const combatOutcome = this.calculateRealisticCombatOutcome(character, enemies, action);
-        narration += `📋 **Résultat observé :**\n${combatOutcome.description}\n\n`;
-
-        // Conséquences mesurables
-        narration += `📉 **Conséquences mesurées :**\n`;
-        narration += `• Perte de vie : ${combatOutcome.healthLoss} points\n`;
-        narration += `• Dépense d'énergie : ${combatOutcome.energyLoss} points\n`;
+        narration += `🌤️ Météo : ${environmentalFactors.weather} | Moment : ${environmentalFactors.timeOfDay}\n`;
+        narration += `🗺️ Terrain : ${environmentalFactors.combat}\n\n`;
         
-        // Temps écoulé factuel
+        // État détaillé du combattant
+        narration += `👤 **ÉTAT DU COMBATTANT**\n`;
+        narration += `• Nom : ${character.name} (Grade ${character.powerLevel} - ${powerLevel.difficulty})\n`;
+        narration += `• Niveau : ${character.level}\n`;
+        narration += `• Vie : ${character.currentLife}/${character.maxLife} PV (${Math.floor((character.currentLife/character.maxLife)*100)}%)\n`;
+        narration += `• Énergie : ${character.currentEnergy}/${character.maxEnergy} (${Math.floor((character.currentEnergy/character.maxEnergy)*100)}%)\n`;
+        narration += `• Position : Debout, stance de combat, poids réparti à 60% sur jambe avant\n`;
+        narration += `• Distance adversaire : ${2 + Math.floor(Math.random() * 4)} mètres\n\n`;
+        
+        // Action détaillée avec séquence temporelle
+        narration += `⚔️ **SÉQUENCE D'ACTION DÉTAILLÉE**\n`;
+        narration += `🎯 Action : ${action}\n\n`;
+        
+        // Décomposition temporelle de l'action
+        narration += `⏱️ **CHRONOLOGIE (séquence micro-temporelle)**\n`;
+        narration += `• T+0.0s : ${character.name} initie le mouvement\n`;
+        narration += `• T+0.3s : Transfert du poids vers l'avant (70% jambe avant)\n`;
+        narration += `• T+0.6s : Rotation du tronc à 35° dans le sens horaire\n`;
+        narration += `• T+0.9s : Bras en extension, vitesse 12 m/s\n`;
+        narration += `• T+1.2s : Point d'impact atteint\n\n`;
+        
+        // Descriptions sensorielles
+        narration += `👁️ **OBSERVATIONS SENSORIELLES**\n`;
+        narration += `• Vue : Trajectoire du mouvement clairement visible, légère traînée de poussière\n`;
+        narration += `• Ouïe : Sifflement de l'air déplacé, son mat de l'impact\n`;
+        narration += `• Toucher : Vibration ressentie dans les articulations, résistance au contact\n\n`;
+        
+        // Résultat du combat avec détails biomécaniques
+        const combatOutcome = this.calculateRealisticCombatOutcome(character, enemies, action);
+        narration += `📊 **RÉSULTAT DE L'ENGAGEMENT**\n`;
+        narration += `${combatOutcome.description}\n\n`;
+        
+        // Analyse biomécanique de l'impact
+        narration += `⚙️ **ANALYSE BIOMÉCANIQUE**\n`;
+        narration += `• Force d'impact estimée : ${50 + Math.floor(Math.random() * 100)} Newtons\n`;
+        narration += `• Angle d'incidence : ${30 + Math.floor(Math.random() * 60)}°\n`;
+        narration += `• Zone de contact : ${2 + Math.floor(Math.random() * 5)} cm²\n`;
+        narration += `• Déformation mesurée : ${1 + Math.floor(Math.random() * 3)} mm\n\n`;
+        
+        // Conséquences détaillées
+        narration += `📉 **CONSÉQUENCES MESURÉES**\n`;
+        narration += `• Perte de vie : ${combatOutcome.healthLoss} PV\n`;
+        narration += `• Dépense d'énergie : ${combatOutcome.energyLoss} points\n`;
+        narration += `• Fatigue musculaire : +${Math.floor(Math.random() * 15)}%\n`;
+        narration += `• Température corporelle : +${0.5 + Math.random()}°C\n`;
+        narration += `• Fréquence cardiaque : ${120 + Math.floor(Math.random() * 40)} bpm\n\n`;
+        
+        // Durée totale
         const timeElapsed = this.calculateCombatTime(action, enemies.length);
-        narration += `⏰ **Durée de l'engagement :** ${timeElapsed} minutes\n`;
+        narration += `⏰ **DURÉE TOTALE DE L'ENGAGEMENT** : ${timeElapsed} minutes\n`;
+        narration += `⏱️ **TEMPS RÉEL ÉCOULÉ** : ${Math.floor(timeElapsed * 60)} secondes\n`;
         
         // Mettre à jour les statistiques
         await this.updateCharacterAfterCombat(character, combatOutcome);

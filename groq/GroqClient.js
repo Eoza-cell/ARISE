@@ -1,35 +1,34 @@
-
 const Groq = require('groq-sdk');
 
 class GroqClient {
     constructor() {
         try {
             const apiKey = process.env.GROQ_API_KEY;
-            
+
             if (!apiKey) {
                 console.log('⚠️ GROQ_API_KEY non configurée - Client Groq désactivé');
                 this.client = null;
                 this.isAvailable = false;
                 return;
             }
-            
+
             this.client = new Groq({
                 apiKey: apiKey,
                 timeout: 15000
             });
-            
+
             this.model = 'llama-3.3-70b-versatile';
             this.sessionMemory = new Map();
             this.maxMemoryPerSession = 100; // Mémoire équilibrée: contexte suffisant sans crash
-            
+
             // Initialiser directement à true car le client est créé avec succès
             this.isAvailable = true;
-            
+
             // Tester la connexion de manière asynchrone (non bloquant)
             this.initializeClient().catch(err => {
                 console.log('⚠️ Test initial Groq échoué (normal au démarrage):', err.message);
             });
-            
+
             console.log('✅ Client Groq initialisé avec succès - Narration IA activée');
         } catch (error) {
             console.error('❌ Erreur initialisation Groq:', error.message);
@@ -37,7 +36,7 @@ class GroqClient {
             this.isAvailable = false;
         }
     }
-    
+
     hasValidClient() {
         return this.isAvailable && this.client !== null && this.client !== undefined;
     }
@@ -96,31 +95,50 @@ class GroqClient {
             this.isAvailable = false;
         }
     }
-    
+
     async generateNarration(prompt, maxTokens = 150) {
         try {
             if (!this.hasValidClient()) {
                 throw new Error('Client Groq non disponible');
             }
 
-            const enhancedPrompt = `Tu es un arbitre RPG impartial qui rapporte uniquement les faits observables avec PRÉCISION MAXIMALE.
+            const enhancedPrompt = `Tu es un NARRATEUR CINÉMATOGRAPHIQUE ULTRA-DÉTAILLÉ qui décrit chaque action avec une PRÉCISION VISUELLE MAXIMALE.
 
-RÈGLES STRICTES DE NARRATION :
-📏 LONGUEUR : Maximum 700 caractères (STRICT)
-🎯 STYLE : Factuel, objectif, neutre comme un journaliste
-⚖️ IMPARTIAL : Aucun jugement, aucune émotion personnelle
-🔍 OBSERVABLE : Seulement ce qui peut être vu, entendu, mesuré
-📐 DISTANCES OBLIGATOIRES : Toujours mentionner les distances en mètres (ex: "à 3 mètres", "distance de 5m")
-⏱️ TEMPS : Préciser la durée des actions (ex: "en 2 secondes", "pendant 5s")
-🎯 ANGLES : Indiquer les directions précises (gauche, droite, 45°, circulaire)
-❌ INTERDIT : Power ups gratuits, modifications instantanées, téléportation
-⚔️ LOGIQUE : Toute action doit avoir une cause et conséquence logique
-🚫 PAS DE : "soudain", "miraculeusement", "par magie", "instantanément"
+RÈGLES DE NARRATION DÉTAILLÉE :
+📏 LONGUEUR : Entre 800-1200 caractères pour narration complète
+🎬 STYLE : Cinématographique, descriptif, immersif comme un roman épique
+🔍 DÉTAILS VISUELS : Décrire textures, couleurs, lumières, ombres, mouvements
+📐 MESURES PRÉCISES : 
+   • Distances exactes (ex: "exactement 4,5 mètres devant lui")
+   • Angles précis (ex: "rotation de 45° vers la droite")
+   • Vitesses (ex: "accélère de 0 à 15 km/h en 1,2 secondes")
+⏱️ CHRONOMÉTRAGE DÉTAILLÉ :
+   • Durées précises pour chaque micro-action
+   • Séquence temporelle claire (ex: "0,3s - lève le bras | 0,8s - frappe | 1,2s - impact")
+🌍 ENVIRONNEMENT COMPLET :
+   • État du sol (texture, inclinaison, friction)
+   • Conditions atmosphériques (vent, température, humidité)
+   • Éclairage et ombres projetées
+   • Sons ambiants et échos
+👁️ PERCEPTION SENSORIELLE :
+   • Ce qui est vu (détails visuels précis)
+   • Ce qui est entendu (sons, tonalités, volumes)
+   • Ce qui est ressenti physiquement (vibrations, chaleur, pression)
+⚙️ BIOMÉCANIQUE :
+   • Position exacte du corps (posture, équilibre, centre de gravité)
+   • Transfert de poids (ex: "65% du poids sur jambe gauche")
+   • Tension musculaire et efforts mesurables
+   • Trajectoires de mouvement détaillées
+🎯 DÉTAILS TECHNIQUES :
+   • Matériaux impliqués et leurs propriétés
+   • Physique réaliste (gravité, inertie, friction)
+   • Conséquences immédiates et différées
+   • Micro-événements séquentiels
 
 CONTEXTE DE L'ACTION :
 ${prompt}
 
-Rapporte les faits observés avec DISTANCES, ANGLES, TEMPS précis. Max 700 caractères.`;
+Narre cette scène comme un réalisateur de film d'action professionnel qui décrit CHAQUE DÉTAIL VISIBLE avec précision technique. Sois TRÈS descriptif et immersif. 800-1200 caractères.`;
 
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: enhancedPrompt }],
@@ -130,11 +148,9 @@ Rapporte les faits observés avec DISTANCES, ANGLES, TEMPS précis. Max 700 cara
             });
 
             let narration = response.choices[0]?.message?.content?.trim() || '';
-            
-            if (narration.length > 700) {
-                const truncated = narration.substring(0, 697);
-                const lastSpace = truncated.lastIndexOf(' ');
-                narration = (lastSpace > 600 ? truncated.substring(0, lastSpace) : truncated) + '...';
+
+            if (narration.length > 1200) {
+                narration = narration.substring(0, 1197) + '...';
             }
 
             return narration;
@@ -173,7 +189,7 @@ Rapporte les faits observés avec DISTANCES, ANGLES, TEMPS précis. Max 700 cara
         - Temps d'exécution de la technique
         - Possibilité de riposte ou parade pour le défenseur
         - Position finale des combattants après l'action
-        
+
         Rapport objectif et factuel avec MÉTRIQUES PRÉCISES. Max 700 caractères.`;
 
         try {
@@ -199,7 +215,7 @@ Rapporte les faits observés avec DISTANCES, ANGLES, TEMPS précis. Max 700 cara
             const npcReactions = this.generateSmartNPCReactions(character, action);
 
             const recentContext = this.getRecentMemory(sessionId).slice(-3).map(m => m.content).join('; ');
-            
+
             const prompt = `Narrateur RPG style GTA médiéval. Narration FLUIDE et DIRECTE.
 
 CONTEXTE: ${character.name} (${character.powerLevel}) à ${location}
