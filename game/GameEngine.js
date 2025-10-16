@@ -573,7 +573,7 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
 
                 // Toutes les actions sont traitées par la narration IA
                 console.log(`🎭 Action RPG: ${message} - NARRATION IA GÉNÉRÉE`);
-                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
+                return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator, sock, chatId });
             }
 
             return response;
@@ -1452,10 +1452,10 @@ En mode libre, je ne traite pas les actions de jeu.`
                           message.toLowerCase().includes('demander');
 
         if (isDialogue) {
-            return await this.processDialogueAction({ player, character, message, dbManager, imageGenerator });
+            return await this.processDialogueAction({ player, character, message, dbManager, imageGenerator, sock, chatId });
         }
 
-        return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator });
+        return await this.processGameActionWithAI({ player, character, message, dbManager, imageGenerator, sock, chatId });
     }
 
     /**
@@ -2067,9 +2067,14 @@ Chaque muscle se tend, chaque sens s'aiguise. ${character.currentEnergy < 50 ? '
 Le destin semble retenir son souffle...`;
     }
 
-    async processGameActionWithAI({ player, character, message, dbManager, imageGenerator }) {
+    async processGameActionWithAI({ player, character, message, dbManager, imageGenerator, sock, chatId }) {
         try {
             console.log(`🎭 Action RPG: ${message} pour ${character.name}`);
+            
+            // S'assurer que sock est disponible pour les réactions
+            if (!this.sock && sock) {
+                this.sock = sock;
+            }
 
             // Analyser la ruse de l'action AVANT tout
             const cunningAnalysis = this.analyzeCunning(message, character);
@@ -2141,6 +2146,23 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
 
             // Analyser l'action pour plus de contexte
             const actionContext = this.analyzeActionForContext(message, character);
+
+            // NOUVEAU: Détecter et démarrer les réactions des PNJ si c'est une attaque
+            if (this.reactionTimeManager && (this.sock || sock) && chatId) {
+                try {
+                    const currentSock = this.sock || sock;
+                    const npcReactions = await this.reactionTimeManager.detectAndStartNPCReactions(
+                        message, 
+                        chatId, 
+                        player.id
+                    );
+                    if (npcReactions && npcReactions.length > 0) {
+                        console.log(`🎯 ${npcReactions.length} réaction(s) PNJ démarrée(s) pour: ${message}`);
+                    }
+                } catch (reactionError) {
+                    console.log('⚠️ Erreur détection réactions PNJ:', reactionError.message);
+                }
+            }
 
             // Générer la narration avec l'IA la plus performante disponible
             let narration = '';

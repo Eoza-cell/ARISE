@@ -20,7 +20,7 @@ class GroqClient {
             
             this.model = 'llama-3.3-70b-versatile';
             this.sessionMemory = new Map();
-            this.maxMemoryPerSession = 12;
+            this.maxMemoryPerSession = 50; // Augmenté pour une mémoire plus vaste
             
             // Initialiser directement à true car le client est créé avec succès
             this.isAvailable = true;
