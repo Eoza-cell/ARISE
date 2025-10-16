@@ -294,6 +294,12 @@ class FrictionUltimateBot {
                 }
             } else if (connection === 'open') {
                 console.log('✅ Connexion WhatsApp établie !');
+    
+    // Démarrer la simulation autonome du monde
+    if (gameEngine.autonomousWorld) {
+        gameEngine.autonomousWorld.startAutonomousSimulation();
+        console.log('🌍 Monde autonome activé - Le jeu évolue en continu');
+    }
                 this.isConnected = true;
 
                 // Initialiser le gestionnaire de boutons

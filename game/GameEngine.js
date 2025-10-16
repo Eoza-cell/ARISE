@@ -142,6 +142,11 @@ class GameEngine {
         this.precisionActionSystem = new PrecisionActionSystem(this);
         console.log('🎯 Système de précision d\'actions initialisé');
 
+        // Initialiser le gestionnaire de monde autonome
+        const AutonomousWorldManager = require('../utils/AutonomousWorldManager');
+        this.autonomousWorld = new AutonomousWorldManager(this, dbManager);
+        console.log('🌍 Gestionnaire de monde autonome initialisé');
+
 
         // Systèmes de difficulté EXTRÊME - Le monde contre le joueur
         this.playerFatigue = new Map(); // Fatigue par joueur (0-100) - AUGMENTE RAPIDEMENT
