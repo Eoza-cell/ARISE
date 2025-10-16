@@ -54,7 +54,7 @@ class AdminManager {
             '/admin_power': 'Ajoute un pouvoir à un joueur [joueur] [pouvoir]',
 
             // Gestion du temps et du monde
-            '/admin_time': 'Modifie l\'heure du jeu [heure] [minute]',
+            '/admin_time': 'Modifie l'heure du jeu [heure] [minute]',
             '/admin_weather': 'Change la météo [royaume] [météo]',
             '/admin_event': 'Lance un événement spécial [type] [royaume]',
 
@@ -123,7 +123,7 @@ class AdminManager {
         if (isValidAdmin) {
             // Créer une session authentifiée pour TOUS les formats possibles de l'ID
             const cleanUserId = userId.replace(/[^0-9]/g, '');
-            
+
             // Authentifier avec tous les formats possibles
             this.authenticatedSessions.set(userId, {
                 timestamp: Date.now(),
@@ -314,7 +314,7 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
         }
 
         const validKingdoms = [
-            'AEGYRIA', 'SOMBRENUIT', 'TERRAVERDE', 'CIELNUAGE', 
+            'AEGYRIA', 'SOMBRENUIT', 'TERRAVERDE', 'CIELNUAGE',
             'FLAMMEBOURG', 'GELOPOLIS', 'VENTARIA', 'AURORALIS',
             'OMBRETERRE', 'CRYSTALIS', 'MAREVERDE', 'SOLARIA'
         ];
@@ -428,8 +428,8 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
 
         // Vérifier si le nom du groupe contient directement le nom du royaume (après normalisation)
         const validKingdoms = [
-            'AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS', 'VARHA', 
-            'SYLVARIA', 'ECLYPSIA', 'TERRE_DESOLE', 'DRAK_TARR', 
+            'AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS', 'VARHA',
+            'SYLVARIA', 'ECLYPSIA', 'TERRE_DESOLE', 'DRAK_TARR',
             'URVALA', 'OMBREFIEL', 'KHALDAR'
         ];
 
@@ -493,7 +493,7 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
      */
     addPowerToPlayer(playerName, power) {
         const powers = [
-            'Téléportation', 'Vol', 'Invisibilité', 'Super Force', 
+            'Téléportation', 'Vol', 'Invisibilité', 'Super Force',
             'Régénération', 'Contrôle Élémentaire', 'Vision Mystique',
             'Maîtrise du Temps', 'Communication Animale', 'Guérison Divine'
         ];
@@ -630,6 +630,18 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
         }
 
         return params;
+    }
+
+    /**
+     * Récupère le chatId d'un royaume
+     */
+    getKingdomChatId(kingdom) {
+        for (const [chatId, assignedKingdom] of this.kingdomGroups.entries()) {
+            if (assignedKingdom === kingdom) {
+                return chatId;
+            }
+        }
+        return null;
     }
 }
 

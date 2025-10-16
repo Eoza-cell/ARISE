@@ -295,11 +295,12 @@ class FrictionUltimateBot {
             } else if (connection === 'open') {
                 console.log('✅ Connexion WhatsApp établie !');
     
-    // Démarrer la simulation autonome du monde
-    if (gameEngine.autonomousWorld) {
-        gameEngine.autonomousWorld.startAutonomousSimulation();
-        console.log('🌍 Monde autonome activé - Le jeu évolue en continu');
-    }
+                // Démarrer la simulation autonome du monde
+                if (this.gameEngine.autonomousWorld) {
+                    this.gameEngine.autonomousWorld.setWhatsAppConnection(this.sock);
+                    this.gameEngine.autonomousWorld.startAutonomousSimulation();
+                    console.log('🌍 Monde autonome activé - Les PNJ envoient leurs actions en temps réel');
+                }
                 this.isConnected = true;
 
                 // Initialiser le gestionnaire de boutons

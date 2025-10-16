@@ -8,6 +8,7 @@ class AutonomousWorldManager {
     constructor(gameEngine, dbManager) {
         this.gameEngine = gameEngine;
         this.dbManager = dbManager;
+        this.sock = null; // Connexion WhatsApp pour envoyer les messages
         
         // Événements mondiaux actifs
         this.activeEvents = new Map();
@@ -24,6 +25,14 @@ class AutonomousWorldManager {
         this.kingdomInterval = null;
         
         console.log('🌍 AutonomousWorldManager initialisé - Le monde vit de manière autonome');
+    }
+    
+    /**
+     * Définit la connexion WhatsApp pour envoyer les actions PNJ
+     */
+    setWhatsAppConnection(sock) {
+        this.sock = sock;
+        console.log('📱 Connexion WhatsApp configurée pour AutonomousWorldManager');
     }
     
     /**
@@ -174,34 +183,53 @@ class AutonomousWorldManager {
     }
     
     /**
-     * Simule les actions autonomes des PNJ
+     * Simule les actions autonomes des PNJ et les envoie dans le chat
      */
     async simulateNPCActions() {
-        const npcActions = [
-            'patrouille dans sa zone',
-            'commerce avec d\'autres PNJ',
-            's\'entraîne au combat',
-            'étudie des sorts anciens',
-            'répare son équipement',
-            'planifie une expédition',
-            'négocie avec un marchand',
-            'médite pour régénérer sa magie'
+        const npcProfiles = [
+            { name: 'Garde Marcus', rank: 'F', actions: ['patrouille dans les rues', 'surveille les alentours', 'interpelle un suspect'] },
+            { name: 'Marchand Lyra', rank: 'G', actions: ['négocie avec un client', 'compte ses pièces', 'organise ses marchandises'] },
+            { name: 'Mage Eldrin', rank: 'D', actions: ['étudie un grimoire ancien', 'pratique une incantation', 'médite pour régénérer sa magie'] },
+            { name: 'Forgeron Thorin', rank: 'E', actions: ['forge une épée', 'répare une armure', 'teste la solidité d\'un bouclier'] },
+            { name: 'Voleur Kael', rank: 'F', actions: ['se faufile dans l\'ombre', 'observe les passants', 'planifie son prochain coup'] },
+            { name: 'Prêtresse Ayla', rank: 'D', actions: ['prie dans le temple', 'guérit un blessé', 'bénit un voyageur'] },
+            { name: 'Chasseur Rex', rank: 'E', actions: ['piste un animal', 'tend un piège', 'nettoie ses armes'] },
+            { name: 'Noble Darius', rank: 'C', actions: ['discute de politique', 'signe des documents', 'inspecte ses terres'] },
+            { name: 'Mercenaire Vex', rank: 'D', actions: ['s\'entraîne au combat', 'affûte sa lame', 'cherche un contrat'] },
+            { name: 'Alchimiste Zara', rank: 'E', actions: ['prépare une potion', 'analyse une plante rare', 'mélange des ingrédients'] }
         ];
         
-        // Simuler 5-10 PNJ actifs
-        const activeNPCCount = Math.floor(Math.random() * 6) + 5;
+        const kingdoms = ['AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS', 'VARHA', 'SYLVARIA', 
+                         'ECLYPSIA', 'TERRE_DESOLE', 'DRAK_TARR', 'URVALA', 'OMBREFIEL', 'KHALDAR'];
+        
+        // Simuler 2-4 PNJ actifs par cycle
+        const activeNPCCount = Math.floor(Math.random() * 3) + 2;
         
         for (let i = 0; i < activeNPCCount; i++) {
-            const action = npcActions[Math.floor(Math.random() * npcActions.length)];
+            const npcProfile = npcProfiles[Math.floor(Math.random() * npcProfiles.length)];
+            const action = npcProfile.actions[Math.floor(Math.random() * npcProfile.actions.length)];
+            const kingdom = kingdoms[Math.floor(Math.random() * kingdoms.length)];
+            const location = this.getRandomLocation();
             const npcId = `npc_auto_${Date.now()}_${i}`;
             
             this.autonomousNPCs.set(npcId, {
+                name: npcProfile.name,
+                rank: npcProfile.rank,
                 action,
+                kingdom,
                 timestamp: Date.now(),
-                location: this.getRandomLocation()
+                location
             });
             
-            console.log(`🤖 PNJ autonome ${npcId} : ${action}`);
+            console.log(`🤖 PNJ autonome ${npcProfile.name} (${npcProfile.rank}) dans ${kingdom} : ${action}`);
+            
+            // Envoyer l'action dans le chat WhatsApp du royaume
+            if (this.sock && this.gameEngine.adminManager) {
+                await this.sendNPCActionToChat(npcProfile, action, kingdom, location);
+            }
+            
+            // Délai entre chaque PNJ pour éviter le spam
+            await new Promise(resolve => setTimeout(resolve, 1000));
         }
         
         // Nettoyer les anciennes actions (plus de 10 minutes)
@@ -211,6 +239,46 @@ class AutonomousWorldManager {
                 this.autonomousNPCs.delete(npcId);
             }
         }
+    }
+    
+    /**
+     * Envoie l'action d'un PNJ dans le chat WhatsApp du royaume
+     */
+    async sendNPCActionToChat(npcProfile, action, kingdom, location) {
+        if (!this.sock || !this.gameEngine.adminManager) return;
+        
+        // Trouver le groupe WhatsApp correspondant au royaume
+        const chatId = this.gameEngine.adminManager.getKingdomChatId(kingdom);
+        if (!chatId) {
+            console.log(`⚠️ Aucun groupe WhatsApp trouvé pour ${kingdom}`);
+            return;
+        }
+        
+        // Générer une narration immersive pour l'action du PNJ
+        const narrativeTexts = [
+            `🎭 **${npcProfile.name}** (Rang ${npcProfile.rank})\n📍 ${location}\n\n${this.capitalize(action)}. L'air vibre d'une énergie particulière tandis que le PNJ vaque à ses occupations, inconscient d'être observé...`,
+            `🌍 Dans ${location}, **${npcProfile.name}** (${npcProfile.rank}) ${action}. Ses mouvements sont naturels, comme ceux d'un véritable habitant de ce monde...`,
+            `⚔️ **${npcProfile.name}** • Rang ${npcProfile.rank}\n🗺️ Localisation : ${location}\n\n${this.capitalize(action)}, totalement absorbé par sa tâche. Le monde continue de vivre, avec ou sans les joueurs...`,
+            `🎯 Un mouvement attire l'attention : **${npcProfile.name}** (${npcProfile.rank}) ${action} à ${location}. La vie grouille dans chaque recoin de ce monde vivant...`
+        ];
+        
+        const narrativeText = narrativeTexts[Math.floor(Math.random() * narrativeTexts.length)];
+        
+        try {
+            await this.sock.sendMessage(chatId, {
+                text: narrativeText
+            });
+            console.log(`📤 Action PNJ envoyée dans le chat ${kingdom}: ${npcProfile.name} - ${action}`);
+        } catch (error) {
+            console.log(`⚠️ Erreur envoi action PNJ: ${error.message}`);
+        }
+    }
+    
+    /**
+     * Capitalise la première lettre d'une chaîne
+     */
+    capitalize(text) {
+        return text.charAt(0).toUpperCase() + text.slice(1);
     }
     
     /**
