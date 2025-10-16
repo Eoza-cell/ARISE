@@ -510,19 +510,25 @@ ${npcReaction.canKill ? '☠️ ATTAQUE MORTELLE POSSIBLE !' : '⚠️ Attaque d
     generateAggressiveNPCReaction(npcData, playerAction) {
         const aggressiveReactions = {
             high_level: [ // PNJ puissants (C+)
-                { action: "contre-attaque mortelle", type: "ATTAQUE CRITIQUE", effectiveness: 95, canKill: true },
-                { action: "frappe dévastatrice", type: "DESTRUCTION", effectiveness: 90, canKill: true },
-                { action: "technique secrète", type: "ART MARTIAL", effectiveness: 85, canKill: false }
+                { action: "contre-attaque mortelle avec précision chirurgicale", type: "ATTAQUE CRITIQUE", effectiveness: 95, canKill: true },
+                { action: "frappe dévastatrice visant les points vitaux", type: "DESTRUCTION", effectiveness: 90, canKill: true },
+                { action: "technique secrète de son ordre", type: "ART MARTIAL", effectiveness: 85, canKill: false },
+                { action: "enchaînement mortel en trois temps", type: "COMBO LÉTAL", effectiveness: 92, canKill: true },
+                { action: "frappe fulgurante impossible à voir", type: "VITESSE EXTRÊME", effectiveness: 88, canKill: false }
             ],
             medium_level: [ // PNJ moyens (F-D)
-                { action: "contre-attaque féroce", type: "Riposte", effectiveness: 75, canKill: false },
-                { action: "esquive et riposte", type: "Combo", effectiveness: 70, canKill: false },
-                { action: "charge brutale", type: "Charge", effectiveness: 65, canKill: false }
+                { action: "contre-attaque féroce bien chronométrée", type: "Riposte", effectiveness: 75, canKill: false },
+                { action: "esquive et riposte en rotation", type: "Combo", effectiveness: 70, canKill: false },
+                { action: "charge brutale épaule en avant", type: "Charge", effectiveness: 65, canKill: false },
+                { action: "série de coups rapides", type: "Enchaînement", effectiveness: 68, canKill: false },
+                { action: "feinte suivie d'un direct", type: "Tactique", effectiveness: 72, canKill: false }
             ],
             low_level: [ // PNJ faibles (G)
-                { action: "défense désespérée", type: "Défense", effectiveness: 45, canKill: false },
-                { action: "recul prudent", type: "Esquive", effectiveness: 40, canKill: false },
-                { action: "cri d'alarme", type: "Alerte", effectiveness: 35, canKill: false }
+                { action: "défense désespérée bras levés", type: "Défense", effectiveness: 45, canKill: false },
+                { action: "recul prudent en trébuchant", type: "Esquive", effectiveness: 40, canKill: false },
+                { action: "cri d'alarme pour alerter les autres", type: "Alerte", effectiveness: 35, canKill: false },
+                { action: "tentative maladroite de bloquer", type: "Protection", effectiveness: 38, canKill: false },
+                { action: "coup de panique sans viser", type: "Désespoir", effectiveness: 30, canKill: false }
             ]
         };
 
@@ -540,22 +546,28 @@ ${npcReaction.canKill ? '☠️ ATTAQUE MORTELLE POSSIBLE !' : '⚠️ Attaque d
         // Générer une pensée agressive contextuelle
         const aggressiveThoughts = {
             high_level: [
-                "Tu oses défier ma puissance !",
-                "Je vais te montrer la vraie force !",
-                "Cette impertinence mérite la mort !",
-                "Prépare-toi à rencontrer ton créateur !"
+                "Tu oses défier ma puissance ?! Imbécile !",
+                "Je vais te montrer la vraie force avant ta mort !",
+                "Cette impertinence mérite la mort la plus douloureuse !",
+                "Prépare-toi à rencontrer ton créateur, ver de terre !",
+                "Ta témérité sera ton dernier souvenir !",
+                "Je vais te briser comme le faible insecte que tu es !"
             ],
             medium_level: [
-                "Je ne me laisserai pas faire !",
-                "Cette attaque mérite une réponse !",
-                "Tu vas regretter ton audace !",
-                "Je dois me défendre !"
+                "Je ne me laisserai pas faire par un novice !",
+                "Cette attaque mérite une réponse cinglante !",
+                "Tu vas regretter ton audace, apprenti !",
+                "Je dois me défendre et te punir !",
+                "Ton erreur sera ta leçon finale !",
+                "Je vais te montrer ce qu'est un vrai combat !"
             ],
             low_level: [
-                "Je... je dois fuir !",
-                "À l'aide ! Je suis attaqué !",
-                "Pitié, épargnez-moi !",
-                "Je ne veux pas mourir !"
+                "Je... je dois fuir avant qu'il ne soit trop tard !",
+                "À l'aide ! Quelqu'un ! Je suis attaqué !",
+                "Pitié, épargnez-moi ! Je ne vaux rien !",
+                "Je ne veux pas mourir ici, pas comme ça !",
+                "Non... non... pourquoi moi ?!",
+                "Je ne suis pas un combattant, laissez-moi partir !"
             ]
         };
 
