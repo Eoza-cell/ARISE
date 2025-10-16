@@ -874,12 +874,26 @@ class FrictionUltimateBot {
         try {
             // Envoi unifié : image avec texte complet, puis audio/vidéo si disponibles
             if (response.image) {
-                await this.sock.sendMessage(chatId, {
+                const messageOptions = {
                     image: response.image,
                     caption: response.text
-                });
+                };
+                
+                // Ajouter les mentions si présentes
+                if (response.mentions && response.mentions.length > 0) {
+                    messageOptions.mentions = response.mentions;
+                }
+                
+                await this.sock.sendMessage(chatId, messageOptions);
             } else {
-                await this.sock.sendMessage(chatId, { text: response.text });
+                const messageOptions = { text: response.text };
+                
+                // Ajouter les mentions si présentes
+                if (response.mentions && response.mentions.length > 0) {
+                    messageOptions.mentions = response.mentions;
+                }
+                
+                await this.sock.sendMessage(chatId, messageOptions);
             }
 
             // Envoyer l'audio en tant que message vocal uniquement si disponible et valide

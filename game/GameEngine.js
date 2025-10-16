@@ -1,3 +1,4 @@
+replit_final_file>
 const OpenAIClient = require('../ai/OpenAIClient');
 const OllamaClient = require('../ai/OllamaClient');
 const GroqClient = require('../groq/GroqClient');
@@ -165,7 +166,7 @@ class GameEngine {
             // Core commands that definitely exist
             '/menu': this.handleMenuCommand.bind(this),
             '/créer': this.handleCreateCharacterCommand.bind(this),
-            
+
             // Nouvelles commandes
             '/boutique': this.handleShopCommand.bind(this),
             '/shop': this.handleShopCommand.bind(this),
@@ -592,7 +593,7 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
     }
 
     async handleShopCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return { text: '❌ Créez d\'abord un personnage avec /créer' };
         }
@@ -615,7 +616,7 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
     }
 
     async handleClothingCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return { text: '❌ Créez d\'abord un personnage avec /créer' };
         }
@@ -626,7 +627,7 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
     }
 
     async handleQuestsCommand({ player, dbManager }) {
-        const character = await dbManager.getCharacterByPlayer(player.id);
+        const character = await this.dbManager.getCharacterByPlayer(player.id);
         if (!character) {
             return { text: '❌ Créez d\'abord un personnage avec /créer' };
         }
@@ -669,7 +670,7 @@ Utilise /créer pour créer ton personnage, puis /jouer pour entrer en mode jeu.
 
         const interval = setInterval(async () => {
             remaining--;
-            
+
             if (remaining > 0) {
                 await sock.sendMessage(chatId, {
                     text: `⏰ **COMPTE À REBOURS** ⏰\n\n⏳ Temps restant: ${remaining} secondes`,
@@ -1754,7 +1755,7 @@ ${initialProgress}
 
             if (remaining <= 0) {
                 clearInterval(updateInterval);
-                
+
                 const finalMessage = `✅ **COMPTE À REBOURS TERMINÉ** ✅
 
 ${this.progressBarRenderer.renderProgressBar(100, {
@@ -1787,12 +1788,12 @@ ${updateProgress}
 
             // Envoyer uniquement des messages importants (toutes les 10 secondes ou moments clés)
             const secondsRemaining = Math.floor(remaining / 1000);
-            const shouldSendUpdate = 
+            const shouldSendUpdate =
                 secondsRemaining % 10 === 0 || // Toutes les 10 secondes
                 secondsRemaining === 30 ||      // 30 secondes
                 secondsRemaining === 15 ||      // 15 secondes
                 secondsRemaining === 5;         // 5 secondes
-            
+
             if (shouldSendUpdate) {
                 try {
                     await sock.sendMessage(chatId, { text: updateMessage });
@@ -2070,7 +2071,7 @@ Le destin semble retenir son souffle...`;
     async processGameActionWithAI({ player, character, message, dbManager, imageGenerator, sock, chatId }) {
         try {
             console.log(`🎭 Action RPG: ${message} pour ${character.name}`);
-            
+
             // S'assurer que sock est disponible pour les réactions
             if (!this.sock && sock) {
                 this.sock = sock;
@@ -2078,7 +2079,7 @@ Le destin semble retenir son souffle...`;
 
             // Analyser la ruse de l'action AVANT tout
             const cunningAnalysis = this.analyzeCunning(message, character);
-            
+
             // Vérifier si le personnage a assez d'énergie pour l'action
             if (character.currentEnergy < 5) {
                 return {
@@ -2098,7 +2099,7 @@ ${character.name} est complètement épuisé !
             // NOUVEAU: Analyser la précision de l'action de combat
             const isCombatAction = this.detectIntentions(message).includes('attack');
             let precisionResult = null;
-            
+
             if (isCombatAction) {
                 // Vérifier si le joueur est immobilisé
                 const playerStats = this.precisionActionSystem.getPlayerStats(character.playerId);
@@ -2110,7 +2111,7 @@ ${character.name} est complètement épuisé !
 
                 // Analyser la précision de l'action de combat
                 precisionResult = await this.precisionActionSystem.analyzeActionPrecision(
-                    message, 
+                    message,
                     character,
                     null // Contexte NPC à implémenter si besoin
                 );
@@ -2152,8 +2153,8 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
                 try {
                     const currentSock = this.sock || sock;
                     const npcReactions = await this.reactionTimeManager.detectAndStartNPCReactions(
-                        message, 
-                        chatId, 
+                        message,
+                        chatId,
                         player.id
                     );
                     if (npcReactions && npcReactions.length > 0) {
@@ -2180,15 +2181,15 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
                         sessionId,
                         character
                     );
-                    
+
                     console.log(`✅ Narration Groq générée (${narration.length} caractères)`);
-                    
+
                     // Ajouter des éléments narratifs supplémentaires selon le type d'action
                     narration = this.enhanceNarrationWithContext(narration, actionContext, character);
-                    
+
                 } catch (groqError) {
                     console.error('❌ Erreur narration Groq:', groqError.message);
-                    
+
                     // Fallback vers Gemini
                     if (this.geminiClient && this.geminiClient.isAvailable) {
                         try {
@@ -2294,13 +2295,13 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
             // Appliquer les bonus/malus de précision si c'est un combat
             if (precisionResult && precisionResult.success) {
                 const precisionBonus = precisionResult.bonusEffects;
-                
+
                 // Réduire le coût en énergie si précision élevée
                 actionResult.energyCost = Math.floor(actionResult.energyCost * precisionBonus.energyCostReduction);
-                
+
                 // Augmenter l'XP si précision élevée
                 actionResult.experience = Math.floor(actionResult.experience * precisionBonus.damageMultiplier);
-                
+
                 // Ajouter les bonus à afficher
                 actionResult.precisionBonus = precisionBonus;
                 actionResult.precisionLevel = precisionResult.precisionLevel;
@@ -2315,7 +2316,7 @@ ${character.name} prend un moment de repos dans ${character.currentLocation}.
             // Générer les barres de progression avec le HealthBarManager
             const updatedHealth = character.currentLife;
             const updatedEnergy = Math.max(0, character.currentEnergy - actionResult.energyCost);
-            
+
             // Créer un objet temporaire pour les barres
             const tempCharacter = {
                 ...character,
@@ -2621,16 +2622,16 @@ ${healthDisplay}
      */
     enhanceNarrationWithContext(narration, actionContext, character) {
         if (!narration) return '';
-        
+
         // Ajouter des détails selon le type d'action
         let enhancement = narration;
-        
+
         if (actionContext.type === 'combat') {
             enhancement += `\n\n⚔️ Combat engagé avec intensité ${actionContext.intensity}.`;
         } else if (actionContext.type === 'exploration') {
             enhancement += `\n\n🔍 Exploration en cours.`;
         }
-        
+
         return enhancement;
     }
 
@@ -2639,10 +2640,10 @@ ${healthDisplay}
      */
     analyzeActionForContext(message, character) {
         const lowerMessage = message.toLowerCase();
-        
+
         let type = 'generic';
         let intensity = 'medium';
-        
+
         if (lowerMessage.includes('attaque') || lowerMessage.includes('combat')) {
             type = 'combat';
             intensity = 'high';
@@ -2653,12 +2654,12 @@ ${healthDisplay}
             type = 'dialogue';
             intensity = 'low';
         }
-        
+
         return { type, intensity };
     }
 
     /**
-     * Sauvegarde l'action du joueur pour la continuité
+     * Sauvegarde l'action du joueur pour la continuité narrative
      */
     async savePlayerAction(playerId, action, result) {
         try {
@@ -2669,12 +2670,12 @@ ${healthDisplay}
                 result,
                 timestamp: Date.now()
             });
-            
+
             // Garder seulement les 10 dernières actions
             if (recentActions.length > 10) {
                 recentActions.shift();
             }
-            
+
             await this.dbManager.setTemporaryData(playerId, 'recent_actions', recentActions);
         } catch (error) {
             console.error('❌ Erreur sauvegarde action:', error);
@@ -4031,7 +4032,7 @@ Utilisez /jouer pour explorer le monde et découvrir naturellement les maîtres 
         const now = new Date();
         const hour = now.getHours();
         const minute = now.getMinutes();
-        
+
         return {
             text: `⏰ **TEMPS DU JEU** ⏰
 
@@ -4096,3 +4097,4 @@ Utilisez /jouer pour explorer le monde et découvrir naturellement les maîtres 
 }
 
 module.exports = GameEngine;
+</replit_final_file>

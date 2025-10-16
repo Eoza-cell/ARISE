@@ -67,7 +67,8 @@ class AdminManager {
             '/admin_debug': 'Active/désactive le mode debug',
             '/admin_backup': 'Crée une sauvegarde de la base de données',
             '/admin_reload': 'Recharge les données du jeu',
-            '/admin_announce': 'Envoie une annonce à tous les joueurs [message]'
+            '/admin_announce': 'Envoie une annonce à tous les joueurs [message]',
+            '/admin_tag': 'Mentionne tous les membres du groupe [message]'
         };
 
         // Heures du jeu (format 24h)
@@ -272,6 +273,9 @@ class AdminManager {
 
             case '/admin_announce':
                 return this.sendAnnouncement(params.message);
+
+            case '/admin_tag':
+                return this.tagAllMembers(params.message, params.groupId, params.sock);
 
             default:
                 return this.getAdminHelp();
@@ -571,6 +575,55 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
     }
 
     /**
+     * Mentionne tous les membres d'un groupe
+     * @param {string} message - Message à envoyer avec les mentions
+     * @param {string} groupId - ID du groupe
+     * @param {Object} sock - Connexion WhatsApp
+     * @returns {Promise<Object>}
+     */
+    async tagAllMembers(message, groupId, sock) {
+        if (!groupId || !sock) {
+            return {
+                text: '❌ Commande invalide. Utilisez dans un groupe: /admin_tag [message]'
+            };
+        }
+
+        if (!groupId.includes('@g.us')) {
+            return {
+                text: '❌ Cette commande ne fonctionne que dans les groupes.'
+            };
+        }
+
+        try {
+            // Récupérer les métadonnées du groupe
+            const groupMetadata = await sock.groupMetadata(groupId);
+            const participants = groupMetadata.participants;
+
+            // Créer le message de mention
+            const mentions = participants.map(p => p.id);
+            const mentionText = participants.map(p => `@${p.id.split('@')[0]}`).join(' ');
+
+            const fullMessage = `📢 **ANNONCE** 📢
+
+${message || 'Attention à tous!'}
+
+${mentionText}`;
+
+            return {
+                text: fullMessage,
+                mentions: mentions,
+                isTagAll: true
+            };
+
+        } catch (error) {
+            console.error('❌ Erreur lors du tag des membres:', error);
+            return {
+                text: '❌ Impossible de récupérer les membres du groupe.'
+            };
+        }
+    }
+
+    /**
      * Obtient l'aide pour les commandes d'administration
      * @returns {string}
      */
@@ -633,6 +686,10 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
                 break;
 
             case '/admin_announce':
+                params.message = args.join(' ');
+                break;
+
+            case '/admin_tag':
                 params.message = args.join(' ');
                 break;
         }
