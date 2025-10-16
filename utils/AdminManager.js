@@ -54,7 +54,7 @@ class AdminManager {
             '/admin_power': 'Ajoute un pouvoir à un joueur [joueur] [pouvoir]',
 
             // Gestion du temps et du monde
-            '/admin_time': 'Modifie l'heure du jeu [heure] [minute]',
+            '/admin_time': 'Modifie l\'heure du jeu [heure] [minute]',
             '/admin_weather': 'Change la météo [royaume] [météo]',
             '/admin_event': 'Lance un événement spécial [type] [royaume]',
 
