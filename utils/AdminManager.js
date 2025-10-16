@@ -54,7 +54,7 @@ class AdminManager {
             '/admin_power': 'Ajoute un pouvoir à un joueur [joueur] [pouvoir]',
 
             // Gestion du temps et du monde
-            '/admin_time': 'Modifie l\'heure du jeu [heure] [minute]',
+            '/admin_time': 'Modifie l'heure du jeu [heure] [minute]',
             '/admin_weather': 'Change la météo [royaume] [météo]',
             '/admin_event': 'Lance un événement spécial [type] [royaume]',
 
@@ -395,52 +395,60 @@ ${timeEmoji} Nouvelle heure: **${hours.toString().padStart(2, '0')}:${minutes.to
      * @returns {string|null}
      */
     detectKingdomFromGroupName(groupName) {
-        if (!groupName) return null;
+        const normalized = groupName.toLowerCase().trim();
 
-        // Normaliser le nom du groupe (supprimer accents et caractères spéciaux)
-        const lowerName = this.normalizeTextForDetection(groupName.toLowerCase());
-
-        // Mots-clés pour chaque royaume (également normalisés)
-        const kingdomKeywords = {
-            'AEGYRIA': ['aegyria', 'honneur', 'honor', 'chevalier', 'knight', 'paladin', 'lumiere', 'light', 'noble', 'oro', 'gold', 'heroic', 'valeur', 'courage'],
-            'SOMBRENUIT': ['sombrenuit', 'ombre', 'shadow', 'dark', 'noir', 'nuit', 'night', 'murmur', 'whisper', 'forest', 'tenebres', 'mysterieux'],
-            'KHELOS': ['khelos', 'desert', 'sable', 'sand', 'mirage', 'oasis', 'chaleur', 'heat', 'dune', 'aride', 'nomade', 'bedouin'],
-            'ABRANTIS': ['abrantis', 'ocean', 'mer', 'sea', 'port', 'marin', 'sailor', 'eau', 'water', 'maritime', 'bateau', 'corsaire', 'pirate'],
-            'VARHA': ['varha', 'glace', 'ice', 'froid', 'cold', 'neige', 'snow', 'montagne', 'mountain', 'loup', 'wolf', 'viking', 'nordic'],
-            'SYLVARIA': ['sylvaria', 'foret', 'forest', 'nature', 'arbre', 'tree', 'elfe', 'elf', 'vert', 'green', 'bois', 'druid', 'fae'],
-            'ECLYPSIA': ['eclypsia', 'eclipse', 'ombre', 'shadow', 'sombre', 'dark', 'mystique', 'mystic', 'magie', 'arcane', 'occult'],
-            'TERRE_DESOLE': ['terre', 'desole', 'wasteland', 'desert', 'ruine', 'ruin', 'apocalypse', 'mort', 'death', 'desolation', 'barren'],
-            'DRAK_TARR': ['drak', 'tarr', 'volcan', 'volcano', 'feu', 'fire', 'lave', 'lava', 'forge', 'demon', 'infernal', 'flamme'],
-            'URVALA': ['urvala', 'marais', 'swamp', 'mort', 'death', 'zombie', 'necro', 'poison', 'maudit', 'curse', 'putrefaction', 'bog'],
-            'OMBREFIEL': ['ombrefiel', 'exil', 'exile', 'gris', 'grey', 'citadelle', 'banni', 'outcast', 'neutral', 'limbo'],
-            'KHALDAR': ['khaldar', 'jungle', 'tropical', 'pilotis', 'amazonien', 'tribal', 'shaman', 'nature', 'primitive', 'sauvage']
+        // Mapping des noms de royaumes avec variations
+        const kingdomMapping = {
+            'aegyria': 'AEGYRIA',
+            'aegyr': 'AEGYRIA',
+            'sombrenuit': 'SOMBRENUIT',
+            'sombre': 'SOMBRENUIT',
+            'nuit': 'SOMBRENUIT',
+            'khelos': 'KHELOS',
+            'khel': 'KHELOS',
+            'abrantis': 'ABRANTIS',
+            'abrant': 'ABRANTIS',
+            'varha': 'VARHA',
+            'var': 'VARHA',
+            'sylvaria': 'SYLVARIA',
+            'sylv': 'SYLVARIA',
+            'foret': 'SYLVARIA',
+            'eclypsia': 'ECLYPSIA',
+            'eclyps': 'ECLYPSIA',
+            'terre desole': 'TERRE_DESOLE',
+            'terre_desole': 'TERRE_DESOLE',
+            'terre': 'TERRE_DESOLE',
+            'desole': 'TERRE_DESOLE',
+            'drak tarr': 'DRAK_TARR',
+            'drak-tarr': 'DRAK_TARR',
+            'drak_tarr': 'DRAK_TARR',
+            'drak': 'DRAK_TARR',
+            'tarr': 'DRAK_TARR',
+            'urvala': 'URVALA',
+            'urval': 'URVALA',
+            'ombrefiel': 'OMBREFIEL',
+            'ombre': 'OMBREFIEL',
+            'khaldar': 'KHALDAR',
+            'khald': 'KHALDAR'
         };
 
-        // Chercher les correspondances
-        for (const [kingdom, keywords] of Object.entries(kingdomKeywords)) {
-            for (const keyword of keywords) {
-                if (lowerName.includes(keyword)) {
-                    console.log(`🏰 Royaume détecté automatiquement: ${kingdom} (mot-clé: "${keyword}" dans "${groupName}")`);
-                    return kingdom;
-                }
-            }
-        }
-
-        // Vérifier si le nom du groupe contient directement le nom du royaume (après normalisation)
-        const validKingdoms = [
-            'AEGYRIA', 'SOMBRENUIT', 'KHELOS', 'ABRANTIS', 'VARHA',
-            'SYLVARIA', 'ECLYPSIA', 'TERRE_DESOLE', 'DRAK_TARR',
-            'URVALA', 'OMBREFIEL', 'KHALDAR'
-        ];
-
-        for (const kingdom of validKingdoms) {
-            if (lowerName.includes(kingdom.toLowerCase())) {
-                console.log(`🏰 Royaume détecté directement: ${kingdom} dans "${groupName}"`);
+        // Recherche par correspondance exacte d'abord
+        for (const [keyword, kingdom] of Object.entries(kingdomMapping)) {
+            if (normalized === keyword) {
+                console.log(`✅ Correspondance exacte: "${groupName}" → ${kingdom}`);
                 return kingdom;
             }
         }
 
-        console.log(`🔍 Aucun royaume détecté pour le groupe: "${groupName}"`);
+        // Puis recherche par inclusion
+        for (const [keyword, kingdom] of Object.entries(kingdomMapping)) {
+            if (normalized.includes(keyword)) {
+                console.log(`✅ Correspondance partielle: "${groupName}" (contient "${keyword}") → ${kingdom}`);
+                return kingdom;
+            }
+        }
+
+        console.log(`❌ Aucun royaume détecté pour: "${groupName}"`);
         return null;
     }
 

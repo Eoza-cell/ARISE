@@ -245,14 +245,25 @@ class AutonomousWorldManager {
      * Envoie l'action d'un PNJ dans le chat WhatsApp du royaume
      */
     async sendNPCActionToChat(npcProfile, action, kingdom, location) {
-        if (!this.sock || !this.gameEngine.adminManager) return;
+        if (!this.sock) {
+            console.log(`❌ Connexion WhatsApp non disponible`);
+            return;
+        }
+        
+        if (!this.gameEngine.adminManager) {
+            console.log(`❌ AdminManager non disponible`);
+            return;
+        }
         
         // Trouver le groupe WhatsApp correspondant au royaume
         const chatId = this.gameEngine.adminManager.getKingdomChatId(kingdom);
         if (!chatId) {
             console.log(`⚠️ Aucun groupe WhatsApp trouvé pour ${kingdom}`);
+            console.log(`💡 Groupes configurés:`, Array.from(this.gameEngine.adminManager.kingdomGroups.entries()));
             return;
         }
+        
+        console.log(`📤 Envoi action PNJ vers ${kingdom} (Chat: ${chatId})`);
         
         // Générer une narration immersive pour l'action du PNJ
         const narrativeTexts = [

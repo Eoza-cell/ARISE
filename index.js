@@ -435,9 +435,11 @@ class FrictionUltimateBot {
                     if (detectedKingdom) {
                         // Auto-assigner le groupe au royaume détecté
                         this.gameEngine.adminManager.kingdomGroups.set(from, detectedKingdom);
-                        console.log(`🏰 Groupe "${groupName}" (normalisé: "${normalizedGroupName}") auto-assigné au royaume: ${detectedKingdom}`);
+                        console.log(`🏰 Groupe "${groupName}" auto-assigné au royaume: ${detectedKingdom}`);
+                        console.log(`📍 Chat ID enregistré: ${from}`);
                     } else {
-                        console.log(`🔍 Aucun royaume détecté pour "${groupName}" (normalisé: "${normalizedGroupName}")`);
+                        console.log(`❓ Aucun royaume détecté pour: "${groupName}"`);
+                        console.log(`💡 Utilisez /admin_kingdom [nom_royaume] pour configurer manuellement`);
                     }
                 } catch (groupError) {
                     console.log('⚠️ Impossible de récupérer les métadonnées du groupe:', groupError.message);
