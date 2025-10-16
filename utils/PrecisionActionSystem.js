@@ -17,22 +17,22 @@ class PrecisionActionSystem {
         // Timer de réinitialisation des échecs consécutifs
         this.failureResetTimers = new Map(); // playerId => timer
         
-        // Seuils de précision pour déterminer l'immobilisation
+        // Seuils de précision pour déterminer l'immobilisation - EXIGENCES ACCRUES
         this.precisionThresholds = {
-            // Très précise - aucun risque d'immobilisation
-            'very_high': { minWords: 25, hasMetrics: true, immobilizationRisk: 0 },
+            // Très précise - aucun risque d'immobilisation (DISTANCES + ANGLES + TEMPS)
+            'very_high': { minWords: 30, hasMetrics: true, hasDistances: true, hasAngles: true, immobilizationRisk: 0 },
             
-            // Précise - risque minimal
-            'high': { minWords: 15, hasDetails: true, immobilizationRisk: 0.1 },
+            // Précise - risque minimal (DISTANCES + DÉTAILS)
+            'high': { minWords: 20, hasDetails: true, hasDistances: true, immobilizationRisk: 0.15 },
             
-            // Moyennement précise - risque modéré
-            'medium': { minWords: 8, hasBasicDetails: true, immobilizationRisk: 0.3 },
+            // Moyennement précise - risque modéré (AU MOINS DIRECTION)
+            'medium': { minWords: 12, hasBasicDetails: true, hasDirection: true, immobilizationRisk: 0.4 },
             
             // Peu précise - risque élevé
-            'low': { minWords: 5, hasBasicDetails: false, immobilizationRisk: 0.7 },
+            'low': { minWords: 8, hasBasicDetails: false, immobilizationRisk: 0.75 },
             
             // Très vague - échec presque garanti
-            'very_low': { minWords: 0, hasBasicDetails: false, immobilizationRisk: 0.9 }
+            'very_low': { minWords: 0, hasBasicDetails: false, immobilizationRisk: 0.95 }
         };
         
         // Durées d'immobilisation selon la gravité de l'erreur
@@ -112,34 +112,43 @@ class PrecisionActionSystem {
         const actionLower = action.toLowerCase();
         const wordCount = action.split(' ').filter(word => word.length > 2).length;
         
-        // Critères de précision
-        const hasMetrics = /\d+\s*(mètre|cm|degré|angle|seconde)/.test(actionLower);
-        const hasDirection = /(gauche|droite|devant|derrière|diagonal|vertical|horizontal)/.test(actionLower);
-        const hasSpecificTarget = /(tête|jambe|bras|torse|cou|épaule|genou|cheville)/.test(actionLower);
-        const hasTechnique = /(uppercut|crochet|direct|jab|cross|feinte|esquive|parade|riposte)/.test(actionLower);
-        const hasEquipment = /(épée|dague|bouclier|lance|arc|bâton|masse|hache)/.test(actionLower);
-        const hasPosition = /(accroupi|debout|en garde|en position|en appui|en équilibre)/.test(actionLower);
+        // Critères de précision RENFORCÉS
+        const hasDistances = /\d+\s*(mètre|m|cm|centimètre)s?/.test(actionLower);
+        const hasAngles = /\d+\s*(degré|°|angle)s?/.test(actionLower);
+        const hasTiming = /\d+\s*(seconde|s|milliseconde|ms)s?/.test(actionLower);
+        const hasDirection = /(gauche|droite|devant|derrière|diagonal|vertical|horizontal|circulaire|latéral)/.test(actionLower);
+        const hasSpecificTarget = /(tête|visage|jambe|bras|torse|cou|épaule|genou|cheville|menton|nez|tempe|plexus)/.test(actionLower);
+        const hasTechnique = /(uppercut|crochet|direct|jab|cross|feinte|esquive|parade|riposte|contre|pivot|rotation)/.test(actionLower);
+        const hasEquipment = /(épée|dague|bouclier|lance|arc|bâton|masse|hache|poing|pied|coude|genou)/.test(actionLower);
+        const hasPosition = /(accroupi|debout|en garde|en position|en appui|en équilibre|jambe avant|jambe arrière)/.test(actionLower);
+        const hasTrajectory = /(ascendant|descendant|horizontal|circulaire|en arc|ligne droite|trajectoire)/.test(actionLower);
         
-        // Calcul du score de précision
+        // Calcul du score de précision STRICT
         let precisionScore = 0;
         
-        if (wordCount >= 25 && hasMetrics) precisionScore += 4;
-        else if (wordCount >= 15) precisionScore += 3;
+        // Bonus pour longueur
+        if (wordCount >= 30 && (hasDistances || hasAngles)) precisionScore += 5;
+        else if (wordCount >= 20) precisionScore += 4;
+        else if (wordCount >= 12) precisionScore += 3;
         else if (wordCount >= 8) precisionScore += 2;
         else if (wordCount >= 5) precisionScore += 1;
         
-        if (hasDirection) precisionScore += 1;
-        if (hasSpecificTarget) precisionScore += 1;
+        // Bonus OBLIGATOIRES pour précision maximale
+        if (hasDistances) precisionScore += 3; // Distance CRITIQUE
+        if (hasAngles) precisionScore += 2;
+        if (hasTiming) precisionScore += 2;
+        if (hasDirection) precisionScore += 2;
+        if (hasSpecificTarget) precisionScore += 2;
         if (hasTechnique) precisionScore += 2;
         if (hasEquipment) precisionScore += 1;
         if (hasPosition) precisionScore += 1;
-        if (hasMetrics) precisionScore += 2;
+        if (hasTrajectory) precisionScore += 2;
         
-        // Conversion en niveau de précision
-        if (precisionScore >= 8) return 'very_high';
-        if (precisionScore >= 6) return 'high';
-        if (precisionScore >= 4) return 'medium';
-        if (precisionScore >= 2) return 'low';
+        // Conversion en niveau de précision STRICT
+        if (precisionScore >= 12 && hasDistances) return 'very_high';
+        if (precisionScore >= 9 && (hasDistances || hasAngles)) return 'high';
+        if (precisionScore >= 6 && hasDirection) return 'medium';
+        if (precisionScore >= 3) return 'low';
         return 'very_low';
     }
     

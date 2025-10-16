@@ -278,30 +278,33 @@ ${timerInfo.targetName} n'a pas réagi à temps !
             timeDisplay = `${timeInSeconds}s`;
         }
 
-        const warningMessage = `⚠️ **TEMPS DE RÉACTION ACTIVÉ !** ⚠️
+        const warningMessage = `⚔️ **COMBAT INITIÉ - COMPTE À REBOURS STRICT** ⚔️
 
 🎯 **${character.name}** (Rang ${character.powerLevel})
-⏰ **Temps limité:** ${timeDisplay}
+⏰ **TEMPS LIMITÉ:** ${timeDisplay} (${timeInSeconds} secondes exactement)
+⏳ **Début:** ${new Date().toLocaleTimeString('fr-FR')}
 
-📢 **Action en cours:** ${reactionData.actionDescription}
+📢 **Action adverse:** ${reactionData.actionDescription}
 
-🛡️ **VOUS DEVEZ RÉAGIR !**
-• Tapez votre action de défense
-• Ou tapez votre contre-attaque
-• Ou tapez votre esquive
+🛡️ **RIPOSTE OBLIGATOIRE - 3 OPTIONS:**
+1️⃣ **DÉFENSE** - Bloquer/Parer l'attaque
+2️⃣ **ESQUIVE** - Éviter avec précision (distance/angle)
+3️⃣ **CONTRE-ATTAQUE** - Riposte offensive détaillée
 
 ⚡ **Rang ${character.powerLevel}** = ${timeDisplay} pour réagir
 
-❌ **Si vous ne répondez pas à temps:**
-• Vous resterez immobile
-• Vous subirez l'attaque complète
-• Aucune défense ne sera appliquée
+❌ **PÉNALITÉS SI TIMEOUT:**
+• 🔒 Immobilisation totale (8-15 secondes)
+• 💔 Dégâts maximum de l'attaque
+• ⚠️ Vulnérabilité aux PNJ environnants
+• 📉 Malus de fatigue cumulatif
 
-💀 **LE TEMPS PRESSE !** 💀`;
+💀 **CHAQUE SECONDE COMPTE !** 💀
+🔔 **Rappels automatiques toutes les 25% du temps**`;
 
         await this.sock.sendMessage(reactionData.chatId, { text: warningMessage });
 
-        // Envoyer des rappels
+        // Envoyer des rappels renforcés
         this.scheduleReminders(reactionData);
     }
 
@@ -311,24 +314,38 @@ ${timerInfo.targetName} n'a pas réagi à temps !
     scheduleReminders(reactionData) {
         const { actionId, reactionTime } = reactionData;
 
+        // Rappel à 25% du temps
+        setTimeout(() => {
+            if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
+                this.sendTimeReminder(actionId, '⏰ 25% du temps écoulé - Riposte possible');
+            }
+        }, reactionTime * 0.25);
+
         // Rappel à 50% du temps
         setTimeout(() => {
             if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
-                this.sendTimeReminder(actionId, '50% du temps écoulé');
+                this.sendTimeReminder(actionId, '⏰ 50% du temps écoulé - Ripostez MAINTENANT');
             }
         }, reactionTime * 0.5);
 
-        // Rappel à 80% du temps  
+        // Rappel à 75% du temps  
         setTimeout(() => {
             if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
-                this.sendTimeReminder(actionId, '80% du temps écoulé - DÉPÊCHEZ-VOUS !');
+                this.sendTimeReminder(actionId, '🚨 75% du temps écoulé - URGENCE !');
             }
-        }, reactionTime * 0.8);
+        }, reactionTime * 0.75);
 
-        // Rappel à 95% du temps
+        // Rappel à 90% du temps
         setTimeout(() => {
             if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
-                this.sendTimeReminder(actionId, '⚠️ DERNIÈRE CHANCE ! 5% du temps restant !');
+                this.sendTimeReminder(actionId, '💀 90% du temps écoulé - DERNIERS INSTANTS !');
+            }
+        }, reactionTime * 0.9);
+
+        // Rappel final à 95% du temps
+        setTimeout(() => {
+            if (this.activeReactions.has(actionId) && this.activeReactions.get(actionId).status === 'waiting') {
+                this.sendTimeReminder(actionId, '☠️ DERNIÈRE CHANCE ! 5% du temps restant !');
             }
         }, reactionTime * 0.95);
     }

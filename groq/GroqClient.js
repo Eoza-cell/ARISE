@@ -103,13 +103,16 @@ class GroqClient {
                 throw new Error('Client Groq non disponible');
             }
 
-            const enhancedPrompt = `Tu es un arbitre RPG impartial qui rapporte uniquement les faits observables.
+            const enhancedPrompt = `Tu es un arbitre RPG impartial qui rapporte uniquement les faits observables avec PRÉCISION MAXIMALE.
 
 RÈGLES STRICTES DE NARRATION :
 📏 LONGUEUR : Maximum 700 caractères (STRICT)
 🎯 STYLE : Factuel, objectif, neutre comme un journaliste
 ⚖️ IMPARTIAL : Aucun jugement, aucune émotion personnelle
 🔍 OBSERVABLE : Seulement ce qui peut être vu, entendu, mesuré
+📐 DISTANCES OBLIGATOIRES : Toujours mentionner les distances en mètres (ex: "à 3 mètres", "distance de 5m")
+⏱️ TEMPS : Préciser la durée des actions (ex: "en 2 secondes", "pendant 5s")
+🎯 ANGLES : Indiquer les directions précises (gauche, droite, 45°, circulaire)
 ❌ INTERDIT : Power ups gratuits, modifications instantanées, téléportation
 ⚔️ LOGIQUE : Toute action doit avoir une cause et conséquence logique
 🚫 PAS DE : "soudain", "miraculeusement", "par magie", "instantanément"
@@ -117,7 +120,7 @@ RÈGLES STRICTES DE NARRATION :
 CONTEXTE DE L'ACTION :
 ${prompt}
 
-Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 caractères.`;
+Rapporte les faits observés avec DISTANCES, ANGLES, TEMPS précis. Max 700 caractères.`;
 
             const response = await this.client.chat.completions.create({
                 messages: [{ role: 'user', content: enhancedPrompt }],
@@ -142,7 +145,7 @@ Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 car
         }
     }
 
-    async generateCombatNarration(combatData, maxTokens = 80) {
+    async generateCombatNarration(combatData, maxTokens = 150) {
         let actionDescription = `Le combat entre ${combatData.attacker} et ${combatData.defender} continue.`;
         if (combatData.action) {
             actionDescription = `Action de ${combatData.attacker} : ${combatData.action}.`;
@@ -158,13 +161,20 @@ Rapporte uniquement les faits observés, sans dramaturgie excessive. Max 700 car
             }
         }
 
-        const prompt = `Arbitre de combat RPG - Rapport factuel :
+        const prompt = `Arbitre de combat RPG - Rapport factuel DÉTAILLÉ :
         Combattants: ${combatData.attacker} (${combatData.attackerLevel}) vs ${combatData.defender} (${combatData.defenderLevel})
         ${actionDescription}
         ${damageInfo}
         Résultat: ${combatData.result || 'Action observée'}
 
-        Rapport objectif et factuel. Max 500 caractères. Aucune dramaturgie.`;
+        DÉTAILS OBLIGATOIRES :
+        - Distance initiale entre combattants (en mètres)
+        - Trajectoire de l'attaque (angle, direction)
+        - Temps d'exécution de la technique
+        - Possibilité de riposte ou parade pour le défenseur
+        - Position finale des combattants après l'action
+        
+        Rapport objectif et factuel avec MÉTRIQUES PRÉCISES. Max 700 caractères.`;
 
         try {
             const narration = await this.generateNarration(prompt, maxTokens);
