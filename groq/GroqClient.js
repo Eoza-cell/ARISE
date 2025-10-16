@@ -18,14 +18,19 @@ class GroqClient {
                 timeout: 15000
             });
             
-            this.isAvailable = false;
             this.model = 'llama-3.3-70b-versatile';
             this.sessionMemory = new Map();
             this.maxMemoryPerSession = 12;
             
-            this.initializeClient();
+            // Initialiser directement à true car le client est créé avec succès
+            this.isAvailable = true;
             
-            console.log('✅ Client Groq initialisé avec succès');
+            // Tester la connexion de manière asynchrone (non bloquant)
+            this.initializeClient().catch(err => {
+                console.log('⚠️ Test initial Groq échoué (normal au démarrage):', err.message);
+            });
+            
+            console.log('✅ Client Groq initialisé avec succès - Narration IA activée');
         } catch (error) {
             console.error('❌ Erreur initialisation Groq:', error.message);
             this.client = null;

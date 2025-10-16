@@ -7,6 +7,7 @@ class ReactionTimeManager {
         this.gameEngine = gameEngine;
         this.sock = sock;
         this.activeTimers = new Map(); // actionId -> timer info
+        this.activeReactions = new Map(); // actionId -> reaction data
         this.reactionTimes = {
             'G': 360000,    // 6 minutes
             'F': 300000,    // 5 minutes
@@ -21,6 +22,7 @@ class ReactionTimeManager {
             'SSS': 5000,    // 5 secondes
             'MONARQUE': 3000 // 3 secondes
         };
+        console.log('⏰ ReactionTimeManager initialisé - Système de temps de réaction activé');
     }
 
     async startReactionTimer(actionId, chatId, targetPlayerId, attackerName, targetName, reactionTimeMs) {
@@ -147,9 +149,9 @@ ${timerInfo.targetName} n'a pas réagi à temps !
     }
 
     /**
-     * Démarre un compte à rebours de réaction
+     * Démarre un compte à rebours de réaction (version principale)
      */
-    async startReactionTimer(actionId, defenderId, chatId, actionDescription) {
+    async startReactionTimerMain(actionId, defenderId, chatId, actionDescription) {
         let character;
         let reactionTime;
         let isNPC = false;
